@@ -144,16 +144,16 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             {/* Live Server Pulse */}
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] text-gray-300 font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>4K CLOUD VAULT ONLINE</span>
+              <span>LOCAL SERVER VAULT ONLINE</span>
             </div>
 
             {/* Switch to Admin Portal Button */}
             <button
               onClick={onOpenAdmin}
-              className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white active:scale-95 transition-all shadow-md"
+              className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white active:scale-95 transition-all shadow-md cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-              <span>Admin Portal</span>
+              <span>Admin Studio</span>
             </button>
           </div>
         </div>
@@ -165,7 +165,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         <section className="text-center space-y-4 max-w-3xl mx-auto pt-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-            <span>High-Res 4K Photography & 2D Vector Cartoon Stickers</span>
+            <span>High-Res Photography & 2D Vector Cartoon Stickers</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-[var(--ps-text-main,#ffffff)] leading-[1.1]">
@@ -173,8 +173,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--ps-text-muted,#9ca3af)] max-w-2xl mx-auto leading-relaxed">
-            Search our curated gallery from premier track days and meets. Download uncompressed 4K
-            RAW photography or stylized cartoon sticker art.
+            Search our curated gallery from premier track days and meets. Download high-resolution
+            photography or stylized cartoon sticker art stored securely on your local server.
           </p>
         </section>
 

@@ -24,8 +24,11 @@ import {
   Paintbrush,
   Download,
   Eye,
+  LogOut,
+  Search,
+  Zap,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig } from '../types';
+import { CarPhoto, AppThemeConfig, VehicleLookupResult } from '../types';
 import { ImageEditorModal } from './ImageEditorModal';
 import { CartoonArtStudio } from './CartoonArtStudio';
 import { DEFAULT_THEMES } from '../data/initialData';
@@ -39,6 +42,8 @@ interface AdminPortalProps {
   currentTheme: AppThemeConfig;
   onSaveTheme: (theme: AppThemeConfig) => Promise<void>;
   onBackToVisitor: () => void;
+  onLogoutAdmin?: () => void;
+  adminName?: string;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -49,6 +54,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   currentTheme,
   onSaveTheme,
   onBackToVisitor,
+  onLogoutAdmin,
+  adminName = 'Admin Photographer',
 }) => {
   const [activeTab, setActiveTab] = useState<'upload' | 'theme' | 'fleet'>('upload');
 
@@ -61,14 +68,75 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [color, setColor] = useState<string>('');
   const [event, setEvent] = useState<string>('Sunset Track Day Laguna');
   const [location, setLocation] = useState<string>('Monterey, CA');
-  const [photographerName, setPhotographerName] = useState<string>('Alex Rivera');
+  const [photographerName, setPhotographerName] = useState<string>(adminName || 'Alex Rivera');
   const [photographerTitle, setPhotographerTitle] = useState<string>('Automotive Photographer');
   const [tagsInput, setTagsInput] = useState<string>('TrackDay, Supercar, HighRes');
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
   const [cartoonImageUrl, setCartoonImageUrl] = useState<string | null>(null);
   const [hasCartoon, setHasCartoon] = useState<boolean>(false);
-  const [resolution, setResolution] = useState<string>('4K • 3840 x 2160 • 300 DPI');
-  const [cameraInfo, setCameraInfo] = useState<string>('Sony A1 • 70-200mm f/2.8 GM • ISO 100');
+  const [resolution, setResolution] = useState<string>('High Resolution • 300 DPI');
+  const [cameraInfo, setCameraInfo] = useState<string>('Sony Alpha • 70-200mm f/2.8 GM • ISO 100');
+
+  // Online Plate Auto-Lookup State
+  const [isLookingUpPlate, setIsLookingUpPlate] = useState<boolean>(false);
+  const [lookupFeedback, setLookupFeedback] = useState<{
+    source: string;
+    details: string;
+  } | null>(null);
+
+  // Auto-fill car details from plate lookup API
+  const handleAutoFillPlate = async (targetPlate?: string) => {
+    const queryPlate = (targetPlate || plateNumber).trim();
+    if (!queryPlate || queryPlate.length < 2) {
+      setStatusMsg({ type: 'error', text: 'Please enter at least 2 characters of a plate or VIN to lookup.' });
+      return;
+    }
+
+    setIsLookingUpPlate(true);
+    setLookupFeedback(null);
+
+    try {
+      const response = await fetch(`/api/lookup-plate?plate=${encodeURIComponent(queryPlate)}`);
+      const data = await response.json();
+
+      if (data.success && data.vehicle) {
+        const v = data.vehicle;
+        if (v.make) setMake(v.make);
+        if (v.model) setModel(v.model);
+        if (v.year) setYear(String(v.year));
+        if (v.color) setColor(v.color);
+        if (v.make && v.model) {
+          setCarName(`${v.make} ${v.model}`);
+        }
+        if (Array.isArray(v.suggestedTags) && v.suggestedTags.length > 0) {
+          setTagsInput(v.suggestedTags.join(', '));
+        }
+
+        setLookupFeedback({
+          source: data.source || 'Online Registry',
+          details: `${v.make} ${v.model} (${v.year || ''}) - ${v.engine || ''}`,
+        });
+
+        setStatusMsg({
+          type: 'success',
+          text: `✨ Auto-filled vehicle specifications for [${queryPlate.toUpperCase()}] via ${data.source}!`,
+        });
+      } else {
+        setStatusMsg({
+          type: 'error',
+          text: 'No online vehicle record found for this plate. You can manually enter make and model.',
+        });
+      }
+    } catch (err: any) {
+      console.error('Plate lookup error:', err);
+      setStatusMsg({
+        type: 'error',
+        text: 'Plate lookup service unavailable. You can enter details manually.',
+      });
+    } finally {
+      setIsLookingUpPlate(false);
+    }
+  };
 
   // Modals
   const [isCropModalOpen, setIsCropModalOpen] = useState<boolean>(false);
@@ -229,7 +297,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           <div className="flex items-center gap-4">
             <button
               onClick={onBackToVisitor}
-              className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Visitor Portal
@@ -237,51 +305,65 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <div className="h-4 w-[1px] bg-[#2C2C2E]" />
             <div className="flex items-center gap-2">
               <span className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
-                ADMIN CONSOLE
+                ADMIN SECURE
               </span>
               <span className="font-bold text-sm tracking-tight hidden sm:inline">
-                Plate Snap / Cars Control Room
+                {adminName || 'Admin Photographer'} Studio
               </span>
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2C2C2E]">
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                activeTab === 'upload'
-                  ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Upload & Studio
-            </button>
+          {/* Tab Navigation & Logout */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2C2C2E]">
+              <button
+                onClick={() => setActiveTab('upload')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                  activeTab === 'upload'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Upload & Studio
+              </button>
 
-            <button
-              onClick={() => setActiveTab('theme')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                activeTab === 'theme'
-                  ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Palette className="w-3.5 h-3.5" />
-              UI Theme Changer
-            </button>
+              <button
+                onClick={() => setActiveTab('theme')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                  activeTab === 'theme'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5" />
+                UI Theme Changer
+              </button>
 
-            <button
-              onClick={() => setActiveTab('fleet')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                activeTab === 'fleet'
-                  ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Manage Fleet ({cars.length})
-            </button>
+              <button
+                onClick={() => setActiveTab('fleet')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                  activeTab === 'fleet'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Manage Fleet ({cars.length})
+              </button>
+            </div>
+
+            {/* Logout button */}
+            {onLogoutAdmin && (
+              <button
+                onClick={onLogoutAdmin}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 transition-colors cursor-pointer"
+                title="Lock and sign out of admin portal"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Lock / Log Out</span>
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -508,25 +590,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
-                {/* License Plate Input - Prominent & Auto-formatted */}
+                {/* License Plate Input - Prominent & Auto-formatted with Online Auto-Fill */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-1.5 flex items-center justify-between">
-                    <span>* License Plate Number (Mandatory)</span>
-                    <span className="text-[10px] text-gray-400">Auto-Indexed</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-blue-400">
+                      * License Plate Number (Mandatory)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleAutoFillPlate()}
+                      disabled={isLookingUpPlate || !plateNumber.trim()}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isLookingUpPlate ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Looking up...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
+                          <span>Auto-Fill Online Data</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                   <div className="relative">
                     <input
                       type="text"
                       required
-                      placeholder="e.g. 7XYZ999, MIATA-91, M4-PERF"
+                      placeholder="e.g. 7XYZ999, GT3-992, MIATA-91, M4-PERF"
                       value={plateNumber}
-                      onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
-                      className="w-full bg-[#1C1C1E] border-2 border-blue-500/60 focus:border-blue-400 rounded-xl py-3 pl-4 pr-12 text-white font-mono font-bold text-lg tracking-wider uppercase outline-none shadow-inner transition-all placeholder:text-gray-600"
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setPlateNumber(val);
+                      }}
+                      onBlur={() => {
+                        if (plateNumber.trim().length >= 3 && !model) {
+                          handleAutoFillPlate(plateNumber);
+                        }
+                      }}
+                      className="w-full bg-[#1C1C1E] border-2 border-blue-500/60 focus:border-blue-400 rounded-xl py-3 pl-4 pr-14 text-white font-mono font-bold text-lg tracking-wider uppercase outline-none shadow-inner transition-all placeholder:text-gray-600"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
                       PLATE
                     </div>
                   </div>
+
+                  {/* Auto-fill indicator badge */}
+                  {lookupFeedback && (
+                    <div className="mt-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300 flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span>
+                        <strong>Auto-Filled ({lookupFeedback.source}):</strong> {lookupFeedback.details}
+                      </span>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Tip: Type plate or VIN and hit <strong className="text-gray-400">Auto-Fill</strong> to automatically retrieve make, model, year, and tags from online registries.
+                  </p>
                 </div>
 
                 {/* Make & Model */}
@@ -551,6 +674,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <option value="Audi">Audi</option>
                       <option value="Toyota">Toyota</option>
                       <option value="Subaru">Subaru</option>
+                      <option value="Ford">Ford</option>
+                      <option value="Dodge">Dodge</option>
+                      <option value="Honda">Honda</option>
+                      <option value="McLaren">McLaren</option>
+                      <option value="Aston Martin">Aston Martin</option>
                       <option value="Custom">Custom / Other</option>
                     </select>
                   </div>
@@ -635,7 +763,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="TrackDay, Supercar, JDM, PopUpHeadlights, 4K"
+                    placeholder="TrackDay, Supercar, JDM, PopUpHeadlights, HighRes"
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 placeholder:text-gray-600"
@@ -662,7 +790,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </label>
                     <input
                       type="text"
-                      placeholder="4K • 3840 x 2160"
+                      placeholder="High Resolution • 300 DPI"
                       value={resolution}
                       onChange={(e) => setResolution(e.target.value)}
                       className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"

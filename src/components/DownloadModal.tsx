@@ -29,7 +29,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 }) => {
   const [selectedDonation, setSelectedDonation] = useState<number | 'custom'>(10);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const [selectedResolution, setSelectedResolution] = useState<'4k' | '1080p' | 'cartoon' | 'raw'>('4k');
+  const [selectedResolution, setSelectedResolution] = useState<'full' | '1080p' | 'cartoon' | 'raw'>('full');
   const [isCartoonView, setIsCartoonView] = useState<boolean>(initialCartoonState);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
@@ -148,7 +148,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               Download High-Res
             </h2>
             <p className="text-[var(--ps-text-muted,#9ca3af)] text-xs md:text-sm mb-6">
-              Your photo is ready for download in 4K resolution (300 DPI).
+              Your photo is ready for download in original high resolution (300 DPI).
             </p>
 
             {/* Resolution Selector */}
@@ -159,17 +159,17 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => {
-                    setSelectedResolution('4k');
+                    setSelectedResolution('full');
                     setIsCartoonView(false);
                   }}
                   className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all text-center ${
-                    selectedResolution === '4k' && !isCartoonView
+                    selectedResolution === 'full' && !isCartoonView
                       ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-primary,#0A84FF)]'
                       : 'border-[#2C2C2E] bg-[#1C1C1E] text-gray-400 hover:text-white'
                   }`}
                 >
-                  <div className="font-bold">4K UHD</div>
-                  <div className="text-[9px] opacity-70">300 DPI (RAW)</div>
+                  <div className="font-bold">Original Res</div>
+                  <div className="text-[9px] opacity-70">300 DPI (Full)</div>
                 </button>
 
                 <button

@@ -29,6 +29,26 @@ export interface CarPhoto {
   createdAt?: string;
 }
 
+export interface VehicleLookupResult {
+  make: string;
+  model: string;
+  year?: number;
+  color?: string;
+  finish?: string;
+  engine?: string;
+  transmission?: string;
+  bodyStyle?: string;
+  suggestedTags?: string[];
+  source?: string;
+}
+
+export interface AdminAuth {
+  isAuthenticated: boolean;
+  token: string | null;
+  adminName?: string;
+  role?: string;
+}
+
 export interface AppThemeConfig {
   id: string;
   name: string;
