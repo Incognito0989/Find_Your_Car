@@ -13,6 +13,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { CarPhoto } from '../types';
+import { formatMediaUrl, getApiBaseUrl } from '../utils/apiConfig';
 
 interface DownloadModalProps {
   car: CarPhoto | null;
@@ -42,14 +43,16 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
   if (!isOpen || !car) return null;
 
-  const currentDisplayImage =
-    isCartoonView && car.cartoonImageUrl ? car.cartoonImageUrl : car.imageUrl;
+  const rawImage = isCartoonView && car.cartoonImageUrl ? car.cartoonImageUrl : car.imageUrl;
+  const currentDisplayImage = formatMediaUrl(rawImage);
 
   const handleDownload = async (withDonation: boolean) => {
     setIsDownloading(true);
     try {
       // Call backend increment download
-      fetch(`/api/cars/${car.id}/download`, { method: 'POST' }).catch(() => {});
+      const base = getApiBaseUrl();
+      const endpoint = base ? `${base}/api/cars/${car.id}/download` : `/api/cars/${car.id}/download`;
+      fetch(endpoint, { method: 'POST' }).catch(() => {});
 
       // Simulate download trigger
       const link = document.createElement('a');
@@ -92,7 +95,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           {/* Close button top left matching reference */}
           <button
             onClick={onClose}
-            className="absolute top-6 left-6 z-20 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-90 transition-all shadow-xl"
+            className="absolute top-6 left-6 z-20 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-90 transition-all shadow-xl cursor-pointer"
             title="Close modal"
           >
             <X className="w-5 h-5" />
@@ -107,218 +110,185 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             {car.hasCartoon && (
               <button
                 onClick={() => setIsCartoonView(!isCartoonView)}
-                className={`backdrop-blur-md border text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 transition-all shadow-xl ${
+                className={`backdrop-blur-md border text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 transition-all shadow-xl cursor-pointer ${
                   isCartoonView
-                    ? 'bg-pink-500 text-white border-pink-400'
-                    : 'bg-black/70 text-pink-400 border-pink-500/40 hover:bg-black'
+                    ? 'bg-pink-500/30 border-pink-500 text-pink-300'
+                    : 'bg-black/70 border-white/10 text-gray-300 hover:text-white'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                {isCartoonView ? 'View Real Photo' : 'View 2D Cartoon'}
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                <span>{isCartoonView ? 'Sticker View' : 'Switch to Cartoon'}</span>
               </button>
             )}
           </div>
 
-          {/* Main Visual Render */}
-          <div className="w-full h-full p-4 flex items-center justify-center relative">
+          {/* Main Visual Presentation */}
+          <div className="w-full h-full p-4 flex items-center justify-center">
             <img
               src={currentDisplayImage}
               alt={car.carName}
-              className={`max-w-full max-h-[70vh] object-contain select-none transition-all duration-300 ${
-                isCartoonView ? 'bg-white rounded-2xl p-6 shadow-2xl max-h-[55vh]' : ''
+              className={`max-w-full max-h-[75vh] object-contain transition-all duration-300 ${
+                isCartoonView ? 'p-8 bg-white/5 rounded-2xl' : 'rounded-xl'
               }`}
             />
           </div>
 
-          {/* Quick share button bottom left */}
-          <button
-            onClick={handleCopyLink}
-            className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md border border-white/10 text-xs text-gray-300 hover:text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            {copiedLink ? 'Link Copied!' : 'Share Photo'}
-          </button>
+          {/* Watermark subtle bottom left */}
+          <div className="absolute bottom-6 left-6 z-20 pointer-events-none opacity-60">
+            <p className="text-[10px] font-mono tracking-widest text-white uppercase">
+              Plate Snap • Verified Vault Record
+            </p>
+          </div>
         </div>
 
-        {/* Right Side: Donation & Download Panel (Matching Reference UI) */}
-        <div className="w-full md:w-[420px] p-6 md:p-10 overflow-y-auto custom-scrollbar bg-[var(--ps-card-bg,#111111)] border-t md:border-t-0 md:border-l border-[var(--ps-card-border,#2C2C2E)] flex flex-col justify-between">
-          <div>
-            {/* Header text */}
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[var(--ps-text-main,#ffffff)] mb-1">
-              Download High-Res
-            </h2>
-            <p className="text-[var(--ps-text-muted,#9ca3af)] text-xs md:text-sm mb-6">
-              Your photo is ready for download in original high resolution (300 DPI).
-            </p>
+        {/* Right Side: Photo Details & Download Workflow */}
+        <div className="w-full md:w-[420px] bg-[var(--ps-card-bg,#111111)] p-6 md:p-8 flex flex-col justify-between overflow-y-auto custom-scrollbar border-t md:border-t-0 md:border-l border-[var(--ps-card-border,#2C2C2E)] space-y-6">
+          <div className="space-y-5">
+            {/* Header & Car Title */}
+            <div>
+              <div className="flex items-center justify-between text-xs text-[var(--ps-text-muted,#9ca3af)] mb-1">
+                <span>{car.year} • {car.make}</span>
+                <span className="font-mono">{car.plateNumber}</span>
+              </div>
+              <h2 className="text-2xl font-black text-[var(--ps-text-main,#ffffff)] tracking-tight">
+                {car.carName}
+              </h2>
+              <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-1">
+                {car.event} • {car.location}
+              </p>
+            </div>
 
-            {/* Resolution Selector */}
-            <div className="mb-6">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">
-                Select Format & Quality
+            {/* Photographer Card */}
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3">
+              <img
+                src={car.photographer.avatar}
+                alt={car.photographer.name}
+                className="w-10 h-10 rounded-full object-cover border border-white/20"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">{car.photographer.name}</p>
+                <p className="text-[10px] text-gray-400 truncate">{car.photographer.title}</p>
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                title="Share photo link"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Download Format / Resolution Options */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-[var(--ps-text-muted,#9ca3af)]">
+                Select File Format
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedResolution('full');
                     setIsCartoonView(false);
                   }}
-                  className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all text-center ${
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                     selectedResolution === 'full' && !isCartoonView
-                      ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-primary,#0A84FF)]'
-                      : 'border-[#2C2C2E] bg-[#1C1C1E] text-gray-400 hover:text-white'
+                      ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-white'
+                      : 'border-[#2C2C2E] bg-[#141416] text-gray-400 hover:text-white'
                   }`}
                 >
-                  <div className="font-bold">Original Res</div>
-                  <div className="text-[9px] opacity-70">300 DPI (Full)</div>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSelectedResolution('1080p');
-                    setIsCartoonView(false);
-                  }}
-                  className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all text-center ${
-                    selectedResolution === '1080p' && !isCartoonView
-                      ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-primary,#0A84FF)]'
-                      : 'border-[#2C2C2E] bg-[#1C1C1E] text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="font-bold">1080p</div>
-                  <div className="text-[9px] opacity-70">Web & Social</div>
+                  <p className="text-xs font-bold">Ultra HD JPG</p>
+                  <p className="text-[10px] text-gray-500">300 DPI Original</p>
                 </button>
 
                 {car.hasCartoon && (
                   <button
+                    type="button"
                     onClick={() => {
                       setSelectedResolution('cartoon');
                       setIsCartoonView(true);
                     }}
-                    className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all text-center ${
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                       isCartoonView
-                        ? 'border-pink-500 bg-pink-500/15 text-pink-400'
-                        : 'border-[#2C2C2E] bg-[#1C1C1E] text-gray-400 hover:text-white'
+                        ? 'border-pink-500 bg-pink-500/15 text-pink-300'
+                        : 'border-[#2C2C2E] bg-[#141416] text-gray-400 hover:text-white'
                     }`}
                   >
-                    <div className="font-bold flex items-center justify-center gap-1">
-                      <Sparkles className="w-3 h-3 text-pink-400" /> Cartoon
+                    <div className="flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-pink-400" />
+                      <p className="text-xs font-bold">Cartoon Sticker</p>
                     </div>
-                    <div className="text-[9px] opacity-70">Vector Sticker</div>
+                    <p className="text-[10px] text-gray-500">Vector SVG / 2D</p>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Support Photographer Donation Section (Exact Reference match) */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                  Support the Photographer
-                </h3>
-                <span className="text-[10px] text-blue-400 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> 100% goes to artist
+            {/* Optional Tip / Donation for Photographer */}
+            <div className="space-y-2.5 pt-2 border-t border-[var(--ps-card-border,#2C2C2E)]">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-gray-300 flex items-center gap-1.5">
+                  <Heart className="w-3.5 h-3.5 text-red-400" />
+                  <span>Support Photographer</span>
                 </span>
+                <span className="text-[11px] text-gray-500">Optional Tip</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                {[5, 10, 20].map((amt) => {
-                  const isSelected = selectedDonation === amt;
-                  return (
-                    <button
-                      key={amt}
-                      onClick={() => {
-                        setSelectedDonation(amt);
-                        setCustomAmount('');
-                      }}
-                      className={`py-3 rounded-xl border font-bold text-sm transition-all ${
-                        isSelected
-                          ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-primary,#0A84FF)] scale-102 shadow-md'
-                          : 'border-[#2C2C2E] hover:border-[var(--ps-primary,#0A84FF)] hover:bg-[var(--ps-primary,#0A84FF)]/10 text-white'
-                      }`}
-                    >
-                      ${amt}
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-4 gap-2">
+                {[5, 10, 20].map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => setSelectedDonation(amt)}
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      selectedDonation === amt
+                        ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                        : 'border-[#2C2C2E] bg-[#141416] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setSelectedDonation(0)}
+                  className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    selectedDonation === 0
+                      ? 'border-gray-500 bg-white/10 text-white'
+                      : 'border-[#2C2C2E] bg-[#141416] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Free
+                </button>
               </div>
-
-              {/* Custom amount field */}
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-semibold">
-                  $
-                </span>
-                <input
-                  type="number"
-                  placeholder="Custom donation amount"
-                  value={customAmount}
-                  onChange={(e) => {
-                    setCustomAmount(e.target.value);
-                    setSelectedDonation('custom');
-                  }}
-                  className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-3 pl-8 pr-4 text-white text-sm focus:ring-1 focus:ring-[var(--ps-primary,#0A84FF)] focus:border-[var(--ps-primary,#0A84FF)] outline-none transition-all placeholder:text-gray-600"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <button
-                onClick={() => handleDownload(true)}
-                disabled={isDownloading}
-                className="w-full bg-[var(--ps-primary,#0A84FF)] text-white py-3.5 px-6 rounded-xl font-bold text-sm hover:brightness-110 shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Heart className="w-4 h-4 text-white fill-white" />
-                {selectedDonation === 'custom' && customAmount
-                  ? `Donate $${customAmount} & Download High-Res`
-                  : typeof selectedDonation === 'number'
-                  ? `Donate $${selectedDonation} & Download High-Res`
-                  : 'Donate & Download High-Res'}
-              </button>
-
-              <button
-                onClick={() => handleDownload(false)}
-                disabled={isDownloading}
-                className="w-full py-2.5 text-gray-500 hover:text-white text-xs font-medium transition-colors text-center cursor-pointer"
-              >
-                Skip donation & download free ($0)
-              </button>
-
-              {downloadSuccess && (
-                <div className="p-2.5 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-semibold flex items-center gap-2 justify-center animate-in fade-in">
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
-                  Download started in full resolution!
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Photographer Profile & Specs Footer (Matching reference) */}
-          <div className="mt-8 pt-6 border-t border-[#2C2C2E]">
-            <div className="flex items-center gap-3.5">
-              <img
-                src={car.photographer.avatar}
-                alt={car.photographer.name}
-                className="w-11 h-11 rounded-full object-cover border border-white/10 ring-2 ring-blue-500/20"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white text-sm truncate">
-                  Captured by {car.photographer.name}
-                </p>
-                <p className="text-xs text-gray-400 truncate">{car.photographer.title}</p>
-                {car.photographer.bio && (
-                  <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
-                    {car.photographer.bio}
-                  </p>
-                )}
-              </div>
-            </div>
+          {/* Action Download Buttons */}
+          <div className="pt-4 space-y-2 border-t border-[var(--ps-card-border,#2C2C2E)]">
+            <button
+              onClick={() => handleDownload(selectedDonation !== 0)}
+              disabled={isDownloading}
+              className="w-full py-3.5 rounded-2xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold text-sm shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {downloadSuccess ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>Download Started!</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4" />
+                  <span>
+                    {selectedDonation === 0
+                      ? 'Download Free'
+                      : `Download & Tip $${selectedDonation}`}
+                  </span>
+                </>
+              )}
+            </button>
 
-            {/* Camera specs */}
-            {car.cameraInfo && (
-              <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2 text-[10px] text-gray-500 font-mono">
-                <Camera className="w-3 h-3 text-gray-600" />
-                <span>{car.cameraInfo}</span>
-              </div>
-            )}
+            <p className="text-center text-[10px] text-gray-500 flex items-center justify-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Full resolution license • Personal and social media usage</span>
+            </p>
           </div>
         </div>
       </div>

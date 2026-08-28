@@ -12,6 +12,7 @@ import {
   X,
   Lock,
   ChevronRight,
+  Server,
 } from 'lucide-react';
 import { CarPhoto, AppThemeConfig } from '../types';
 import { PhotoCard } from './PhotoCard';
@@ -20,6 +21,7 @@ import { DownloadModal } from './DownloadModal';
 interface VisitorPortalProps {
   cars: CarPhoto[];
   onOpenAdmin: () => void;
+  onOpenServerConfig?: () => void;
   currentTheme: AppThemeConfig;
   onToggleThemeMode?: () => void;
 }
@@ -27,6 +29,7 @@ interface VisitorPortalProps {
 export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   cars,
   onOpenAdmin,
+  onOpenServerConfig,
   currentTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -141,11 +144,18 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
           {/* Right Header Navigation Actions */}
           <div className="flex items-center gap-3">
-            {/* Live Server Pulse */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] text-gray-300 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>LOCAL SERVER VAULT ONLINE</span>
-            </div>
+            {/* Live Server Status / Configuration Button */}
+            {onOpenServerConfig && (
+              <button
+                onClick={onOpenServerConfig}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 font-mono transition-colors cursor-pointer"
+                title="Configure Backend Docker Server URL"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="hidden sm:inline">SQL VAULT ONLINE</span>
+                <Server className="w-3 h-3 text-blue-400 ml-1" />
+              </button>
+            )}
 
             {/* Switch to Admin Portal Button */}
             <button
@@ -196,7 +206,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="p-2 text-gray-400 hover:text-white transition-colors mr-1"
+                  className="p-2 text-gray-400 hover:text-white transition-colors mr-1 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -217,7 +227,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               <button
                 key={plate}
                 onClick={() => setSearchQuery(plate)}
-                className={`font-mono px-2.5 py-1 rounded-lg border transition-all ${
+                className={`font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                   searchQuery.toUpperCase() === plate
                     ? 'border-blue-500 bg-blue-500/20 text-blue-400 font-bold'
                     : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
@@ -237,7 +247,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               <button
                 key={make}
                 onClick={() => setSelectedMake(make)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
                   selectedMake === make
                     ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
                     : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white hover:border-gray-600'
@@ -254,22 +264,32 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             <div className="flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E]">
               <button
                 onClick={() => setArtFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   artFilter === 'all' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                All
+                All Works
+              </button>
+              <button
+                onClick={() => setArtFilter('photos')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  artFilter === 'photos'
+                    ? 'bg-white/15 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Photos Only
               </button>
               <button
                 onClick={() => setArtFilter('cartoons')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
                   artFilter === 'cartoons'
-                    ? 'bg-pink-500/30 text-pink-300 font-bold'
+                    ? 'bg-pink-500/20 text-pink-300 font-bold'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
                 <Sparkles className="w-3 h-3 text-pink-400" />
-                2D Cartoon Only
+                <span>Cartoons</span>
               </button>
             </div>
 
@@ -277,19 +297,19 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             <div className="flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E]">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                   viewMode === 'grid' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
                 }`}
-                title="Grid Layout"
+                title="Grid View"
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                   viewMode === 'list' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
                 }`}
-                title="List Layout"
+                title="List View"
               >
                 <List className="w-4 h-4" />
               </button>
@@ -297,86 +317,76 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
         </section>
 
-        {/* Results Metadata Header */}
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <div>
-            Showing <span className="font-bold text-white">{filteredCars.length}</span> verified
-            captures
-            {searchQuery && (
-              <span>
-                {' '}
-                matching "<span className="text-white font-mono">{searchQuery}</span>"
+        {/* Results Gallery Section */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-white">Automotive Showcase</h2>
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-white/10 text-gray-300">
+                {filteredCars.length} {filteredCars.length === 1 ? 'result' : 'results'}
               </span>
-            )}
-          </div>
-          {searchQuery && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedMake('All');
-                setArtFilter('all');
-              }}
-              className="text-blue-400 hover:underline flex items-center gap-1"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-
-        {/* Gallery Cards Grid (Matching exact 3-column Apple/Porsche layout) */}
-        {filteredCars.length > 0 ? (
-          <div
-            className={
-              viewMode === 'grid'
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'
-                : 'space-y-4'
-            }
-          >
-            {filteredCars.map((car) => (
-              <PhotoCard
-                key={car.id}
-                car={car}
-                onOpenDownloadModal={handleOpenDownload}
-                viewMode={viewMode}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[28px] p-12 text-center space-y-4 max-w-lg mx-auto shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
-              <Search className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-white">No Vehicles Found</h3>
-            <p className="text-xs text-gray-400">
-              No matching captures found for plate or query "
-              <span className="font-mono text-white">{searchQuery}</span>". Try one of the quick
-              tags above or upload new photos in the Admin Portal.
-            </p>
-            <div className="pt-2 flex items-center justify-center gap-3">
+
+            {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-colors"
+                className="text-xs text-gray-400 hover:text-white flex items-center gap-1 cursor-pointer"
               >
-                Reset Search
+                <span>Clear search filter</span>
+                <X className="w-3.5 h-3.5" />
               </button>
+            )}
+          </div>
+
+          {filteredCars.length > 0 ? (
+            <div
+              className={
+                viewMode === 'grid'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+                  : 'flex flex-col gap-4'
+              }
+            >
+              {filteredCars.map((car) => (
+                <PhotoCard
+                  key={car.id}
+                  car={car}
+                  onOpenDownloadModal={handleOpenDownload}
+                  viewMode={viewMode}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="p-16 text-center bg-[#141416]/60 border border-[#2C2C2E] rounded-3xl space-y-4 max-w-xl mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-gray-400">
+                <Search className="w-8 h-8 text-[var(--ps-primary,#0A84FF)]" />
+              </div>
+              <h3 className="text-lg font-bold text-white">No cars found for "{searchQuery}"</h3>
+              <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                Try searching by different characters, manufacturer (e.g. Porsche, BMW, Mazda), or clear the search.
+              </p>
               <button
-                onClick={onOpenAdmin}
-                className="px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] text-white text-xs font-semibold hover:brightness-110 transition-colors"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedMake('All');
+                  setArtFilter('all');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
               >
-                Upload to Admin Portal
+                Reset All Filters
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </section>
 
-        {/* Cinematic Bottom Banner */}
-        <section className="rounded-[32px] overflow-hidden relative bg-gradient-to-r from-blue-950/40 via-purple-950/30 to-black border border-white/10 p-8 sm:p-12 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/20 text-pink-400 text-xs font-bold border border-pink-500/30">
-              <Sparkles className="w-3.5 h-3.5" /> 2D Vector Cartoon Stickers
+        {/* Feature Highlight: 2D Cartoon Stickers */}
+        <section className="bg-gradient-to-r from-pink-950/40 via-purple-950/20 to-blue-950/40 border border-pink-500/20 rounded-3xl p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md">
+          <div className="space-y-3 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-bold">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Iconic Mazda Miata Vector Art Mode</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-              Want your car rendered in 2D sticker art?
+              Turn Your Car Into a 2D Cartoon Sticker.
             </h2>
             <p className="text-xs sm:text-sm text-gray-400">
               Transform any track photograph into iconic pop-up headlight Miata cel-shaded vector
@@ -407,7 +417,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
 
           <div className="flex items-center gap-6 text-gray-400">
-            <button onClick={onOpenAdmin} className="hover:text-white transition-colors">
+            <button onClick={onOpenAdmin} className="hover:text-white transition-colors cursor-pointer">
               Admin Portal
             </button>
             <span className="hover:text-white transition-colors cursor-pointer">

@@ -17,10 +17,26 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   theme,
 }) => {
   const [password, setPassword] = useState('');
-  const [email, setEmail] = useState('admin@platesnapcars.local');
+  const [email, setEmail] = useState('');
+  const [serverAdminEmail, setServerAdminEmail] = useState('admin@platesnapcars.local');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch configured admin info from server
+  React.useEffect(() => {
+    if (isOpen) {
+      fetch('/api/admin/info')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.adminEmail) {
+            setServerAdminEmail(data.adminEmail);
+            setEmail(data.adminEmail);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -38,13 +54,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: password.trim(), email: email.trim() }),
+        body: JSON.stringify({ password: password.trim(), email: (email || serverAdminEmail).trim() }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Authentication failed. Please check your password.');
+        throw new Error(data.error || 'Authentication failed. Please check your credentials.');
       }
 
       // Store in localStorage for persistent admin session
@@ -61,6 +77,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   const handleUseDefaultPassword = () => {
     setPassword('platesnap2026');
+    if (!email) setEmail(serverAdminEmail);
     setError(null);
   };
 

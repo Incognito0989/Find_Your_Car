@@ -6,24 +6,25 @@ WORKDIR /app
 # Copy dependency definition files
 COPY package*.json ./
 
-# Install all dependencies including devDependencies for build (works with or without package-lock.json)
+# Install all dependencies for build
 RUN npm install
 
 # Copy application source code
 COPY . .
 
-# Build the frontend and backend bundle
+# Build the backend bundle
 RUN npm run build
 
-# Production runtime stage
+# Production runtime stage (Headless Backend Server)
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV BACKEND_ONLY=true
 
-# Copy built artifacts and production dependencies
+# Copy built bundle and install production dependencies
 COPY package*.json ./
 RUN npm install --omit=dev && npm cache clean --force
 
@@ -32,7 +33,7 @@ COPY --from=builder /app/dist ./dist
 # Create persistent data directories
 RUN mkdir -p /app/data/uploads
 
-# Volume mount point for persistent server storage
+# Volume mount point for persistent SQLite database and photos
 VOLUME ["/app/data"]
 
 EXPOSE 3000

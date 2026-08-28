@@ -1,731 +1,220 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
+import cors from "cors";
 import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
-
-dotenv.config();
+import { createServer as createViteServer } from "vite";
+import {
+  getSqliteDatabase,
+  saveDatabaseToDisk,
+  mapRowToCar,
+  searchCarsInDatabase,
+} from "./src/utils/database";
 
 const app = express();
-const PORT = 3000;
-
-// Directories for local server storage
+const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
-const CARS_DB_FILE = path.join(DATA_DIR, "cars_database.json");
-const THEME_DB_FILE = path.join(DATA_DIR, "theme_config.json");
-const ADMIN_CONFIG_FILE = path.join(DATA_DIR, "admin_config.json");
 
-// Ensure local storage folders exist
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+// Enable CORS so the Vercel-hosted frontend can connect directly to this backend
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      callback(null, true);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-admin-token"],
+  })
+);
+
+// Increase JSON payload limit for high-res automotive photos
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Ensure upload directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Admin configuration management
-interface AdminConfig {
-  passwordHash: string;
-  adminName: string;
-  adminEmail: string;
-  sessions: string[];
-}
+// Serve uploaded photos statically
+app.use("/uploads", express.static(UPLOADS_DIR));
 
-function loadAdminConfig(): AdminConfig {
-  const defaultPass = process.env.ADMIN_PASSWORD || "platesnap2026";
-  try {
-    if (fs.existsSync(ADMIN_CONFIG_FILE)) {
-      return JSON.parse(fs.readFileSync(ADMIN_CONFIG_FILE, "utf-8"));
-    }
-  } catch (err) {
-    console.error("Failed to read admin config from disk:", err);
+// Lazy initialization for Gemini API (server-side only)
+let genAI: GoogleGenAI | null = null;
+function getGemini(): GoogleGenAI | null {
+  if (!process.env.GEMINI_API_KEY) {
+    return null;
   }
-  const defaultConf: AdminConfig = {
-    passwordHash: defaultPass,
-    adminName: "Lead Automotive Photographer",
-    adminEmail: "admin@platesnapcars.local",
-    sessions: [],
-  };
-  saveAdminConfig(defaultConf);
-  return defaultConf;
-}
-
-function saveAdminConfig(config: AdminConfig) {
-  try {
-    fs.writeFileSync(ADMIN_CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to write admin config to disk:", err);
+  if (!genAI) {
+    genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
+  return genAI;
 }
 
-let adminConfig: AdminConfig = loadAdminConfig();
-
-// Helper to verify admin session token
-function isValidAdminSession(token?: string | null): boolean {
-  if (!token) return false;
-  const cleanToken = token.replace(/^Bearer\s+/i, "").trim();
-  return adminConfig.sessions.includes(cleanToken);
-}
-
-// Middleware to guard admin endpoints
-function requireAdmin(req: Request, res: Response, next: Function) {
-  const authHeader = req.headers.authorization || (req.query.token as string);
-  if (isValidAdminSession(authHeader)) {
-    return next();
-  }
-  return res.status(401).json({
-    error: "Unauthorized: Admin access required. Please log in with admin credentials.",
-  });
-}
-
-// Helper to load/save JSON database to local server disk
-function loadLocalDatabase(): any[] {
-  try {
-    if (fs.existsSync(CARS_DB_FILE)) {
-      const content = fs.readFileSync(CARS_DB_FILE, "utf-8");
-      return JSON.parse(content);
-    }
-  } catch (err) {
-    console.error("Failed to read local database from disk:", err);
-  }
-  return [];
-}
-
-function saveLocalDatabase(data: any[]) {
-  try {
-    fs.writeFileSync(CARS_DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to write database to disk:", err);
-  }
-}
-
-function loadLocalTheme(): any {
-  try {
-    if (fs.existsSync(THEME_DB_FILE)) {
-      return JSON.parse(fs.readFileSync(THEME_DB_FILE, "utf-8"));
-    }
-  } catch (err) {
-    console.error("Failed to read local theme config:", err);
-  }
-  return null;
-}
-
-function saveLocalTheme(theme: any) {
-  try {
-    fs.writeFileSync(THEME_DB_FILE, JSON.stringify(theme, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to write theme to disk:", err);
-  }
-}
-
-// In-memory data store with local server disk synchronization
-let carsDatabase: any[] = loadLocalDatabase();
-let appThemeConfig: any = loadLocalTheme();
-
-// Helper to save base64 image data directly as files on your local server disk
+// Save base64 image data directly as files to disk
 function saveBase64ImageToDisk(dataUrl: string, prefix = "car"): string {
   if (!dataUrl || !dataUrl.startsWith("data:image/")) {
-    return dataUrl; // Already a URL or path
+    return dataUrl;
   }
 
   try {
     const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return dataUrl;
-    }
+    if (!matches) return dataUrl;
 
-    let ext = matches[1];
-    if (ext === "svg+xml") ext = "svg";
-    if (ext === "jpeg") ext = "jpg";
-
+    const ext = matches[1] === "svg+xml" ? "svg" : matches[1] === "jpeg" ? "jpg" : matches[1];
     const base64Data = matches[2];
-    const fileName = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, fileName);
+    const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const filePath = path.join(UPLOADS_DIR, filename);
 
     fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
-    // Return the local server static URL route
-    return `/uploads/${fileName}`;
+    console.log(`[Storage] Saved image file to disk: ${filename}`);
+    return `/uploads/${filename}`;
   } catch (err) {
-    console.error("Error writing image to local disk:", err);
+    console.error("Failed to save image to disk:", err);
     return dataUrl;
   }
 }
 
-// Middleware for body parsing (supporting large photo uploads)
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+// Admin configuration helper
+const activeSessions = new Set<string>();
 
-// Serve local server media uploads statically
-app.use("/uploads", express.static(UPLOADS_DIR));
+function getAdminCredentials() {
+  return {
+    email: (process.env.ADMIN_EMAIL || "admin@platesnapcars.local").toLowerCase().trim(),
+    password: (process.env.ADMIN_PASSWORD || "platesnap2026").trim(),
+    name: process.env.ADMIN_NAME || "Lead Automotive Photographer",
+  };
+}
 
-// Helper to initialize Google GenAI lazily
-let genAiClient: GoogleGenAI | null = null;
-function getGemini(): GoogleGenAI | null {
-  if (!genAiClient && process.env.GEMINI_API_KEY) {
-    genAiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
+// Middleware: Verify Admin Token
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  const adminTokenHeader = req.headers["x-admin-token"] as string;
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : adminTokenHeader;
+
+  if (!token || !activeSessions.has(token)) {
+    return res.status(401).json({ error: "Unauthorized. Admin session invalid or expired." });
   }
-  return genAiClient;
+  next();
 }
 
 // ==========================================
-// ADMIN AUTHENTICATION ROUTES
+// API ROUTES
 // ==========================================
 
-// POST Admin Login
+// Health Check / Backend Status Endpoint
+app.get("/api/health", async (req: Request, res: Response) => {
+  const db = await getSqliteDatabase();
+  const stmt = db.prepare("SELECT COUNT(*) as count FROM cars");
+  let count = 0;
+  if (stmt.step()) {
+    count = (stmt.getAsObject() as { count: number }).count;
+  }
+  stmt.free();
+
+  res.json({
+    status: "ok",
+    service: "PlateSnap Dynamic SQL Backend",
+    database: "SQLite (Embedded)",
+    totalCarsIndexed: count,
+    mode: process.env.BACKEND_ONLY === "true" ? "headless-backend" : "fullstack",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Admin public info (for login verification / branding)
+app.get("/api/admin/info", (req: Request, res: Response) => {
+  const creds = getAdminCredentials();
+  res.json({
+    adminEmail: creds.email,
+    adminName: creds.name,
+  });
+});
+
+// Admin Login
 app.post("/api/admin/login", (req: Request, res: Response) => {
   const { password, email } = req.body;
   if (!password) {
     return res.status(400).json({ error: "Password is required." });
   }
 
-  const expectedPassword = adminConfig.passwordHash || process.env.ADMIN_PASSWORD || "platesnap2026";
-  if (password.trim() !== expectedPassword.trim()) {
+  const creds = getAdminCredentials();
+
+  if (email && email.toLowerCase().trim() !== creds.email) {
+    return res.status(401).json({ error: `Invalid admin email. Expected: ${creds.email}` });
+  }
+
+  if (password.trim() !== creds.password) {
     return res.status(401).json({ error: "Invalid admin password. Please check your credentials." });
   }
 
-  const token = `admin_sess_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-  adminConfig.sessions.push(token);
-  // Keep maximum 20 active sessions
-  if (adminConfig.sessions.length > 20) {
-    adminConfig.sessions = adminConfig.sessions.slice(-20);
-  }
-  saveAdminConfig(adminConfig);
+  const token = `adm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  activeSessions.add(token);
 
   res.json({
     success: true,
     token,
     admin: {
-      name: adminConfig.adminName || "Lead Automotive Photographer",
-      email: email || adminConfig.adminEmail || "admin@platesnapcars.local",
+      name: creds.name,
+      email: creds.email,
       role: "SuperAdmin",
     },
   });
 });
 
-// GET Verify Admin Session
-app.get("/api/admin/verify", (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  if (isValidAdminSession(authHeader)) {
-    return res.json({
-      authenticated: true,
-      admin: {
-        name: adminConfig.adminName,
-        email: adminConfig.adminEmail,
-        role: "SuperAdmin",
-      },
-    });
-  }
-  res.status(401).json({ authenticated: false, error: "Session expired or invalid" });
-});
-
-// POST Admin Logout
+// Admin Logout
 app.post("/api/admin/logout", (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const cleanToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-    adminConfig.sessions = adminConfig.sessions.filter((t) => t !== cleanToken);
-    saveAdminConfig(adminConfig);
-  }
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : (req.headers["x-admin-token"] as string);
+  if (token) activeSessions.delete(token);
   res.json({ success: true, message: "Logged out successfully" });
 });
 
-// POST Update Admin Password
-app.post("/api/admin/change-password", requireAdmin, (req: Request, res: Response) => {
-  const { currentPassword, newPassword, adminName } = req.body;
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: "New password must be at least 6 characters long." });
-  }
-
-  if (currentPassword && currentPassword.trim() !== adminConfig.passwordHash.trim()) {
-    return res.status(400).json({ error: "Current password does not match." });
-  }
-
-  adminConfig.passwordHash = newPassword.trim();
-  if (adminName) adminConfig.adminName = adminName.trim();
-  saveAdminConfig(adminConfig);
-
-  res.json({ success: true, message: "Admin credentials updated successfully." });
-});
-
 // ==========================================
-// VEHICLE PLATE / VIN AUTO-FILL LOOKUP API
+// DYNAMIC SQL SEARCH & CARS ENDPOINTS
 // ==========================================
 
-const KNOWN_ENTHUSIAST_PLATES: Record<string, any> = {
-  "7XYZ999": {
-    make: "Porsche",
-    model: "911 GT3 RS (992)",
-    year: 2023,
-    color: "Chalk Gray",
-    finish: "Gloss with Carbon Aerokit",
-    engine: "4.0L Naturally Aspirated Boxer-6 (518 HP)",
-    transmission: "7-Speed Porsche Doppelkupplung (PDK)",
-    bodyStyle: "Coupe",
-    suggestedTags: ["Porsche", "911GT3RS", "TrackDay", "WeissachPackage", "Supercar"],
-  },
-  "M4PERF": {
-    make: "BMW",
-    model: "M4 Competition xDrive (G82)",
-    year: 2024,
-    color: "Isle of Man Green Metallic",
-    finish: "Gloss Metallic",
-    engine: "3.0L BMW M TwinPower Turbo S58 (503 HP)",
-    transmission: "8-Speed M Steptronic",
-    bodyStyle: "Coupe",
-    suggestedTags: ["BMW", "M4Competition", "G82", "BimmerPost", "TwinTurbo"],
-  },
-  "M4-PERF": {
-    make: "BMW",
-    model: "M4 Competition xDrive (G82)",
-    year: 2024,
-    color: "Isle of Man Green Metallic",
-    finish: "Gloss Metallic",
-    engine: "3.0L BMW M TwinPower Turbo S58 (503 HP)",
-    transmission: "8-Speed M Steptronic",
-    bodyStyle: "Coupe",
-    suggestedTags: ["BMW", "M4Competition", "G82", "BimmerPost", "TwinTurbo"],
-  },
-  "VETTE8": {
-    make: "Chevrolet",
-    model: "Corvette Z06 (C8)",
-    year: 2023,
-    color: "Torch Red",
-    finish: "Gloss with Carbon Flash Nacelles",
-    engine: "5.5L Flat-Plane Crank LT6 V8 (670 HP)",
-    transmission: "8-Speed Dual-Clutch Tremec",
-    bodyStyle: "Coupe / Targa",
-    suggestedTags: ["Corvette", "C8Z06", "FlatPlaneV8", "AmericanMuscle", "TrackSpec"],
-  },
-  "VETTE-8": {
-    make: "Chevrolet",
-    model: "Corvette Z06 (C8)",
-    year: 2023,
-    color: "Torch Red",
-    finish: "Gloss with Carbon Flash Nacelles",
-    engine: "5.5L Flat-Plane Crank LT6 V8 (670 HP)",
-    transmission: "8-Speed Dual-Clutch Tremec",
-    bodyStyle: "Coupe / Targa",
-    suggestedTags: ["Corvette", "C8Z06", "FlatPlaneV8", "AmericanMuscle", "TrackSpec"],
-  },
-  "MIATA91": {
-    make: "Mazda",
-    model: "MX-5 Miata (NA)",
-    year: 1991,
-    color: "Classic Red",
-    finish: "Gloss with Pop-Up Headlights",
-    engine: "1.6L DOHC 16-Valve Inline-4 (B6ZE)",
-    transmission: "5-Speed Manual",
-    bodyStyle: "Convertible / Roadster",
-    suggestedTags: ["Mazda", "Miata", "NA6C", "PopUpHeadlights", "JDM", "Roadster"],
-  },
-  "MIATA-91": {
-    make: "Mazda",
-    model: "MX-5 Miata (NA)",
-    year: 1991,
-    color: "Classic Red",
-    finish: "Gloss with Pop-Up Headlights",
-    engine: "1.6L DOHC 16-Valve Inline-4 (B6ZE)",
-    transmission: "5-Speed Manual",
-    bodyStyle: "Convertible / Roadster",
-    suggestedTags: ["Mazda", "Miata", "NA6C", "PopUpHeadlights", "JDM", "Roadster"],
-  },
-  "ABC1234": {
-    make: "Nissan",
-    model: "Skyline GT-R V-Spec (BNR34)",
-    year: 1999,
-    color: "Bayside Blue (TV2)",
-    finish: "Metallic Gloss",
-    engine: "2.6L Twin-Turbo Inline-6 (RB26DETT)",
-    transmission: "6-Speed Getrag Manual",
-    bodyStyle: "Coupe",
-    suggestedTags: ["Nissan", "Skyline", "R34GTR", "Godzilla", "RB26", "JDMIcon"],
-  },
-  "E55AMG": {
-    make: "Mercedes-AMG",
-    model: "E55 AMG Kompressor (W211)",
-    year: 2005,
-    color: "Obsidian Black",
-    finish: "Gloss Metallic",
-    engine: "5.4L Supercharged M113K V8 (469 HP)",
-    transmission: "5-Speed AMG Speedshift",
-    bodyStyle: "Sedan",
-    suggestedTags: ["Mercedes", "AMG", "E55", "SuperchargedV8", "AutobahnCruiser"],
-  },
-  "E55-AM-G": {
-    make: "Mercedes-AMG",
-    model: "E55 AMG Kompressor (W211)",
-    year: 2005,
-    color: "Obsidian Black",
-    finish: "Gloss Metallic",
-    engine: "5.4L Supercharged M113K V8 (469 HP)",
-    transmission: "5-Speed AMG Speedshift",
-    bodyStyle: "Sedan",
-    suggestedTags: ["Mercedes", "AMG", "E55", "SuperchargedV8", "AutobahnCruiser"],
-  },
-  "GT3RS": {
-    make: "Porsche",
-    model: "911 GT3 RS",
-    year: 2024,
-    color: "Guards Red",
-    finish: "Gloss with Exposed Carbon Hood",
-    engine: "4.0L Boxer-6",
-    transmission: "7-Speed PDK",
-    bodyStyle: "Coupe",
-    suggestedTags: ["Porsche", "GT3RS", "Nurburgring", "AeroTrack"],
-  },
-  "SUPRA94": {
-    make: "Toyota",
-    model: "Supra Turbo (A80 / Mk4)",
-    year: 1994,
-    color: "Renaissance Red",
-    finish: "Gloss",
-    engine: "3.0L Twin-Turbo 2JZ-GTE",
-    transmission: "6-Speed V160 Manual",
-    bodyStyle: "Coupe / Targa",
-    suggestedTags: ["Toyota", "Supra", "Mk4", "2JZGTE", "JDM"],
-  },
-  "R34GTR": {
-    make: "Nissan",
-    model: "Skyline GT-R (BNR34)",
-    year: 2001,
-    color: "Bayside Blue",
-    finish: "Gloss Metallic",
-    engine: "2.6L Twin-Turbo RB26DETT",
-    transmission: "6-Speed Manual",
-    bodyStyle: "Coupe",
-    suggestedTags: ["Nissan", "Skyline", "R34", "GTR", "JDM"],
-  },
-  "S2KAP2": {
-    make: "Honda",
-    model: "S2000 (AP2)",
-    year: 2007,
-    color: "Grand Prix White",
-    finish: "Gloss",
-    engine: "2.2L VTEC F22C1 Inline-4",
-    transmission: "6-Speed Manual",
-    bodyStyle: "Roadster",
-    suggestedTags: ["Honda", "S2000", "VTEC", "AP2", "Roadster"],
-  },
-  "HELLCAT": {
-    make: "Dodge",
-    model: "Challenger SRT Hellcat Redeye",
-    year: 2023,
-    color: "Plum Crazy Purple",
-    finish: "Gloss Pearl",
-    engine: "6.2L Supercharged HEMI V8 (797 HP)",
-    transmission: "8-Speed TorqueFlite",
-    bodyStyle: "Coupe",
-    suggestedTags: ["Dodge", "Hellcat", "SRT", "SuperchargedHEMI", "Mopar"],
-  },
-};
-
-// GET Plate Auto-fill Data endpoint
-app.get("/api/lookup-plate", async (req: Request, res: Response) => {
+// GET all cars / Search with dynamic SQL queries & indexes
+app.get("/api/cars", async (req: Request, res: Response) => {
   try {
-    const rawPlate = (req.query.plate as string || "").toUpperCase().trim();
-    const state = (req.query.state as string || "").toUpperCase().trim();
+    const q = (req.query.q as string) || "";
+    const event = (req.query.event as string) || "";
+    const tag = (req.query.tag as string) || "";
 
-    if (!rawPlate) {
-      return res.status(400).json({ error: "Plate number or VIN is required." });
-    }
-
-    const cleanPlate = rawPlate.replace(/[^A-Z0-9]/g, "");
-
-    // 1. Direct match in enthusiast plate directory
-    if (KNOWN_ENTHUSIAST_PLATES[cleanPlate] || KNOWN_ENTHUSIAST_PLATES[rawPlate]) {
-      const match = KNOWN_ENTHUSIAST_PLATES[cleanPlate] || KNOWN_ENTHUSIAST_PLATES[rawPlate];
-      return res.json({
-        success: true,
-        found: true,
-        plate: rawPlate,
-        state: state || "Universal",
-        source: "Automotive Plate Registry",
-        vehicle: match,
-      });
-    }
-
-    // 2. If 17 characters, attempt official NHTSA vPIC VIN decoder lookup
-    if (cleanPlate.length === 17) {
-      try {
-        const fetchResponse = await fetch(
-          `https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/${cleanPlate}?format=json`,
-          { signal: AbortSignal.timeout(4000) }
-        );
-        if (fetchResponse.ok) {
-          const vinData: any = await fetchResponse.json();
-          if (vinData?.Results && vinData.Results.length > 0) {
-            const r = vinData.Results[0];
-            if (r.Make && r.Model) {
-              const vinVehicle = {
-                make: r.Make || "Vehicle",
-                model: r.Model || "Model",
-                year: r.ModelYear ? parseInt(r.ModelYear, 10) : new Date().getFullYear(),
-                color: "Factory Paint",
-                finish: "Gloss Metallic",
-                engine: r.DisplacementL ? `${r.DisplacementL}L ${r.EngineConfiguration || "Engine"}` : "Factory Spec",
-                transmission: r.TransmissionStyle || "Manual / Automatic",
-                bodyStyle: r.BodyClass || "Sedan / Coupe",
-                suggestedTags: [r.Make, r.Model, r.ModelYear, "VINVerified"].filter(Boolean),
-              };
-              return res.json({
-                success: true,
-                found: true,
-                plate: rawPlate,
-                source: "NHTSA National Vehicle Database",
-                vehicle: vinVehicle,
-              });
-            }
-          }
-        }
-      } catch (vinErr) {
-        console.log("NHTSA lookup non-critical timeout/error:", vinErr);
-      }
-    }
-
-    // 3. Smart AI Vehicle Extraction with Gemini (if configured)
-    const ai = getGemini();
-    if (ai) {
-      try {
-        const prompt = `You are a vehicle registration and car enthusiast expert. A car enthusiast is uploading a photo with license plate string "${rawPlate}"${state ? ` (State/Region: ${state})` : ""}.
-Analyze the vanity plate letters and numbers (e.g. M4, GT3, VETTE, 911, AMG, STI, EVO, MIATA, R34, SUPRA, S2K, 86, BRZ, C8, E46, S58, etc.) or standard plate pattern.
-Return a realistic vehicle profile in strict JSON format:
-{
-  "make": "Exact Car Make (e.g. Porsche, BMW, Mazda, etc.)",
-  "model": "Exact Model & Trim (e.g. 911 GT3 RS, M4 Competition, MX-5 Miata)",
-  "year": 2023,
-  "color": "Signature enthusiast or factory color (e.g. Isle of Man Green, Nardo Gray, Torch Red, Bayside Blue)",
-  "finish": "Gloss / Matte / Satin",
-  "engine": "Engine specification (e.g. 4.0L Flat-6, 3.0L Twin-Turbo I6)",
-  "transmission": "6-Speed Manual / 7-Speed Dual-Clutch",
-  "bodyStyle": "Coupe / Convertible / Sedan / Hatchback",
-  "suggestedTags": ["Tag1", "Tag2", "Tag3", "Tag4"]
-}
-Return ONLY valid JSON with no backticks or markdown fences.`;
-
-        const aiResponse = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: prompt,
-          config: {
-            temperature: 0.2,
-            responseMimeType: "application/json",
-          },
-        });
-
-        const text = aiResponse.text || "{}";
-        const parsed = JSON.parse(text);
-        if (parsed.make && parsed.model) {
-          return res.json({
-            success: true,
-            found: true,
-            plate: rawPlate,
-            source: "AI Online Plate Registry Decoder",
-            vehicle: parsed,
-          });
-        }
-      } catch (aiErr) {
-        console.log("AI plate decode fallback to heuristic patterns:", aiErr);
-      }
-    }
-
-    // 4. Heuristic Pattern Extractor
-    const upper = cleanPlate.toUpperCase();
-    let heuristicVehicle: any = null;
-
-    if (upper.includes("GT3") || upper.includes("911") || upper.includes("PORSCHE") || upper.includes("992") || upper.includes("991")) {
-      heuristicVehicle = {
-        make: "Porsche",
-        model: upper.includes("RS") ? "911 GT3 RS" : "911 Carrera GTS",
-        year: 2023,
-        color: "Chalk / Arctic Gray",
-        finish: "Gloss with Aero Trim",
-        engine: "4.0L Naturally Aspirated Flat-6",
-        transmission: "7-Speed PDK",
-        bodyStyle: "Coupe",
-        suggestedTags: ["Porsche", "911", "TrackDay", "Euro"],
-      };
-    } else if (upper.includes("M3") || upper.includes("M4") || upper.includes("M5") || upper.includes("BMW") || upper.includes("BIMMER") || upper.includes("G80") || upper.includes("G82")) {
-      heuristicVehicle = {
-        make: "BMW",
-        model: upper.includes("M4") ? "M4 Competition" : upper.includes("M5") ? "M5 CS" : "M3 Competition",
-        year: 2024,
-        color: "Isle of Man Green",
-        finish: "Gloss Metallic",
-        engine: "3.0L S58 Twin-Turbo Inline-6",
-        transmission: "8-Speed M Steptronic",
-        bodyStyle: "Coupe / Sedan",
-        suggestedTags: ["BMW", "MPower", "BimmerPost", "TwinTurbo"],
-      };
-    } else if (upper.includes("MIATA") || upper.includes("NA6") || upper.includes("NA8") || upper.includes("ND2") || upper.includes("MX5")) {
-      heuristicVehicle = {
-        make: "Mazda",
-        model: "MX-5 Miata",
-        year: upper.includes("91") ? 1991 : 2022,
-        color: "Soul Red Crystal",
-        finish: "Gloss with Pop-Up or LED Headlights",
-        engine: "2.0L Skyactiv-G 4-Cylinder",
-        transmission: "6-Speed Manual",
-        bodyStyle: "Roadster",
-        suggestedTags: ["Mazda", "Miata", "Roadster", "JDM"],
-      };
-    } else if (upper.includes("VETTE") || upper.includes("Z06") || upper.includes("C8") || upper.includes("C7") || upper.includes("LT6")) {
-      heuristicVehicle = {
-        make: "Chevrolet",
-        model: "Corvette Z06 (C8)",
-        year: 2023,
-        color: "Torch Red",
-        finish: "Gloss with Carbon Flash Accents",
-        engine: "5.5L Flat-Plane LT6 V8",
-        transmission: "8-Speed Dual-Clutch",
-        bodyStyle: "Coupe / Targa",
-        suggestedTags: ["Corvette", "C8Z06", "AmericanMuscle", "TrackDay"],
-      };
-    } else if (upper.includes("AMG") || upper.includes("BENZ") || upper.includes("MERC") || upper.includes("E55") || upper.includes("C63")) {
-      heuristicVehicle = {
-        make: "Mercedes-AMG",
-        model: upper.includes("C63") ? "C63 AMG V8" : upper.includes("E55") ? "E55 AMG Kompressor" : "AMG GT Coupe",
-        year: 2023,
-        color: "Selenite Gray Magno",
-        finish: "Satin Matte",
-        engine: "4.0L Biturbo V8",
-        transmission: "9-Speed AMG Speedshift",
-        bodyStyle: "Coupe / Sedan",
-        suggestedTags: ["Mercedes", "AMG", "Affalterbach", "BiturboV8"],
-      };
-    } else if (upper.includes("GTR") || upper.includes("R34") || upper.includes("R35") || upper.includes("NISMO") || upper.includes("SKYLINE")) {
-      heuristicVehicle = {
-        make: "Nissan",
-        model: upper.includes("R35") ? "GT-R Nismo" : "Skyline GT-R (R34)",
-        year: upper.includes("R34") ? 1999 : 2023,
-        color: "Bayside Blue",
-        finish: "Gloss Metallic",
-        engine: upper.includes("R34") ? "2.6L Twin-Turbo RB26DETT" : "3.8L Twin-Turbo VR38DETT",
-        transmission: "Manual / Dual-Clutch",
-        bodyStyle: "Coupe",
-        suggestedTags: ["Nissan", "GTR", "Godzilla", "JDMIcon"],
-      };
-    } else if (upper.includes("SUPRA") || upper.includes("2JZ") || upper.includes("MK4") || upper.includes("MK5") || upper.includes("A90")) {
-      heuristicVehicle = {
-        make: "Toyota",
-        model: upper.includes("MK4") || upper.includes("94") ? "Supra Turbo (Mk4)" : "GR Supra 3.0",
-        year: upper.includes("MK4") ? 1994 : 2024,
-        color: "Renaissance Red",
-        finish: "Gloss",
-        engine: upper.includes("MK4") ? "3.0L Twin-Turbo 2JZ-GTE" : "3.0L Turbo Inline-6 (B58)",
-        transmission: "6-Speed Manual",
-        bodyStyle: "Coupe",
-        suggestedTags: ["Toyota", "Supra", "JDM", "Turbo"],
-      };
-    } else if (upper.includes("STI") || upper.includes("WRX") || upper.includes("SUBIE") || upper.includes("BOXER")) {
-      heuristicVehicle = {
-        make: "Subaru",
-        model: "WRX STI",
-        year: 2020,
-        color: "World Rally Blue Pearl",
-        finish: "Gloss with Gold BBS Wheels",
-        engine: "2.5L Turbocharged Boxer-4 (EJ257)",
-        transmission: "6-Speed Close-Ratio Manual",
-        bodyStyle: "Sedan",
-        suggestedTags: ["Subaru", "WRXSTI", "AWD", "Turbo", "RallySpec"],
-      };
-    } else if (upper.includes("CIVIC") || upper.includes("TYPER") || upper.includes("CTR") || upper.includes("VTEC") || upper.includes("FL5") || upper.includes("FK8")) {
-      heuristicVehicle = {
-        make: "Honda",
-        model: "Civic Type R (FL5)",
-        year: 2024,
-        color: "Championship White",
-        finish: "Gloss with Red Badging",
-        engine: "2.0L VTEC Turbo K20C1 (315 HP)",
-        transmission: "6-Speed Manual with Rev-Match",
-        bodyStyle: "Hatchback",
-        suggestedTags: ["Honda", "CivicTypeR", "FL5", "VTEC", "HotHatch"],
-      };
-    } else {
-      // General dynamic fallback based on plate letters
-      heuristicVehicle = {
-        make: "Custom Automotive",
-        model: `Spec ${rawPlate}`,
-        year: new Date().getFullYear(),
-        color: "Signature Metallic",
-        finish: "Gloss Coat",
-        engine: "High Performance Engine",
-        transmission: "Sport Transmission",
-        bodyStyle: "Sports Car",
-        suggestedTags: ["CarMeet", "Automotive", "CustomBuild", "PlateVerified"],
-      };
-    }
-
-    return res.json({
-      success: true,
-      found: true,
-      plate: rawPlate,
-      source: "Automotive Plate Pattern Heuristics",
-      vehicle: heuristicVehicle,
-    });
+    const db = await getSqliteDatabase();
+    const results = searchCarsInDatabase(db, q, event, tag);
+    res.json({ cars: results, total: results.length });
   } catch (err: any) {
-    console.error("Error looking up plate:", err);
-    res.status(500).json({ error: err.message || "Failed to lookup plate online" });
+    console.error("SQL Search error:", err);
+    res.status(500).json({ error: "Search query failed on database engine." });
   }
 });
 
-// Health Check
-app.get("/api/health", (req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    itemsCount: carsDatabase.length,
-    geminiEnabled: Boolean(process.env.GEMINI_API_KEY),
-  });
-});
+// GET single car by ID
+app.get("/api/cars/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const db = await getSqliteDatabase();
+  const stmt = db.prepare("SELECT * FROM cars WHERE id = ?");
+  stmt.bind([id]);
 
-// GET all cars (supports search query, plate, make, tag)
-app.get("/api/cars", (req: Request, res: Response) => {
-  const { query, plate, make, tag } = req.query;
-
-  let results = [...carsDatabase];
-
-  if (plate && typeof plate === "string") {
-    const cleanPlate = plate.replace(/[\s\-_]/g, "").toUpperCase();
-    results = results.filter((c) =>
-      c.plateNumber.replace(/[\s\-_]/g, "").toUpperCase().includes(cleanPlate)
-    );
+  if (!stmt.step()) {
+    stmt.free();
+    return res.status(404).json({ error: "Vehicle photo record not found" });
   }
 
-  if (query && typeof query === "string") {
-    const q = query.toLowerCase().trim();
-    results = results.filter(
-      (c) =>
-        c.plateNumber.toLowerCase().includes(q) ||
-        c.carName.toLowerCase().includes(q) ||
-        c.make.toLowerCase().includes(q) ||
-        c.model.toLowerCase().includes(q) ||
-        c.event.toLowerCase().includes(q) ||
-        (c.photographer && c.photographer.name.toLowerCase().includes(q)) ||
-        (c.tags && c.tags.some((t: string) => t.toLowerCase().includes(q)))
-    );
-  }
+  const row = stmt.getAsObject();
+  stmt.free();
 
-  if (make && typeof make === "string" && make !== "All") {
-    results = results.filter((c) => c.make.toLowerCase() === make.toLowerCase());
-  }
+  // Increment view count in SQL
+  db.run("UPDATE cars SET views = views + 1 WHERE id = ?", [id]);
+  saveDatabaseToDisk(db);
 
-  if (tag && typeof tag === "string") {
-    results = results.filter((c) => c.tags && c.tags.includes(tag));
-  }
-
-  res.json({ cars: results, total: results.length });
+  res.json({ car: mapRowToCar(row) });
 });
 
 // POST new car upload (Admin only)
-app.post("/api/cars", requireAdmin, (req: Request, res: Response) => {
+app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
   try {
     const {
       plateNumber,
@@ -746,213 +235,259 @@ app.post("/api/cars", requireAdmin, (req: Request, res: Response) => {
     } = req.body;
 
     if (!plateNumber || !imageUrl) {
-      return res.status(400).json({ error: "Plate number and image URL are required." });
+      return res.status(400).json({ error: "Plate number and image are required." });
     }
 
-    // Save image files locally to server disk
-    const savedImageUrl = saveBase64ImageToDisk(imageUrl, `plate_${plateNumber.replace(/[^a-zA-Z0-9]/g, "")}`);
+    const cleanPlate = plateNumber.toUpperCase().trim();
+    const savedImageUrl = saveBase64ImageToDisk(imageUrl, `plate_${cleanPlate.replace(/[^a-zA-Z0-9]/g, "")}`);
     const savedCartoonUrl = cartoonImageUrl
-      ? saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${plateNumber.replace(/[^a-zA-Z0-9]/g, "")}`)
+      ? saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${cleanPlate.replace(/[^a-zA-Z0-9]/g, "")}`)
       : null;
 
-    const newCar = {
-      id: `car-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      plateNumber: plateNumber.toUpperCase().trim(),
-      carName: carName || `${make || "Custom"} ${model || "Vehicle"}`,
-      make: make || "Custom",
-      model: model || "Vehicle",
-      year: year ? parseInt(year, 10) : new Date().getFullYear(),
-      color: color || "Custom Color",
-      event: event || "Automotive Gathering",
-      date: new Date().toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      }) + ` • ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
-      location: location || "Metropolitan Car Meet",
-      photographer: photographer || {
-        name: "Admin Photographer",
-        title: "Staff Automotive Photographer",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-        bio: "Official Plate Snap Cars verified shooter.",
-      },
-      imageUrl: savedImageUrl,
-      cartoonImageUrl: savedCartoonUrl,
-      hasCartoon: Boolean(hasCartoon || savedCartoonUrl),
-      tags: Array.isArray(tags) ? tags : ["CarMeet", make || "Automotive"],
-      views: 1,
-      downloads: 0,
-      resolution: resolution || "High Resolution • 300 DPI",
-      cameraInfo: cameraInfo || "Sony Alpha • 50mm f/1.8 • 1/1000s • ISO 100",
-      createdAt: new Date().toISOString(),
-    };
+    const carId = `car-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const formattedDate =
+      new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
+      ` • ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 
-    carsDatabase.unshift(newCar);
-    saveLocalDatabase(carsDatabase);
-    res.status(201).json({ success: true, car: newCar });
+    const tagsArray = Array.isArray(tags) ? tags : ["CarMeet", make || "Automotive"];
+    const creds = getAdminCredentials();
+
+    const db = await getSqliteDatabase();
+    db.run(
+      `INSERT INTO cars (
+        id, plate_number, car_name, make, model, year, color, event, location, date,
+        photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
+        image_url, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)`,
+      [
+        carId,
+        cleanPlate,
+        carName || `${make || "Custom"} ${model || "Vehicle"}`,
+        make || "Custom",
+        model || "Vehicle",
+        year ? parseInt(year, 10) : new Date().getFullYear(),
+        color || "Custom Color",
+        event || "Automotive Gathering",
+        location || "Metropolitan Car Meet",
+        formattedDate,
+        photographer?.name || creds.name,
+        photographer?.title || "Automotive Photographer",
+        photographer?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+        photographer?.bio || "Official Plate Snap Cars verified shooter.",
+        photographer?.instagram || "",
+        savedImageUrl,
+        savedCartoonUrl,
+        Boolean(hasCartoon || savedCartoonUrl) ? 1 : 0,
+        JSON.stringify(tagsArray),
+        resolution || "High Resolution • 300 DPI",
+        cameraInfo || "Sony Alpha • 50mm f/1.8 • 1/1000s • ISO 100",
+        new Date().toISOString(),
+      ]
+    );
+
+    saveDatabaseToDisk(db);
+
+    const stmt = db.prepare("SELECT * FROM cars WHERE id = ?");
+    stmt.bind([carId]);
+    stmt.step();
+    const newCarRow = stmt.getAsObject();
+    stmt.free();
+
+    res.status(201).json({ success: true, car: mapRowToCar(newCarRow) });
   } catch (err: any) {
-    console.error("Error creating car:", err);
-    res.status(500).json({ error: err.message || "Failed to create car photo record" });
+    console.error("Error creating car in SQLite:", err);
+    res.status(500).json({ error: err.message || "Failed to create vehicle record in database." });
   }
 });
 
-// Seed / sync initial database
-app.post("/api/cars/seed", (req: Request, res: Response) => {
-  const { initialCars } = req.body;
-  if (Array.isArray(initialCars) && carsDatabase.length === 0) {
-    carsDatabase = [...initialCars];
-    saveLocalDatabase(carsDatabase);
-  }
-  res.json({ success: true, count: carsDatabase.length });
-});
-
-// PUT update car photo or cartoon (Admin only)
-app.put("/api/cars/:id", requireAdmin, (req: Request, res: Response) => {
+// PUT update car photo (Admin only)
+app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const index = carsDatabase.findIndex((c) => c.id === id);
+  const db = await getSqliteDatabase();
 
-  if (index === -1) {
+  const stmt = db.prepare("SELECT * FROM cars WHERE id = ?");
+  stmt.bind([id]);
+  if (!stmt.step()) {
+    stmt.free();
     return res.status(404).json({ error: "Car record not found." });
   }
+  const existing = stmt.getAsObject() as any;
+  stmt.free();
 
-  let updatedData = { ...req.body };
-  if (updatedData.imageUrl && updatedData.imageUrl.startsWith("data:image/")) {
-    updatedData.imageUrl = saveBase64ImageToDisk(updatedData.imageUrl, `plate_${id}`);
+  let {
+    plateNumber,
+    carName,
+    make,
+    model,
+    year,
+    color,
+    event,
+    location,
+    imageUrl,
+    cartoonImageUrl,
+    hasCartoon,
+    tags,
+  } = req.body;
+
+  if (imageUrl && imageUrl.startsWith("data:image/")) {
+    imageUrl = saveBase64ImageToDisk(imageUrl, `plate_${id}`);
+  } else if (!imageUrl) {
+    imageUrl = existing.image_url;
   }
-  if (updatedData.cartoonImageUrl && updatedData.cartoonImageUrl.startsWith("data:image/")) {
-    updatedData.cartoonImageUrl = saveBase64ImageToDisk(updatedData.cartoonImageUrl, `cartoon_${id}`);
+
+  if (cartoonImageUrl && cartoonImageUrl.startsWith("data:image/")) {
+    cartoonImageUrl = saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${id}`);
   }
 
-  carsDatabase[index] = {
-    ...carsDatabase[index],
-    ...updatedData,
-    id, // protect id from being overwritten
-  };
+  const tagsJson = tags ? (Array.isArray(tags) ? JSON.stringify(tags) : tags) : existing.tags;
 
-  saveLocalDatabase(carsDatabase);
-  res.json({ success: true, car: carsDatabase[index] });
+  db.run(
+    `UPDATE cars SET
+      plate_number = ?,
+      car_name = ?,
+      make = ?,
+      model = ?,
+      year = ?,
+      color = ?,
+      event = ?,
+      location = ?,
+      image_url = ?,
+      cartoon_image_url = ?,
+      has_cartoon = ?,
+      tags = ?
+    WHERE id = ?`,
+    [
+      plateNumber ? plateNumber.toUpperCase().trim() : existing.plate_number,
+      carName || existing.car_name,
+      make || existing.make,
+      model || existing.model,
+      year ? parseInt(year, 10) : existing.year,
+      color || existing.color,
+      event || existing.event,
+      location || existing.location,
+      imageUrl,
+      cartoonImageUrl || existing.cartoon_image_url,
+      hasCartoon !== undefined ? (hasCartoon ? 1 : 0) : existing.has_cartoon,
+      tagsJson,
+      id,
+    ]
+  );
+
+  saveDatabaseToDisk(db);
+
+  const stmt2 = db.prepare("SELECT * FROM cars WHERE id = ?");
+  stmt2.bind([id]);
+  stmt2.step();
+  const updatedRow = stmt2.getAsObject();
+  stmt2.free();
+
+  res.json({ success: true, car: mapRowToCar(updatedRow) });
 });
 
 // Increment download count (Public)
-app.post("/api/cars/:id/download", (req: Request, res: Response) => {
+app.post("/api/cars/:id/download", async (req: Request, res: Response) => {
   const { id } = req.params;
-  const car = carsDatabase.find((c) => c.id === id);
-  if (car) {
-    car.downloads = (car.downloads || 0) + 1;
-    saveLocalDatabase(carsDatabase);
-    return res.json({ success: true, downloads: car.downloads });
+  const db = await getSqliteDatabase();
+  db.run("UPDATE cars SET downloads = downloads + 1 WHERE id = ?", [id]);
+  saveDatabaseToDisk(db);
+
+  const stmt = db.prepare("SELECT downloads FROM cars WHERE id = ?");
+  stmt.bind([id]);
+  if (stmt.step()) {
+    const row = stmt.getAsObject() as { downloads: number };
+    stmt.free();
+    return res.json({ success: true, downloads: row.downloads });
   }
+  stmt.free();
   res.status(404).json({ error: "Car not found" });
 });
 
 // DELETE car photo (Admin only)
-app.delete("/api/cars/:id", requireAdmin, (req: Request, res: Response) => {
+app.delete("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
   const { id } = req.params;
-  const initialLength = carsDatabase.length;
-  carsDatabase = carsDatabase.filter((c) => c.id !== id);
-
-  if (carsDatabase.length === initialLength) {
-    return res.status(404).json({ error: "Car record not found." });
-  }
-
-  saveLocalDatabase(carsDatabase);
-  res.json({ success: true, message: "Car photo deleted successfully." });
+  const db = await getSqliteDatabase();
+  db.run("DELETE FROM cars WHERE id = ?", [id]);
+  saveDatabaseToDisk(db);
+  res.json({ success: true, message: "Car record deleted successfully." });
 });
 
 // GET saved theme config
-app.get("/api/theme", (req: Request, res: Response) => {
-  res.json({ theme: appThemeConfig });
+app.get("/api/theme", async (req: Request, res: Response) => {
+  const db = await getSqliteDatabase();
+  const stmt = db.prepare("SELECT value FROM app_settings WHERE key = 'theme'");
+  if (stmt.step()) {
+    const row = stmt.getAsObject() as { value: string };
+    stmt.free();
+    try {
+      return res.json({ theme: JSON.parse(row.value) });
+    } catch {}
+  }
+  stmt.free();
+  res.json({ theme: null });
 });
 
 // POST update theme config (Admin only)
-app.post("/api/theme", requireAdmin, (req: Request, res: Response) => {
+app.post("/api/theme", requireAdmin, async (req: Request, res: Response) => {
   const { theme } = req.body;
-  if (!theme) {
-    return res.status(400).json({ error: "Theme configuration required." });
-  }
-  appThemeConfig = theme;
-  saveLocalTheme(appThemeConfig);
-  res.json({ success: true, theme: appThemeConfig });
-});
+  if (!theme) return res.status(400).json({ error: "Theme configuration required." });
 
-// POST AI Cartoon Art Generator / Stylizer Endpoint (Admin only)
-app.post("/api/generate-cartoon", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { carName, make, model, color, specialFeatures, base64Image } = req.body;
-    const ai = getGemini();
+  const db = await getSqliteDatabase();
+  db.run(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+    [JSON.stringify(theme)]
+  );
+  saveDatabaseToDisk(db);
 
-    if (!ai) {
-      return res.json({
-        success: true,
-        method: "fallback",
-        message: "Gemini API key not configured. Using client-side high-precision vector cartoon engine.",
-      });
-    }
-
-    const prompt = `You are a legendary Japanese chibi car artist and vinyl sticker designer who creates iconic 2D minimalist vector car illustrations in the style of the iconic pop-up headlight Mazda Miata sticker art (flat bold colors, thick black outlines, cute expressive headlights, front-facing or 3/4 perspective, clean sticker vibe).
-Car: ${make || ""} ${model || carName || "Sports Car"}
-Color: ${color || "Vibrant"}
-Details: ${specialFeatures || "Wide stance, signature headlights, aggressive front lip, sticker aesthetic"}
-
-Please generate a high quality standalone clean SVG representation of this car matching this exact cartoon sticker art style. Return ONLY valid <svg>...</svg> code with no markdown backticks or commentary, viewBox="0 0 800 600", width="800", height="600". Include bold black outline paths (stroke-width 8 to 12), cute headlights, front grille/smile, wheels with slight camber, and cel-shaded vibrant car paint fills.`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-      },
-    });
-
-    let text = response.text || "";
-    // Clean up code fences if present
-    text = text.replace(/```xml/g, "").replace(/```svg/g, "").replace(/```/g, "").trim();
-
-    if (text.includes("<svg") && text.includes("</svg>")) {
-      const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/);
-      if (svgMatch) {
-        const svgContent = svgMatch[0];
-        const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
-        return res.json({
-          success: true,
-          method: "gemini-svg",
-          svg: svgContent,
-          dataUrl,
-        });
-      }
-    }
-
-    res.json({
-      success: true,
-      method: "gemini-text-fallback",
-      rawText: text,
-    });
-  } catch (err: any) {
-    console.error("Gemini cartoon generation error:", err);
-    res.status(500).json({ error: err.message || "Failed to generate cartoon art" });
-  }
+  res.json({ success: true, theme });
 });
 
 // ==========================================
-// VITE / SERVER INITIALIZATION
+// SERVER INITIALIZATION
 // ==========================================
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  const isBackendOnly = process.env.BACKEND_ONLY === "true";
+
+  if (isBackendOnly) {
+    console.log("[PlateSnap Server] Running in Headless Backend Mode (No frontend bundle served).");
+    app.get("/", (req: Request, res: Response) => {
+      res.json({
+        service: "PlateSnap Automotive SQL Backend",
+        status: "online",
+        apiEndpoints: [
+          "/api/health",
+          "/api/cars?q=7XYZ999",
+          "/api/admin/login",
+          "/uploads/*",
+        ],
+      });
+    });
+  } else if (process.env.NODE_ENV !== "production") {
+    // Development mode with Vite Middleware
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
+    // Production SPA serving fallback
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get("*", (req: Request, res: Response) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[PlateSnap Cars Server] Running on http://0.0.0.0:${PORT}`);
+    console.log(`====================================================`);
+    console.log(`🏎️ PlateSnap Dynamic SQL Server`);
+    console.log(`📡 URL: http://0.0.0.0:${PORT}`);
+    console.log(`💾 Database: SQLite -> ${path.join(DATA_DIR, "cars.sqlite")}`);
+    console.log(`🖼️ Media Storage: -> ${UPLOADS_DIR}`);
+    console.log(`🔌 Mode: ${isBackendOnly ? "Headless Backend API" : "Fullstack"}`);
+    console.log(`====================================================`);
   });
 }
 

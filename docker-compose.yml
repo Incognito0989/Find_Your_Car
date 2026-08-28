@@ -6,14 +6,20 @@ services:
     container_name: plate-snap-server
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
+      - BACKEND_ONLY=${BACKEND_ONLY:-true}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@platesnapcars.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-platesnap2026}
+      - ADMIN_NAME=${ADMIN_NAME:-Lead Automotive Photographer}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
-      # Mount the local ./data directory into container for permanent photo & database storage
+      # Mount host ./data directory into container for permanent SQLite database & photo uploads
       - ./data:/app/data
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]

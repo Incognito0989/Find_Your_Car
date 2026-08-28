@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, Sparkles, Image as ImageIcon, Camera, Eye } from 'lucide-react';
 import { CarPhoto } from '../types';
+import { formatMediaUrl } from '../utils/apiConfig';
 
 interface PhotoCardProps {
   car: CarPhoto;
@@ -15,7 +16,8 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
 }) => {
   const [showCartoon, setShowCartoon] = useState<boolean>(false);
 
-  const displayImage = showCartoon && car.cartoonImageUrl ? car.cartoonImageUrl : car.imageUrl;
+  const rawImage = showCartoon && car.cartoonImageUrl ? car.cartoonImageUrl : car.imageUrl;
+  const displayImage = formatMediaUrl(rawImage);
 
   if (viewMode === 'list') {
     return (
@@ -49,7 +51,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
                 e.stopPropagation();
                 setShowCartoon(!showCartoon);
               }}
-              className="absolute bottom-2.5 right-2.5 bg-black/80 hover:bg-black text-pink-400 border border-pink-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 backdrop-blur-md transition-all shadow-lg"
+              className="absolute bottom-2.5 right-2.5 bg-black/80 hover:bg-black text-pink-400 border border-pink-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 backdrop-blur-md transition-all shadow-lg cursor-pointer"
               title="Toggle Cartoon / Real Photo"
             >
               <Sparkles className="w-3 h-3" />
@@ -58,57 +60,51 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           )}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)] tracking-tight truncate">
+        {/* Content Info */}
+        <div className="flex-1 min-w-0 space-y-2 py-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)] truncate">
               {car.carName}
             </h3>
-            {car.year && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[#1C1C1E] text-gray-400 border border-[#2C2C2E]">
-                {car.year}
-              </span>
-            )}
-            {car.hasCartoon && (
-              <span className="bg-pink-500/15 text-pink-400 border border-pink-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                2D Cartoon Available
-              </span>
-            )}
+            <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-[var(--ps-text-muted,#9ca3af)] font-mono">
+              {car.year}
+            </span>
           </div>
 
-          <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider">
-            {car.event} • {car.date}
+          <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] flex items-center gap-2">
+            <span>{car.event}</span>
+            <span>•</span>
+            <span>{car.location}</span>
           </p>
 
-          <div className="flex items-center gap-4 text-xs text-gray-400 pt-1">
-            <span className="flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-gray-500" />
-              {car.photographer.name}
-            </span>
-            <span className="font-mono text-[11px] text-gray-500">{car.resolution}</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap pt-1">
-            {car.tags.slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-gray-400 border border-white/5"
-              >
-                #{tag}
-              </span>
-            ))}
+          <div className="flex items-center gap-2 pt-2">
+            <img
+              src={car.photographer.avatar}
+              alt={car.photographer.name}
+              className="w-5 h-5 rounded-full object-cover border border-white/20"
+            />
+            <span className="text-xs text-gray-300 font-medium">{car.photographer.name}</span>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex md:flex-col items-center gap-2 shrink-0 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0 pt-2 md:pt-0">
           <button
-            onClick={() => onOpenDownloadModal(car, showCartoon)}
-            className="flex-1 md:flex-initial bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold py-2.5 px-5 rounded-xl shadow-md text-xs flex items-center justify-center gap-2 active:scale-95 transition-all"
+            onClick={() => onOpenDownloadModal(car, false)}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            View & Download
+            <span>High-Res Photo</span>
           </button>
+          {car.hasCartoon && (
+            <button
+              onClick={() => onOpenDownloadModal(car, true)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Cartoon Sticker</span>
+            </button>
+          )}
         </div>
       </div>
     );
@@ -117,81 +113,106 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   return (
     <div
       id={`photo-card-${car.id}`}
-      className="photo-card group relative bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] overflow-hidden transition-all duration-500 shadow-lg hover:shadow-2xl hover:border-[var(--ps-primary,#0A84FF)]/40 flex flex-col justify-between"
+      className="photo-card group relative bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[20px] overflow-hidden transition-all duration-300 shadow-lg hover:shadow-2xl hover:border-[var(--ps-primary,#0A84FF)]/50 flex flex-col"
     >
-      {/* Photo Image Aspect 4/3 */}
-      <div className="aspect-[4/3] overflow-hidden relative bg-black flex items-center justify-center">
+      {/* Thumbnail Aspect Ratio */}
+      <div className="relative w-full aspect-[4/3] overflow-hidden bg-black flex items-center justify-center">
         <img
           src={displayImage}
           alt={car.carName}
-          className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${
-            showCartoon ? 'bg-white object-contain p-3' : ''
+          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+            showCartoon ? 'bg-white object-contain p-4' : ''
           }`}
-          loading="lazy"
         />
 
-        {/* Plate Badge (Matching reference design) */}
-        <div className="absolute top-4 left-4 z-20">
-          <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.75))] backdrop-blur-md px-3 py-1.5 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-2 shadow-xl">
-            <span className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] font-bold uppercase tracking-wider">
+        {/* License Plate Badge (Floating Top Left) */}
+        <div className="absolute top-3 left-3">
+          <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.75))] backdrop-blur-md px-3 py-1 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-1.5 shadow-md">
+            <span className="text-[9px] text-[var(--ps-text-muted,#9ca3af)] font-bold uppercase tracking-wider">
               Plate
             </span>
-            <span className="text-sm font-mono font-bold text-[var(--ps-badge-text,#ffffff)] tracking-wider">
+            <span className="text-xs font-mono font-bold text-[var(--ps-badge-text,#ffffff)]">
               {car.plateNumber}
             </span>
           </div>
         </div>
 
-        {/* 2D Cartoon Quick Switch Pill */}
+        {/* Art Type Indicator / Toggle */}
         {car.hasCartoon && (
-          <div className="absolute top-4 right-4 z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowCartoon(!showCartoon);
-              }}
-              className="bg-black/80 hover:bg-black border border-pink-500/50 text-pink-400 text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-xl hover:scale-105 transition-all"
-              title="Toggle Cartoon / Real Photo"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-              <span>{showCartoon ? 'Real Photo' : 'Cartoon Art'}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Hover Overlay Action (Matching reference design) */}
-        <div className="photo-card-overlay absolute inset-0 flex flex-col items-center justify-center p-6 z-10">
           <button
-            onClick={() => onOpenDownloadModal(car, showCartoon)}
-            className="bg-white text-black font-bold py-3 px-8 rounded-xl shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 text-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowCartoon(!showCartoon);
+            }}
+            className="absolute bottom-3 right-3 bg-black/80 hover:bg-black text-pink-400 border border-pink-500/40 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md transition-all shadow-lg active:scale-95 cursor-pointer"
+            title="Toggle Cartoon / Real Photo"
           >
-            <Download className="w-4 h-4 text-black" />
-            View & Download
+            <Sparkles className="w-3 h-3" />
+            {showCartoon ? 'Show Photo' : 'Show Cartoon'}
           </button>
-          <span className="text-[11px] text-gray-300 mt-2 font-medium tracking-wide">
-            {showCartoon ? '4K Vector Sticker Ready' : '4K 300 DPI High-Res'}
-          </span>
-        </div>
+        )}
       </div>
 
-      {/* Card Info Footer */}
-      <div className="p-6 flex items-center justify-between border-t border-[var(--ps-card-border,#2C2C2E)]/60 bg-[var(--ps-card-bg,#111111)]">
-        <div className="min-w-0 pr-3">
-          <h3 className="font-semibold text-[var(--ps-text-main,#ffffff)] tracking-tight truncate text-base">
-            {car.carName}
-          </h3>
-          <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider mt-1 truncate">
-            {car.date}
+      {/* Card Content Footer */}
+      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-bold text-base text-[var(--ps-text-main,#ffffff)] line-clamp-1 group-hover:text-[var(--ps-primary,#0A84FF)] transition-colors">
+              {car.carName}
+            </h3>
+            <span className="text-xs font-mono text-[var(--ps-text-muted,#9ca3af)] shrink-0">
+              {car.year}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-1 line-clamp-1">
+            {car.event} • {car.location}
           </p>
         </div>
 
-        <button
-          onClick={() => onOpenDownloadModal(car, showCartoon)}
-          className="text-gray-400 hover:text-[var(--ps-primary,#0A84FF)] hover:scale-110 cursor-pointer transition-all p-2 rounded-lg hover:bg-white/5 shrink-0"
-          title="Download High-Res"
-        >
-          <Download className="w-5 h-5" />
-        </button>
+        {/* Tags */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {car.tags.slice(0, 3).map((tag, idx) => (
+            <span
+              key={idx}
+              className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-gray-400 font-mono"
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+
+        {/* Photographer & Action */}
+        <div className="pt-3 border-t border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img
+              src={car.photographer.avatar}
+              alt={car.photographer.name}
+              className="w-6 h-6 rounded-full object-cover border border-white/15"
+            />
+            <span className="text-xs text-gray-300 font-medium truncate max-w-[100px]">
+              {car.photographer.name}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => onOpenDownloadModal(car, false)}
+              className="p-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white shadow-md transition-all active:scale-95 cursor-pointer"
+              title="Download High-Res Photo"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            {car.hasCartoon && (
+              <button
+                onClick={() => onOpenDownloadModal(car, true)}
+                className="p-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 shadow-md transition-all active:scale-95 cursor-pointer"
+                title="Download Cartoon Sticker"
+              >
+                <Sparkles className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

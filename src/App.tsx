@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { CarPhoto, AppThemeConfig, AdminAuth } from './types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CarPhoto, AppThemeConfig } from './types';
 import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES } from './data/initialData';
 import { VisitorPortal } from './components/VisitorPortal';
 import { AdminPortal } from './components/AdminPortal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { ServerConnectionModal } from './components/ServerConnectionModal';
 import { applyThemeToDocument } from './utils/themeUtils';
+import { getApiBaseUrl } from './utils/apiConfig';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'visitor' | 'admin'>('visitor');
@@ -16,6 +18,42 @@ export function App() {
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [adminUser, setAdminUser] = useState<{ name: string; email: string } | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isServerModalOpen, setIsServerModalOpen] = useState<boolean>(false);
+
+  // Helper for calling API with configured base URL
+  const apiFetch = useCallback((endpoint: string, options?: RequestInit) => {
+    const base = getApiBaseUrl();
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = base ? `${base}${cleanEndpoint}` : cleanEndpoint;
+    return fetch(url, options);
+  }, []);
+
+  // Fetch cars and theme from backend API
+  const refreshAppData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const carsRes = await apiFetch('/api/cars');
+      if (carsRes.ok) {
+        const carsData = await carsRes.json();
+        if (carsData && Array.isArray(carsData.cars) && carsData.cars.length > 0) {
+          setCars(carsData.cars);
+        }
+      }
+
+      const themeRes = await apiFetch('/api/theme');
+      if (themeRes.ok) {
+        const themeData = await themeRes.json();
+        if (themeData && themeData.theme) {
+          setCurrentTheme(themeData.theme);
+          applyThemeToDocument(themeData.theme);
+        }
+      }
+    } catch (err) {
+      console.warn('Backend sync defaulted to cache:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiFetch]);
 
   // Check stored admin session on mount
   useEffect(() => {
@@ -29,25 +67,11 @@ export function App() {
           setAdminUser(JSON.parse(savedUser));
         } catch (e) {}
       }
-
-      // Verify token with backend
-      fetch(`/api/admin/verify?token=${encodeURIComponent(savedToken)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (!data.authenticated) {
-            localStorage.removeItem('platesnap_admin_token');
-            localStorage.removeItem('platesnap_admin_user');
-            setAdminToken(null);
-            setAdminUser(null);
-          }
-        })
-        .catch(() => {});
     }
   }, []);
 
-  // Initialize theme and load cars from backend
+  // Initialize theme and load cars on boot
   useEffect(() => {
-    // 1. Initial local theme apply
     const savedThemeJson = localStorage.getItem('plate_snap_theme');
     let activeTheme = DEFAULT_THEMES[0];
     if (savedThemeJson) {
@@ -60,65 +84,17 @@ export function App() {
     setCurrentTheme(activeTheme);
     applyThemeToDocument(activeTheme);
 
-    // 2. Fetch cars and theme from backend API
-    const initAppData = async () => {
-      try {
-        // Fetch or seed cars
-        const carsRes = await fetch('/api/cars');
-        const carsData = await carsRes.json();
-
-        if (carsData && Array.isArray(carsData.cars) && carsData.cars.length > 0) {
-          setCars(carsData.cars);
-        } else {
-          // Seed backend with initial car records
-          await fetch('/api/cars/seed', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initialCars: INITIAL_CAR_PHOTOS }),
-          });
-          setCars(INITIAL_CAR_PHOTOS);
-        }
-
-        // Fetch saved server theme
-        const themeRes = await fetch('/api/theme');
-        const themeData = await themeRes.json();
-        if (themeData && themeData.theme) {
-          setCurrentTheme(themeData.theme);
-          applyThemeToDocument(themeData.theme);
-        }
-      } catch (err) {
-        console.warn('Backend sync defaulted to local store:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAppData();
-  }, []);
+    refreshAppData();
+  }, [refreshAppData]);
 
   // Open Admin portal with authentication check
-  const handleOpenAdmin = async () => {
+  const handleOpenAdmin = () => {
     const token = adminToken || localStorage.getItem('platesnap_admin_token');
     if (!token) {
       setIsLoginModalOpen(true);
       return;
     }
-
-    try {
-      const res = await fetch(`/api/admin/verify?token=${encodeURIComponent(token)}`);
-      const data = await res.json();
-      if (data.authenticated) {
-        setAdminToken(token);
-        if (data.admin) setAdminUser(data.admin);
-        setCurrentView('admin');
-      } else {
-        localStorage.removeItem('platesnap_admin_token');
-        setAdminToken(null);
-        setIsLoginModalOpen(true);
-      }
-    } catch (e) {
-      setIsLoginModalOpen(true);
-    }
+    setCurrentView('admin');
   };
 
   // Login successful callback
@@ -133,10 +109,9 @@ export function App() {
   const handleLogoutAdmin = async () => {
     if (adminToken) {
       try {
-        await fetch('/api/admin/logout', {
+        await apiFetch('/api/admin/logout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: adminToken }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
         });
       } catch (e) {}
     }
@@ -147,7 +122,7 @@ export function App() {
     setCurrentView('visitor');
   };
 
-  // Add new car handler (with admin token)
+  // Add new car handler (persists into SQLite backend)
   const handleAddCar = async (newCarData: Partial<CarPhoto>) => {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -155,45 +130,18 @@ export function App() {
         headers['Authorization'] = `Bearer ${adminToken}`;
       }
 
-      const res = await fetch('/api/cars', {
+      const res = await apiFetch('/api/cars', {
         method: 'POST',
         headers,
         body: JSON.stringify(newCarData),
       });
+
       const data = await res.json();
       if (data.success && data.car) {
         setCars((prev) => [data.car, ...prev]);
       } else if (res.status === 401) {
         setIsLoginModalOpen(true);
         throw new Error('Admin authorization required to upload.');
-      } else {
-        // Fallback local update
-        const fallbackCar: CarPhoto = {
-          id: `car-${Date.now()}`,
-          plateNumber: newCarData.plateNumber || 'CUSTOM',
-          carName: newCarData.carName || 'Custom Vehicle',
-          make: newCarData.make || 'Custom',
-          model: newCarData.model || 'Model',
-          year: newCarData.year || 2024,
-          color: newCarData.color || 'Custom',
-          event: newCarData.event || 'Automotive Gathering',
-          date: 'Just Now',
-          location: newCarData.location || 'Local Meet',
-          photographer: newCarData.photographer || {
-            name: adminUser?.name || 'Alex Rivera',
-            title: 'Staff Photographer',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-          },
-          imageUrl: newCarData.imageUrl || '',
-          cartoonImageUrl: newCarData.cartoonImageUrl,
-          hasCartoon: Boolean(newCarData.hasCartoon || newCarData.cartoonImageUrl),
-          tags: newCarData.tags || ['CarMeet'],
-          views: 1,
-          downloads: 0,
-          resolution: 'High Resolution • 300 DPI',
-          cameraInfo: 'Sony Alpha • 50mm f/1.8',
-        };
-        setCars((prev) => [fallbackCar, ...prev]);
       }
     } catch (e) {
       console.error('Error adding car:', e);
@@ -209,7 +157,7 @@ export function App() {
         headers['Authorization'] = `Bearer ${adminToken}`;
       }
 
-      const res = await fetch(`/api/cars/${id}`, {
+      const res = await apiFetch(`/api/cars/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(updated),
@@ -220,7 +168,12 @@ export function App() {
         return;
       }
 
-      setCars((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+      const data = await res.json();
+      if (data.success && data.car) {
+        setCars((prev) => prev.map((c) => (c.id === id ? data.car : c)));
+      } else {
+        setCars((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+      }
     } catch (e) {
       console.error('Error updating car:', e);
     }
@@ -234,7 +187,7 @@ export function App() {
         headers['Authorization'] = `Bearer ${adminToken}`;
       }
 
-      const res = await fetch(`/api/cars/${id}`, { method: 'DELETE', headers });
+      const res = await apiFetch(`/api/cars/${id}`, { method: 'DELETE', headers });
       if (res.status === 401) {
         setIsLoginModalOpen(true);
         return;
@@ -258,13 +211,13 @@ export function App() {
         headers['Authorization'] = `Bearer ${adminToken}`;
       }
 
-      await fetch('/api/theme', {
+      await apiFetch('/api/theme', {
         method: 'POST',
         headers,
         body: JSON.stringify({ theme: newTheme }),
       });
     } catch (e) {
-      console.warn('Saved theme to local cache.');
+      console.warn('Saved theme locally.');
     }
   };
 
@@ -274,6 +227,7 @@ export function App() {
         <VisitorPortal
           cars={cars}
           onOpenAdmin={handleOpenAdmin}
+          onOpenServerConfig={() => setIsServerModalOpen(true)}
           currentTheme={currentTheme}
         />
       ) : (
@@ -295,6 +249,14 @@ export function App() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+        theme={currentTheme}
+      />
+
+      {/* Backend Connection Modal */}
+      <ServerConnectionModal
+        isOpen={isServerModalOpen}
+        onClose={() => setIsServerModalOpen(false)}
+        onConnected={refreshAppData}
         theme={currentTheme}
       />
     </div>
