@@ -1,10 +1,35 @@
 services:
+  # PostgreSQL Relational Database Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: platesnap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-platesnap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platesnap_secret_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-platesnap_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Persistent PostgreSQL data storage
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-platesnap} -d ${POSTGRES_DB:-platesnap_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # Plate Snap Node.js API Backend
   plate-snap-server:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: plate-snap-server
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${PORT:-3000}:3000"
     env_file:
@@ -13,13 +38,18 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
-      - BACKEND_ONLY=${BACKEND_ONLY:-true}
+      - BACKEND_ONLY=${BACKEND_ONLY:-false}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-platesnap}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-platesnap_secret_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-platesnap_db}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@platesnapcars.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-platesnap2026}
       - ADMIN_NAME=${ADMIN_NAME:-Lead Automotive Photographer}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
-      # Mount host ./data directory into container for permanent SQLite database & photo uploads
+      # Mount host ./data directory into container for permanent photo uploads & assets
       - ./data:/app/data
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
@@ -27,3 +57,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+volumes:
+  postgres_data:
+    driver: local

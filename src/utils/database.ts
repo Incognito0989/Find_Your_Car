@@ -1,103 +1,112 @@
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
-import path from 'path';
-import fs from 'fs';
+import { Pool } from 'pg';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DATA_DIR, 'cars.sqlite');
+let pgPool: Pool | null = null;
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+export function getDatabaseUrl(): string {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+  const host = process.env.POSTGRES_HOST || 'postgres';
+  const port = process.env.POSTGRES_PORT || '5432';
+  const user = process.env.POSTGRES_USER || 'platesnap';
+  const password = process.env.POSTGRES_PASSWORD || 'platesnap_secret_pass';
+  const database = process.env.POSTGRES_DB || 'platesnap_db';
+  return `postgres://${user}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
 
-let dbInstance: SqlJsDatabase | null = null;
+export function getPgPool(): Pool {
+  if (!pgPool) {
+    const connectionString = getDatabaseUrl();
+    console.log(`[PostgreSQL] Initializing connection pool (host: ${process.env.POSTGRES_HOST || 'postgres'})...`);
+    pgPool = new Pool({
+      connectionString,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
 
-export async function getSqliteDatabase(): Promise<SqlJsDatabase> {
-  if (dbInstance) return dbInstance;
+    pgPool.on('error', (err) => {
+      console.error('[PostgreSQL] Unexpected client error on idle connection:', err);
+    });
+  }
+  return pgPool;
+}
 
-  const SQL = await initSqlJs();
+export async function initializePostgresDatabase(): Promise<void> {
+  const pool = getPgPool();
+  let connected = false;
+  let attempts = 0;
+  const maxAttempts = 15;
 
-  if (fs.existsSync(DB_FILE)) {
+  while (!connected && attempts < maxAttempts) {
     try {
-      const fileBuffer = fs.readFileSync(DB_FILE);
-      dbInstance = new SQL.Database(fileBuffer);
-      console.log(`[SQLite] Loaded existing database from ${DB_FILE}`);
-    } catch (err) {
-      console.error('[SQLite] Error reading existing database file, creating fresh one:', err);
-      dbInstance = new SQL.Database();
+      attempts++;
+      const client = await pool.connect();
+      client.release();
+      connected = true;
+      console.log('[PostgreSQL] Connected to PostgreSQL database successfully!');
+    } catch (err: any) {
+      console.log(`[PostgreSQL] Waiting for PostgreSQL container to boot up... (Attempt ${attempts}/${maxAttempts})`);
+      await new Promise((res) => setTimeout(res, 2000));
     }
-  } else {
-    console.log(`[SQLite] Creating new database file at ${DB_FILE}`);
-    dbInstance = new SQL.Database();
   }
 
-  initializeSchema(dbInstance);
-  saveDatabaseToDisk(dbInstance);
-  return dbInstance;
-}
-
-export function saveDatabaseToDisk(db: SqlJsDatabase) {
-  try {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_FILE, buffer);
-  } catch (err) {
-    console.error('[SQLite] Failed to persist database to disk:', err);
+  if (!connected) {
+    console.warn('[PostgreSQL] Could not connect to PostgreSQL immediately. Background retry will occur upon request.');
+    return;
   }
-}
 
-function initializeSchema(db: SqlJsDatabase) {
-  db.run(`
+  // Create Schema
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS cars (
-      id TEXT PRIMARY KEY,
-      plate_number TEXT NOT NULL,
-      car_name TEXT NOT NULL,
-      make TEXT NOT NULL,
-      model TEXT NOT NULL,
+      id VARCHAR(128) PRIMARY KEY,
+      plate_number VARCHAR(64) NOT NULL,
+      car_name VARCHAR(255) NOT NULL,
+      make VARCHAR(128) NOT NULL,
+      model VARCHAR(128) NOT NULL,
       year INTEGER,
-      color TEXT,
-      event TEXT,
-      location TEXT,
-      date TEXT,
-      photographer_name TEXT,
-      photographer_title TEXT,
+      color VARCHAR(128),
+      event VARCHAR(255),
+      location VARCHAR(255),
+      date VARCHAR(128),
+      photographer_name VARCHAR(255),
+      photographer_title VARCHAR(255),
       photographer_avatar TEXT,
       photographer_bio TEXT,
-      photographer_instagram TEXT,
+      photographer_instagram VARCHAR(128),
       image_url TEXT NOT NULL,
       cartoon_image_url TEXT,
-      has_cartoon INTEGER DEFAULT 0,
-      tags TEXT,
+      has_cartoon BOOLEAN DEFAULT FALSE,
+      tags JSONB DEFAULT '[]'::jsonb,
       views INTEGER DEFAULT 0,
       downloads INTEGER DEFAULT 0,
-      resolution TEXT,
-      camera_info TEXT,
-      created_at TEXT
+      resolution VARCHAR(128),
+      camera_info VARCHAR(255),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
 
+    CREATE INDEX IF NOT EXISTS idx_cars_plate_number ON cars(plate_number);
+    CREATE INDEX IF NOT EXISTS idx_cars_make ON cars(make);
+    CREATE INDEX IF NOT EXISTS idx_cars_event ON cars(event);
+    CREATE INDEX IF NOT EXISTS idx_cars_created_at ON cars(created_at DESC);
+
     CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT
+      key VARCHAR(128) PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
   `);
 
-  // Check if we need to seed initial cars
-  const stmt = db.prepare('SELECT COUNT(*) as count FROM cars');
-  let count = 0;
-  if (stmt.step()) {
-    const row = stmt.getAsObject() as { count: number };
-    count = row.count;
-  }
-  stmt.free();
-
+  // Seed default cars if empty
+  const countRes = await pool.query('SELECT COUNT(*) as count FROM cars');
+  const count = parseInt(countRes.rows[0].count, 10);
   if (count === 0) {
-    console.log('[SQLite] Empty database detected. Seeding initial vehicle records...');
-    seedDefaultCars(db);
+    console.log('[PostgreSQL] Empty database detected. Seeding initial vehicle vault records...');
+    await seedDefaultCars(pool);
   }
 }
 
-function seedDefaultCars(db: SqlJsDatabase) {
+async function seedDefaultCars(pool: Pool) {
   const initialCars = [
     {
       id: "car-1",
@@ -117,13 +126,13 @@ function seedDefaultCars(db: SqlJsDatabase) {
       photographer_instagram: "@rivera_motorsport",
       image_url: "https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400",
       cartoon_image_url: null,
-      has_cartoon: 0,
+      has_cartoon: false,
       tags: JSON.stringify(["Porsche", "GT3RS", "TrackDay", "LagunaSeca", "Supercar", "992"]),
       views: 1420,
       downloads: 384,
       resolution: "High Resolution • 300 DPI",
       camera_info: "Sony Alpha • 70-200mm f/2.8 GM II • 1/2000s • ISO 100",
-      created_at: "2023-10-24T16:32:00Z"
+      created_at: new Date("2023-10-24T16:32:00Z")
     },
     {
       id: "car-2",
@@ -143,13 +152,13 @@ function seedDefaultCars(db: SqlJsDatabase) {
       photographer_instagram: "@vance_visuals",
       image_url: "https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1400",
       cartoon_image_url: null,
-      has_cartoon: 0,
+      has_cartoon: false,
       tags: JSON.stringify(["BMW", "M4", "Competition", "CanyonRun", "G82", "Turbo"]),
       views: 980,
       downloads: 215,
       resolution: "High Resolution • 300 DPI",
       camera_info: "Canon R5 • 50mm f/1.2 L • 1/1600s • ISO 100",
-      created_at: "2023-10-24T15:15:00Z"
+      created_at: new Date("2023-10-24T15:15:00Z")
     },
     {
       id: "car-3",
@@ -169,13 +178,13 @@ function seedDefaultCars(db: SqlJsDatabase) {
       photographer_instagram: "@tchen_shutter",
       image_url: "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1400",
       cartoon_image_url: null,
-      has_cartoon: 0,
+      has_cartoon: false,
       tags: JSON.stringify(["Mazda", "Miata", "NA", "JDM", "PopUpHeadlights", "Grassroots"]),
       views: 2150,
       downloads: 740,
       resolution: "High Resolution • 300 DPI",
       camera_info: "Nikon Z9 • 85mm f/1.4 • 1/3200s • ISO 64",
-      created_at: "2023-10-22T14:10:00Z"
+      created_at: new Date("2023-10-22T14:10:00Z")
     },
     {
       id: "car-4",
@@ -195,23 +204,24 @@ function seedDefaultCars(db: SqlJsDatabase) {
       photographer_instagram: "@rivera_motorsport",
       image_url: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1400",
       cartoon_image_url: null,
-      has_cartoon: 0,
+      has_cartoon: false,
       tags: JSON.stringify(["Nissan", "Skyline", "GTR", "R34", "BaysideBlue", "JDM", "Legend"]),
       views: 3410,
       downloads: 1290,
       resolution: "High Resolution • 300 DPI",
       camera_info: "Sony Alpha • 24-70mm f/2.8 GM • 1/1000s • ISO 100",
-      created_at: "2023-10-20T09:45:00Z"
+      created_at: new Date("2023-10-20T09:45:00Z")
     }
   ];
 
   for (const car of initialCars) {
-    db.run(
+    await pool.query(
       `INSERT INTO cars (
         id, plate_number, car_name, make, model, year, color, event, location, date,
         photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
         image_url, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20, $21, $22, $23, $24)
+      ON CONFLICT (id) DO NOTHING`,
       [
         car.id,
         car.plate_number,
@@ -277,54 +287,50 @@ export function mapRowToCar(row: any) {
     downloads: row.downloads || 0,
     resolution: row.resolution || "High Resolution • 300 DPI",
     cameraInfo: row.camera_info || "Pro Camera • 50mm",
-    createdAt: row.created_at || new Date().toISOString(),
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
   };
 }
 
-export function searchCarsInDatabase(db: SqlJsDatabase, query: string, eventFilter?: string, tagFilter?: string) {
+export async function searchCarsInPostgres(query: string, eventFilter?: string, tagFilter?: string) {
+  const pool = getPgPool();
   let sql = `SELECT * FROM cars WHERE 1=1`;
   const params: any[] = [];
+  let paramIdx = 1;
 
   if (query && query.trim()) {
     const q = query.trim();
     const cleanPlate = q.replace(/[\s\-_.]/g, '');
 
     sql += ` AND (
-      REPLACE(REPLACE(REPLACE(UPPER(plate_number), ' ', ''), '-', ''), '_', '') LIKE UPPER(?)
-      OR UPPER(plate_number) LIKE UPPER(?)
-      OR UPPER(car_name) LIKE UPPER(?)
-      OR UPPER(make) LIKE UPPER(?)
-      OR UPPER(model) LIKE UPPER(?)
-      OR UPPER(event) LIKE UPPER(?)
-      OR UPPER(location) LIKE UPPER(?)
-      OR UPPER(photographer_name) LIKE UPPER(?)
-      OR UPPER(tags) LIKE UPPER(?)
-      OR CAST(year AS TEXT) LIKE ?
+      REGEXP_REPLACE(UPPER(plate_number), '[\\s\\-_.]', '', 'g') ILIKE $${paramIdx}
+      OR plate_number ILIKE $${paramIdx + 1}
+      OR car_name ILIKE $${paramIdx + 1}
+      OR make ILIKE $${paramIdx + 1}
+      OR model ILIKE $${paramIdx + 1}
+      OR event ILIKE $${paramIdx + 1}
+      OR location ILIKE $${paramIdx + 1}
+      OR photographer_name ILIKE $${paramIdx + 1}
+      OR tags::text ILIKE $${paramIdx + 1}
+      OR CAST(year AS TEXT) ILIKE $${paramIdx + 1}
     )`;
-    const p1 = `%${cleanPlate}%`;
-    const p2 = `%${q}%`;
-    params.push(p1, p2, p2, p2, p2, p2, p2, p2, p2, p2);
+    params.push(`%${cleanPlate}%`, `%${q}%`);
+    paramIdx += 2;
   }
 
   if (eventFilter && eventFilter !== 'All Events' && eventFilter.trim()) {
-    sql += ` AND event = ?`;
+    sql += ` AND event = $${paramIdx}`;
     params.push(eventFilter.trim());
+    paramIdx += 1;
   }
 
   if (tagFilter && tagFilter.trim()) {
-    sql += ` AND UPPER(tags) LIKE UPPER(?)`;
+    sql += ` AND tags::text ILIKE $${paramIdx}`;
     params.push(`%${tagFilter.trim()}%`);
+    paramIdx += 1;
   }
 
   sql += ` ORDER BY created_at DESC`;
 
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows: any[] = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-
-  return rows.map(mapRowToCar);
+  const result = await pool.query(sql, params);
+  return result.rows.map(mapRowToCar);
 }
