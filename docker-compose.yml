@@ -1,0 +1,23 @@
+services:
+  plate-snap-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: plate-snap-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-platesnap2026}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      # Mount the local ./data directory into container for permanent photo & database storage
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
