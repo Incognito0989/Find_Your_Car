@@ -270,6 +270,14 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       instagram: '@rivera_motorsport'
     },
     imageUrl: 'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400',
+    images: [
+      'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1400'
+    ],
     cartoonImageUrl: SAMPLE_CARTOON_PORSCHE_SVG,
     hasCartoon: true,
     tags: ['Porsche', 'GT3RS', 'TrackDay', 'LagunaSeca', 'Supercar', '992'],
@@ -298,6 +306,13 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       instagram: '@vance_visuals'
     },
     imageUrl: 'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1400',
+    images: [
+      'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1556189250-72ba954cfc2b?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1400'
+    ],
     cartoonImageUrl: SAMPLE_CARTOON_BMW_SVG,
     hasCartoon: true,
     tags: ['BMW', 'M4', 'G82', 'CanyonCarver', 'TwinTurbo', 'IsleOfMan'],
@@ -326,6 +341,12 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       instagram: '@rostova_lens'
     },
     imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1400',
+    images: [
+      'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1400'
+    ],
     cartoonImageUrl: SAMPLE_CARTOON_CORVETTE_SVG,
     hasCartoon: true,
     tags: ['Corvette', 'C8', 'V8', 'MidEngine', 'GoldenHour', 'Malibu'],
@@ -354,6 +375,13 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       instagram: '@kenji_jdm'
     },
     imageUrl: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1400',
+    images: [
+      'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400'
+    ],
     cartoonImageUrl: SAMPLE_CARTOON_MIATA_SVG,
     hasCartoon: true,
     tags: ['Mazda', 'Miata', 'NA', 'PopUpHeadlights', 'JDM', 'CuteCar', 'Touge'],
@@ -382,6 +410,12 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       instagram: '@rivera_motorsport'
     },
     imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1400',
+    images: [
+      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&q=80&w=1400'
+    ],
     cartoonImageUrl: SAMPLE_CARTOON_MIATA_SVG,
     hasCartoon: false,
     tags: ['Nissan', 'GTR', 'R34', 'Godzilla', 'RB26', 'JDM', 'BaysideBlue'],
@@ -410,6 +444,12 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       instagram: '@vance_visuals'
     },
     imageUrl: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1400',
+    images: [
+      'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1400',
+      'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400'
+    ],
     cartoonImageUrl: SAMPLE_CARTOON_BMW_SVG,
     hasCartoon: false,
     tags: ['Mercedes', 'AMG', 'E55', 'V8Kompressor', 'Supercharged', 'Autobahn'],

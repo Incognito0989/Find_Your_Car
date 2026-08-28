@@ -7,8 +7,17 @@ import { createServer as createViteServer } from "vite";
 import {
   getPgPool,
   initializePostgresDatabase,
-  mapRowToCar,
+  getIsPostgresAvailable,
   searchCarsInPostgres,
+  getCarByIdFromDb,
+  insertCarIntoDb,
+  updateCarInDb,
+  deleteCarFromDb,
+  incrementDownloadInDb,
+  getThemeFromDb,
+  saveThemeToDb,
+  getLocalCars,
+  mapRowToCar,
 } from "./src/utils/database";
 
 const app = express();
@@ -80,10 +89,16 @@ function saveBase64ImageToDisk(dataUrl: string, prefix = "car"): string {
 const activeSessions = new Set<string>();
 
 function getAdminCredentials() {
+  const email = (process.env.ADMIN_EMAIL || "admin@platesnapcars.local").toLowerCase().trim();
+  const password = (process.env.ADMIN_PASSWORD || "platesnap2026").trim();
+  let name = (process.env.ADMIN_NAME || "Lead Automotive Photographer").trim();
+  if (name === password || !name) {
+    name = "Lead Automotive Photographer";
+  }
   return {
-    email: (process.env.ADMIN_EMAIL || "admin@platesnapcars.local").toLowerCase().trim(),
-    password: (process.env.ADMIN_PASSWORD || "platesnap2026").trim(),
-    name: process.env.ADMIN_NAME || "Lead Automotive Photographer",
+    email,
+    password,
+    name,
   };
 }
 
@@ -105,54 +120,61 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
 // Health Check / Backend Status Endpoint
 app.get("/api/health", async (req: Request, res: Response) => {
-  try {
-    const pool = getPgPool();
-    const result = await pool.query("SELECT COUNT(*) as count FROM cars");
-    const count = parseInt(result.rows[0].count, 10);
+  const isPgUp = getIsPostgresAvailable();
+  const cars = getLocalCars();
 
-    res.json({
-      status: "ok",
-      service: "PlateSnap PostgreSQL Backend API",
-      database: "PostgreSQL",
-      host: process.env.POSTGRES_HOST || "postgres",
-      totalCarsIndexed: count,
-      mode: process.env.BACKEND_ONLY === "true" ? "headless-backend" : "fullstack",
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      status: "database_error",
-      database: "PostgreSQL (connecting...)",
-      error: err.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
+  res.json({
+    status: "ok",
+    service: "PlateSnap Automotive Backend API",
+    database: isPgUp ? "PostgreSQL (Connected)" : "Local Storage Engine (Active)",
+    postgresHost: process.env.POSTGRES_HOST || "postgres",
+    isPostgresConnected: isPgUp,
+    totalCarsIndexed: cars.length,
+    mode: process.env.BACKEND_ONLY === "true" ? "headless-backend" : "fullstack",
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// Admin public info (for login verification / branding)
+// Admin public info (for public photographer credit display)
 app.get("/api/admin/info", (req: Request, res: Response) => {
   const creds = getAdminCredentials();
   res.json({
-    adminEmail: creds.email,
     adminName: creds.name,
   });
 });
 
 // Admin Login
 app.post("/api/admin/login", (req: Request, res: Response) => {
-  const { password, email } = req.body;
+  const { password, email, username, identifier } = req.body;
   if (!password) {
     return res.status(400).json({ error: "Password is required." });
   }
 
   const creds = getAdminCredentials();
+  const inputIdentifier = (identifier || username || email || "").toLowerCase().trim();
+  const inputPassword = String(password).trim();
 
-  if (email && email.toLowerCase().trim() !== creds.email) {
-    return res.status(401).json({ error: `Invalid admin email. Expected: ${creds.email}` });
+  // Valid identifiers include configured email/username, name, and standard admin aliases
+  const validIdentifiers = new Set([
+    creds.email.toLowerCase().trim(),
+    creds.name.toLowerCase().trim(),
+    "admin",
+    "administrator",
+    "admin@platesnapcars.local",
+  ]);
+
+  if (process.env.ADMIN_EMAIL) {
+    validIdentifiers.add(process.env.ADMIN_EMAIL.toLowerCase().trim());
   }
 
-  if (password.trim() !== creds.password) {
-    return res.status(401).json({ error: "Invalid admin password. Please check your credentials." });
+  const isPasswordValid =
+    inputPassword === creds.password ||
+    inputPassword === (process.env.ADMIN_PASSWORD || "platesnap2026");
+
+  const isIdentifierValid = !inputIdentifier || validIdentifiers.has(inputIdentifier);
+
+  if (!isPasswordValid || !isIdentifierValid) {
+    return res.status(401).json({ error: "Invalid credentials. Please verify your username/email and password." });
   }
 
   const token = `adm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
@@ -178,7 +200,7 @@ app.post("/api/admin/logout", (req: Request, res: Response) => {
 });
 
 // ==========================================
-// POSTGRESQL SEARCH & CARS ENDPOINTS
+// POSTGRESQL & SEARCH CARS ENDPOINTS
 // ==========================================
 
 // GET all cars / Search with dynamic SQL queries & indexes
@@ -191,7 +213,7 @@ app.get("/api/cars", async (req: Request, res: Response) => {
     const results = await searchCarsInPostgres(q, event, tag);
     res.json({ cars: results, total: results.length });
   } catch (err: any) {
-    console.error("PostgreSQL Search error:", err);
+    console.error("Search error:", err);
     res.status(500).json({ error: "Search query failed on database engine." });
   }
 });
@@ -200,17 +222,13 @@ app.get("/api/cars", async (req: Request, res: Response) => {
 app.get("/api/cars/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const pool = getPgPool();
-    const result = await pool.query("SELECT * FROM cars WHERE id = $1", [id]);
+    const car = await getCarByIdFromDb(id);
 
-    if (result.rows.length === 0) {
+    if (!car) {
       return res.status(404).json({ error: "Vehicle photo record not found" });
     }
 
-    // Increment view count
-    await pool.query("UPDATE cars SET views = views + 1 WHERE id = $1", [id]);
-
-    res.json({ car: mapRowToCar(result.rows[0]) });
+    res.json({ car });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -229,6 +247,7 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
       event,
       photographer,
       imageUrl,
+      images,
       cartoonImageUrl,
       hasCartoon,
       tags,
@@ -237,14 +256,31 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
       location,
     } = req.body;
 
-    if (!plateNumber || !imageUrl) {
-      return res.status(400).json({ error: "Plate number and image are required." });
+    const rawImagesList: string[] = Array.isArray(images) && images.length > 0 ? images : (imageUrl ? [imageUrl] : []);
+
+    if (!plateNumber || rawImagesList.length === 0) {
+      return res.status(400).json({ error: "Plate number and at least one image are required." });
     }
 
     const cleanPlate = plateNumber.toUpperCase().trim();
-    const savedImageUrl = saveBase64ImageToDisk(imageUrl, `plate_${cleanPlate.replace(/[^a-zA-Z0-9]/g, "")}`);
+    const cleanPlateSlug = cleanPlate.replace(/[^a-zA-Z0-9]/g, "");
+
+    // Process all images in the set/folder
+    const savedImages: string[] = rawImagesList.map((img: string, idx: number) => {
+      if (img && img.startsWith("data:image/")) {
+        return saveBase64ImageToDisk(img, `plate_${cleanPlateSlug}_${idx + 1}_${Date.now()}`);
+      }
+      return img;
+    });
+
+    const primaryImageUrl = imageUrl && imageUrl.startsWith("data:image/")
+      ? savedImages[0]
+      : (imageUrl || savedImages[0]);
+
     const savedCartoonUrl = cartoonImageUrl
-      ? saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${cleanPlate.replace(/[^a-zA-Z0-9]/g, "")}`)
+      ? (cartoonImageUrl.startsWith("data:image/")
+          ? saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${cleanPlateSlug}`)
+          : cartoonImageUrl)
       : null;
 
     const carId = `car-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -255,43 +291,41 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
     const tagsArray = Array.isArray(tags) ? tags : ["CarMeet", make || "Automotive"];
     const creds = getAdminCredentials();
 
-    const pool = getPgPool();
-    const insertRes = await pool.query(
-      `INSERT INTO cars (
-        id, plate_number, car_name, make, model, year, color, event, location, date,
-        photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
-        image_url, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, 1, 0, $20, $21, NOW())
-      RETURNING *`,
-      [
-        carId,
-        cleanPlate,
-        carName || `${make || "Custom"} ${model || "Vehicle"}`,
-        make || "Custom",
-        model || "Vehicle",
-        year ? parseInt(year, 10) : new Date().getFullYear(),
-        color || "Custom Color",
-        event || "Automotive Gathering",
-        location || "Metropolitan Car Meet",
-        formattedDate,
-        photographer?.name || creds.name,
-        photographer?.title || "Automotive Photographer",
-        photographer?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-        photographer?.bio || "Official Plate Snap Cars verified shooter.",
-        photographer?.instagram || "",
-        savedImageUrl,
-        savedCartoonUrl,
-        Boolean(hasCartoon || savedCartoonUrl),
-        JSON.stringify(tagsArray),
-        resolution || "High Resolution • 300 DPI",
-        cameraInfo || "Sony Alpha • 50mm f/1.8 • 1/1000s • ISO 100",
-      ]
-    );
+    const newCar = {
+      id: carId,
+      plateNumber: cleanPlate,
+      carName: carName || `${make || "Custom"} ${model || "Vehicle"}`,
+      make: make || "Custom",
+      model: model || "Vehicle",
+      year: year ? parseInt(year, 10) : new Date().getFullYear(),
+      color: color || "Custom Color",
+      event: event || "Automotive Gathering",
+      location: location || "Metropolitan Car Meet",
+      date: formattedDate,
+      photographer: {
+        name: photographer?.name || creds.name,
+        title: photographer?.title || "Automotive Photographer",
+        avatar: photographer?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+        bio: photographer?.bio || "Official Plate Snap Cars verified shooter.",
+        instagram: photographer?.instagram || "",
+      },
+      imageUrl: primaryImageUrl,
+      images: savedImages,
+      cartoonImageUrl: savedCartoonUrl,
+      hasCartoon: Boolean(hasCartoon || savedCartoonUrl),
+      tags: tagsArray,
+      views: 1,
+      downloads: 0,
+      resolution: resolution || "High Resolution • 300 DPI",
+      cameraInfo: cameraInfo || "Sony Alpha • 50mm f/1.8 • 1/1000s • ISO 100",
+      createdAt: new Date().toISOString(),
+    };
 
-    res.status(201).json({ success: true, car: mapRowToCar(insertRes.rows[0]) });
+    const inserted = await insertCarIntoDb(newCar);
+    res.status(201).json({ success: true, car: inserted });
   } catch (err: any) {
-    console.error("Error creating car in PostgreSQL:", err);
-    res.status(500).json({ error: err.message || "Failed to create vehicle record in database." });
+    console.error("Error creating car:", err);
+    res.status(500).json({ error: err.message || "Failed to create vehicle record." });
   }
 });
 
@@ -299,14 +333,6 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
 app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const pool = getPgPool();
-
-    const existingRes = await pool.query("SELECT * FROM cars WHERE id = $1", [id]);
-    if (existingRes.rows.length === 0) {
-      return res.status(404).json({ error: "Car record not found." });
-    }
-    const existing = existingRes.rows[0];
-
     let {
       plateNumber,
       carName,
@@ -317,57 +343,54 @@ app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
       event,
       location,
       imageUrl,
+      images,
       cartoonImageUrl,
       hasCartoon,
       tags,
     } = req.body;
 
+    let savedImages: string[] = [];
+    if (Array.isArray(images) && images.length > 0) {
+      savedImages = images.map((img: string, idx: number) => {
+        if (img && img.startsWith("data:image/")) {
+          return saveBase64ImageToDisk(img, `plate_${id}_${idx + 1}_${Date.now()}`);
+        }
+        return img;
+      });
+    }
+
     if (imageUrl && imageUrl.startsWith("data:image/")) {
-      imageUrl = saveBase64ImageToDisk(imageUrl, `plate_${id}`);
-    } else if (!imageUrl) {
-      imageUrl = existing.image_url;
+      imageUrl = saveBase64ImageToDisk(imageUrl, `plate_${id}_cover_${Date.now()}`);
+    } else if (!imageUrl && savedImages.length > 0) {
+      imageUrl = savedImages[0];
     }
 
     if (cartoonImageUrl && cartoonImageUrl.startsWith("data:image/")) {
-      cartoonImageUrl = saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${id}`);
+      cartoonImageUrl = saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${id}_${Date.now()}`);
     }
 
-    const tagsJson = tags ? (Array.isArray(tags) ? JSON.stringify(tags) : tags) : JSON.stringify(existing.tags);
+    const updates: any = {
+      ...(plateNumber ? { plateNumber: plateNumber.toUpperCase().trim() } : {}),
+      ...(carName ? { carName } : {}),
+      ...(make ? { make } : {}),
+      ...(model ? { model } : {}),
+      ...(year ? { year: parseInt(year, 10) } : {}),
+      ...(color ? { color } : {}),
+      ...(event ? { event } : {}),
+      ...(location ? { location } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(savedImages.length > 0 ? { images: savedImages } : {}),
+      ...(cartoonImageUrl !== undefined ? { cartoonImageUrl } : {}),
+      ...(hasCartoon !== undefined ? { hasCartoon: Boolean(hasCartoon) } : {}),
+      ...(tags ? { tags: Array.isArray(tags) ? tags : [tags] } : {}),
+    };
 
-    const updateRes = await pool.query(
-      `UPDATE cars SET
-        plate_number = $1,
-        car_name = $2,
-        make = $3,
-        model = $4,
-        year = $5,
-        color = $6,
-        event = $7,
-        location = $8,
-        image_url = $9,
-        cartoon_image_url = $10,
-        has_cartoon = $11,
-        tags = $12::jsonb
-      WHERE id = $13
-      RETURNING *`,
-      [
-        plateNumber ? plateNumber.toUpperCase().trim() : existing.plate_number,
-        carName || existing.car_name,
-        make || existing.make,
-        model || existing.model,
-        year ? parseInt(year, 10) : existing.year,
-        color || existing.color,
-        event || existing.event,
-        location || existing.location,
-        imageUrl,
-        cartoonImageUrl || existing.cartoon_image_url,
-        hasCartoon !== undefined ? Boolean(hasCartoon) : existing.has_cartoon,
-        tagsJson,
-        id,
-      ]
-    );
+    const updated = await updateCarInDb(id, updates);
+    if (!updated) {
+      return res.status(404).json({ error: "Car record not found." });
+    }
 
-    res.json({ success: true, car: mapRowToCar(updateRes.rows[0]) });
+    res.json({ success: true, car: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -377,15 +400,8 @@ app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
 app.post("/api/cars/:id/download", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const pool = getPgPool();
-    const result = await pool.query(
-      "UPDATE cars SET downloads = downloads + 1 WHERE id = $1 RETURNING downloads",
-      [id]
-    );
-    if (result.rows.length > 0) {
-      return res.json({ success: true, downloads: result.rows[0].downloads });
-    }
-    res.status(404).json({ error: "Car not found" });
+    const downloads = await incrementDownloadInDb(id);
+    res.json({ success: true, downloads });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -395,8 +411,7 @@ app.post("/api/cars/:id/download", async (req: Request, res: Response) => {
 app.delete("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const pool = getPgPool();
-    await pool.query("DELETE FROM cars WHERE id = $1", [id]);
+    await deleteCarFromDb(id);
     res.json({ success: true, message: "Car record deleted successfully." });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -406,12 +421,8 @@ app.delete("/api/cars/:id", requireAdmin, async (req: Request, res: Response) =>
 // GET saved theme config
 app.get("/api/theme", async (req: Request, res: Response) => {
   try {
-    const pool = getPgPool();
-    const result = await pool.query("SELECT value FROM app_settings WHERE key = 'theme'");
-    if (result.rows.length > 0) {
-      return res.json({ theme: result.rows[0].value });
-    }
-    res.json({ theme: null });
+    const theme = await getThemeFromDb();
+    res.json({ theme });
   } catch (err: any) {
     res.json({ theme: null });
   }
@@ -423,13 +434,7 @@ app.post("/api/theme", requireAdmin, async (req: Request, res: Response) => {
     const { theme } = req.body;
     if (!theme) return res.status(400).json({ error: "Theme configuration required." });
 
-    const pool = getPgPool();
-    await pool.query(
-      `INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', $1::jsonb, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [JSON.stringify(theme)]
-    );
-
+    await saveThemeToDb(theme);
     res.json({ success: true, theme });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -440,9 +445,9 @@ app.post("/api/theme", requireAdmin, async (req: Request, res: Response) => {
 // SERVER INITIALIZATION
 // ==========================================
 async function startServer() {
-  // Initialize and connect to PostgreSQL
+  // Initialize and connect to PostgreSQL (or seamlessly use file storage)
   initializePostgresDatabase().catch((err) => {
-    console.warn("[PostgreSQL] Background initialization noticed:", err.message);
+    console.log("[Database] Local store ready, background PostgreSQL probe noticed:", err.message);
   });
 
   const isBackendOnly = process.env.BACKEND_ONLY === "true";
@@ -482,9 +487,9 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`====================================================`);
-    console.log(`🏎️ PlateSnap PostgreSQL Backend Server`);
+    console.log(`🏎️ PlateSnap Automotive Server`);
     console.log(`📡 URL: http://0.0.0.0:${PORT}`);
-    console.log(`🐘 Database: PostgreSQL (${process.env.POSTGRES_HOST || "postgres"}:5432/${process.env.POSTGRES_DB || "platesnap_db"})`);
+    console.log(`🐘 Database Engine: PostgreSQL / Resilient Multi-Storage`);
     console.log(`🖼️ Media Storage: -> ${UPLOADS_DIR}`);
     console.log(`🔌 Mode: ${isBackendOnly ? "Headless Backend API" : "Fullstack"}`);
     console.log(`====================================================`);
@@ -492,3 +497,4 @@ async function startServer() {
 }
 
 startServer();
+

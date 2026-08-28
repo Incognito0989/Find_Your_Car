@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Upload,
   Crop,
@@ -27,12 +27,18 @@ import {
   LogOut,
   Search,
   Zap,
+  Star,
+  FolderUp,
+  Images,
+  Maximize2,
+  X,
 } from 'lucide-react';
 import { CarPhoto, AppThemeConfig, VehicleLookupResult } from '../types';
 import { ImageEditorModal } from './ImageEditorModal';
 import { CartoonArtStudio } from './CartoonArtStudio';
 import { DEFAULT_THEMES } from '../data/initialData';
 import { applyThemeToDocument } from '../utils/themeUtils';
+import { formatMediaUrl } from '../utils/apiConfig';
 
 interface AdminPortalProps {
   cars: CarPhoto[];
@@ -44,6 +50,12 @@ interface AdminPortalProps {
   onBackToVisitor: () => void;
   onLogoutAdmin?: () => void;
   adminName?: string;
+}
+
+interface StagedPhoto {
+  id: string;
+  url: string;
+  name: string;
 }
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
@@ -71,11 +83,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [photographerName, setPhotographerName] = useState<string>(adminName || 'Alex Rivera');
   const [photographerTitle, setPhotographerTitle] = useState<string>('Automotive Photographer');
   const [tagsInput, setTagsInput] = useState<string>('TrackDay, Supercar, HighRes');
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
+
+  // Multi-image Staging State
+  const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
+  const [coverIndex, setCoverIndex] = useState<number>(0);
+  const [activeEditingPhotoIndex, setActiveEditingPhotoIndex] = useState<number>(0);
+
   const [cartoonImageUrl, setCartoonImageUrl] = useState<string | null>(null);
   const [hasCartoon, setHasCartoon] = useState<boolean>(false);
   const [resolution, setResolution] = useState<string>('High Resolution • 300 DPI');
   const [cameraInfo, setCameraInfo] = useState<string>('Sony Alpha • 70-200mm f/2.8 GM • ISO 100');
+
+  // Fleet Existing Car Photo Management Modal
+  const [editingCarGallery, setEditingCarGallery] = useState<CarPhoto | null>(null);
+
+  // Hidden File Input References
+  const multiFileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const manageCarFileInputRef = useRef<HTMLInputElement>(null);
 
   // Online Plate Auto-Lookup State
   const [isLookingUpPlate, setIsLookingUpPlate] = useState<boolean>(false);
@@ -150,64 +175,142 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [themeForm, setThemeForm] = useState<AppThemeConfig>({ ...currentTheme });
   const [themeSavedToast, setThemeSavedToast] = useState<boolean>(false);
 
-  // Quick sample photo library for easy testing
+  // Quick sample photo library for easy testing with multi-photo arrays
   const SAMPLE_PHOTOS = [
     {
-      label: 'Porsche 911 GT3 RS',
+      label: 'Porsche 911 GT3 RS (6 Photos)',
       plate: 'GT3-992',
       make: 'Porsche',
       model: '911 GT3 RS',
       color: 'Python Green',
       url: 'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1200',
+      images: [
+        'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200',
+      ],
     },
     {
-      label: 'Mazda Miata Pop-Up NA',
+      label: 'Mazda Miata Pop-Up NA (4 Photos)',
       plate: 'MIATA-91',
       make: 'Mazda',
       model: 'MX-5 Miata',
       color: 'Classic Pink',
       url: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200',
+      images: [
+        'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
+      ],
     },
     {
-      label: 'BMW M4 Competition',
+      label: 'BMW M4 Competition (4 Photos)',
       plate: 'M4-PERF',
       make: 'BMW',
       model: 'M4 Competition G82',
       color: 'Yas Marina Blue',
       url: 'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1200',
+      images: [
+        'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1555353540-64580b51c258?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1200',
+      ],
     },
     {
-      label: 'Corvette C8 Stingray',
+      label: 'Corvette C8 Stingray (4 Photos)',
       plate: 'VETTE-8',
       make: 'Chevrolet',
       model: 'Corvette C8',
       color: 'Sebring Orange',
       url: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200',
+      images: [
+        'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
+        'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1200',
+      ],
     },
   ];
 
-  // Handle local file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setUploadedImageUrl(result);
-        setStatusMsg({ type: 'success', text: `Loaded image "${file.name}". You can now crop or convert to cartoon art!` });
-      };
-      reader.readAsDataURL(file);
+  // Process a list of File objects (from multi-select, folder input, or drag-and-drop)
+  const handleFilesAdded = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(
+      (f) => f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|tiff|gif)$/i.test(f.name)
+    );
+
+    if (fileArray.length === 0) {
+      setStatusMsg({ type: 'error', text: 'No supported image files found in selection.' });
+      return;
+    }
+
+    const readers = fileArray.map((file) => {
+      return new Promise<StagedPhoto>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          resolve({
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            url: event.target?.result as string,
+            name: file.name,
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    try {
+      const loaded = await Promise.all(readers);
+      setStagedPhotos((prev) => [...prev, ...loaded]);
+      setStatusMsg({
+        type: 'success',
+        text: `📸 Successfully staged ${loaded.length} automotive photo${loaded.length > 1 ? 's' : ''}!`,
+      });
+    } catch (e) {
+      setStatusMsg({ type: 'error', text: 'Error reading selected files.' });
     }
   };
 
+  // Drag and drop event handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesAdded(e.dataTransfer.files);
+    }
+  };
+
+  // Remove photo from staging list
+  const handleRemovePhoto = (id: string, idx: number) => {
+    setStagedPhotos((prev) => prev.filter((p) => p.id !== id));
+    if (coverIndex >= idx && coverIndex > 0) {
+      setCoverIndex(coverIndex - 1);
+    }
+  };
+
+  // Select sample template
   const handleSelectSample = (sample: (typeof SAMPLE_PHOTOS)[0]) => {
-    setUploadedImageUrl(sample.url);
+    const photos: StagedPhoto[] = sample.images.map((imgUrl, i) => ({
+      id: `sample-${i}-${Date.now()}`,
+      url: imgUrl,
+      name: `${sample.make}_Angle_${i + 1}.jpg`,
+    }));
+    setStagedPhotos(photos);
+    setCoverIndex(0);
     setPlateNumber(sample.plate);
     setMake(sample.make);
     setModel(sample.model);
     setCarName(`${sample.make} ${sample.model}`);
     setColor(sample.color);
-    setStatusMsg({ type: 'success', text: `Loaded template for ${sample.label}.` });
+    setStatusMsg({ type: 'success', text: `Loaded ${photos.length} multi-angle photos for ${sample.label}.` });
   };
 
   // Submit new car to backend
@@ -217,8 +320,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setStatusMsg({ type: 'error', text: 'License plate number is required for all uploads.' });
       return;
     }
-    if (!uploadedImageUrl) {
-      setStatusMsg({ type: 'error', text: 'Please upload or select an automotive image first.' });
+    if (stagedPhotos.length === 0) {
+      setStatusMsg({ type: 'error', text: 'Please upload at least one photo or a folder of photos.' });
       return;
     }
 
@@ -228,6 +331,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         .split(',')
         .map((t) => t.trim().replace(/^#/, ''))
         .filter(Boolean);
+
+      const coverPhoto = stagedPhotos[coverIndex] || stagedPhotos[0];
+      const allImagesUrls = stagedPhotos.map((p) => p.url);
 
       await onAddCar({
         plateNumber: plateNumber.toUpperCase().trim(),
@@ -244,7 +350,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
           bio: 'Verified Plate Snap Cars high-resolution event photographer.',
         },
-        imageUrl: uploadedImageUrl,
+        imageUrl: coverPhoto.url,
+        images: allImagesUrls,
         cartoonImageUrl: cartoonImageUrl || undefined,
         hasCartoon: Boolean(hasCartoon || cartoonImageUrl),
         tags: tagsArray.length > 0 ? tagsArray : [make, 'CarMeet'],
@@ -254,21 +361,86 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       setStatusMsg({
         type: 'success',
-        text: `Successfully published photo for plate [${plateNumber.toUpperCase()}]. It is now searchable in the visitor dashboard!`,
+        text: `Successfully published ${allImagesUrls.length} photos for plate [${plateNumber.toUpperCase()}]. It is now searchable in the visitor dashboard!`,
       });
 
       // Reset form
       setPlateNumber('');
       setModel('');
       setCarName('');
-      setUploadedImageUrl('');
+      setStagedPhotos([]);
+      setCoverIndex(0);
       setCartoonImageUrl(null);
       setHasCartoon(false);
     } catch (err: any) {
-      setStatusMsg({ type: 'error', text: err.message || 'Failed to upload car photo' });
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to upload car photos' });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Adding photos to an existing car in fleet
+  const handleAddPhotosToExistingCar = async (files: FileList | File[]) => {
+    if (!editingCarGallery) return;
+
+    const fileArray = Array.from(files).filter(
+      (f) => f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|tiff|gif)$/i.test(f.name)
+    );
+
+    if (fileArray.length === 0) return;
+
+    const readers = fileArray.map((file) => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+    });
+
+    const newUrls = await Promise.all(readers);
+    const existingImages = Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
+      ? editingCarGallery.images
+      : [editingCarGallery.imageUrl];
+
+    const updatedImages = [...existingImages, ...newUrls];
+    await onUpdateCar(editingCarGallery.id, { images: updatedImages });
+
+    setEditingCarGallery({
+      ...editingCarGallery,
+      images: updatedImages,
+    });
+
+    setStatusMsg({
+      type: 'success',
+      text: `Added ${newUrls.length} photos to [${editingCarGallery.plateNumber}]. Total photos: ${updatedImages.length}`,
+    });
+  };
+
+  // Remove photo from existing car
+  const handleRemovePhotoFromExistingCar = async (photoIndex: number) => {
+    if (!editingCarGallery) return;
+    const existingImages = Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
+      ? [...editingCarGallery.images]
+      : [editingCarGallery.imageUrl];
+
+    if (existingImages.length <= 1) {
+      setStatusMsg({ type: 'error', text: 'A car must have at least one photo.' });
+      return;
+    }
+
+    existingImages.splice(photoIndex, 1);
+    const newCover = existingImages[0];
+
+    await onUpdateCar(editingCarGallery.id, {
+      images: existingImages,
+      imageUrl: newCover,
+    });
+
+    setEditingCarGallery({
+      ...editingCarGallery,
+      images: existingImages,
+      imageUrl: newCover,
+    });
   };
 
   // Theme Live Preview & Apply
@@ -289,6 +461,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTimeout(() => setThemeSavedToast(false), 3000);
   };
 
+  const currentCoverPhoto = stagedPhotos[coverIndex] || stagedPhotos[0];
+
   return (
     <div className="min-h-screen bg-[var(--ps-bg,#000000)] text-[var(--ps-text-main,#ffffff)] pb-24 transition-colors duration-300">
       {/* Top Admin Navigation Bar */}
@@ -300,51 +474,46 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Visitor Portal
+              <span>Back to Visitor Site</span>
             </button>
-            <div className="h-4 w-[1px] bg-[#2C2C2E]" />
+            <div className="h-4 w-px bg-white/20 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
-                ADMIN SECURE
-              </span>
-              <span className="font-bold text-sm tracking-tight hidden sm:inline">
-                {adminName || 'Admin Photographer'} Studio
-              </span>
+              <Shield className="w-4 h-4 text-green-400" />
+              <span className="font-bold text-sm text-white">Photographer Admin Portal</span>
+              <span className="text-[11px] text-gray-400 font-mono hidden md:inline">({adminName})</span>
             </div>
           </div>
 
-          {/* Tab Navigation & Logout */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2C2C2E]">
+          <div className="flex items-center gap-2">
+            {/* Tabs Selector */}
+            <div className="flex items-center bg-[#1C1C1E] p-1 rounded-xl border border-[#2C2C2E]">
               <button
                 onClick={() => setActiveTab('upload')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'upload'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <Upload className="w-3.5 h-3.5" />
-                Upload & Studio
+                <FolderUp className="w-3.5 h-3.5" />
+                Upload Multi-Photos & Folder
               </button>
-
               <button
                 onClick={() => setActiveTab('theme')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'theme'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
                 <Palette className="w-3.5 h-3.5" />
-                UI Theme Changer
+                Theme Studio
               </button>
-
               <button
                 onClick={() => setActiveTab('fleet')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'fleet'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
@@ -396,66 +565,117 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         )}
 
-        {/* TAB 1: UPLOAD & STUDIO SUITE */}
+        {/* TAB 1: MULTI-IMAGE & FOLDER UPLOAD SUITE */}
         {activeTab === 'upload' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Side: Upload & Media Prep (7 cols) */}
+            {/* Left Side: Upload & Multi-Photo Staging Tray (7 cols) */}
             <div className="lg:col-span-7 space-y-6">
               <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl space-y-6">
                 <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
                   <div>
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <FileImage className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
-                      Image Media & Staging
+                      <Images className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
+                      Vehicle Gallery & Media Staging
                     </h2>
                     <p className="text-xs text-gray-400">
-                      Upload high-res automotive file, crop & level orientation, and generate 2D cartoon art
+                      Upload individual photos, batch multi-select, or upload an entire folder of vehicle captures
                     </p>
                   </div>
+
+                  {stagedPhotos.length > 0 && (
+                    <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-mono font-bold px-3 py-1 rounded-full">
+                      {stagedPhotos.length} {stagedPhotos.length === 1 ? 'Photo' : 'Photos'} Staged
+                    </span>
+                  )}
                 </div>
 
+                {/* Hidden Multi-file and Folder Inputs */}
+                <input
+                  ref={multiFileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => e.target.files && handleFilesAdded(e.target.files)}
+                  className="hidden"
+                />
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  // @ts-ignore
+                  webkitdirectory=""
+                  // @ts-ignore
+                  directory=""
+                  onChange={(e) => e.target.files && handleFilesAdded(e.target.files)}
+                  className="hidden"
+                />
+
                 {/* Upload Box / Dropzone */}
-                {!uploadedImageUrl ? (
-                  <div className="border-2 border-dashed border-[#3C3C3E] hover:border-[var(--ps-primary,#0A84FF)] rounded-2xl p-8 text-center transition-colors bg-[#161618] relative group cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                    />
-                    <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-[var(--ps-primary,#0A84FF)] flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                      <Upload className="w-7 h-7" />
+                {stagedPhotos.length === 0 ? (
+                  <div
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    className="border-2 border-dashed border-[#3C3C3E] hover:border-[var(--ps-primary,#0A84FF)] rounded-2xl p-8 text-center transition-all bg-[#161618] relative group flex flex-col items-center justify-center space-y-4"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-[var(--ps-primary,#0A84FF)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FolderUp className="w-8 h-8" />
                     </div>
-                    <h3 className="font-bold text-white text-base mb-1">
-                      Drag & Drop Car Photo Here
-                    </h3>
-                    <p className="text-xs text-gray-400 mb-4">
-                      Supports JPG, PNG, WEBP, TIFF in high resolution (up to 50MB)
-                    </p>
-                    <span className="inline-block bg-[#2C2C2E] text-white text-xs font-semibold px-4 py-2 rounded-xl group-hover:bg-[var(--ps-primary,#0A84FF)] transition-colors">
-                      Browse Files
-                    </span>
+
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-white text-base">
+                        Drag & Drop Photos or Entire Car Folder Here
+                      </h3>
+                      <p className="text-xs text-gray-400 max-w-md mx-auto">
+                        Supports high-resolution JPG, PNG, WEBP, TIFF. Upload all angles (front, rear, interior, track action) at once.
+                      </p>
+                    </div>
+
+                    {/* Dual Action Buttons */}
+                    <div className="flex items-center gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => multiFileInputRef.current?.click()}
+                        className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Images className="w-4 h-4" />
+                        Select Multiple Photos
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => folderInputRef.current?.click()}
+                        className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                      >
+                        <FolderUp className="w-4 h-4" />
+                        Upload Car Folder
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {/* Active Upload Preview Card */}
+                  <div className="space-y-6">
+                    {/* Primary Cover Spotlight Preview */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Original or Cropped Image Preview */}
-                      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-[#2C2C2E] bg-black flex items-center justify-center group shadow-lg">
+                      {/* Cover Photo */}
+                      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-[var(--ps-primary,#0A84FF)] bg-black flex items-center justify-center group shadow-xl">
                         <img
-                          src={uploadedImageUrl}
-                          alt="Staged Car"
+                          src={currentCoverPhoto?.url}
+                          alt="Primary Cover"
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute top-2.5 left-2.5 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-bold text-white border border-white/10 uppercase tracking-wider">
-                          Ready for Crop & Level
+                        <div className="absolute top-2.5 left-2.5 bg-[var(--ps-primary,#0A84FF)] text-white px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-md">
+                          <Star className="w-3 h-3 fill-white" />
+                          Primary Cover Photo
                         </div>
 
                         {/* Interactive Edit Trigger on Hover */}
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setIsCropModalOpen(true)}
+                            onClick={() => {
+                              setActiveEditingPhotoIndex(coverIndex);
+                              setIsCropModalOpen(true);
+                            }}
                             className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-lg transition-all"
                           >
                             <Crop className="w-3.5 h-3.5" />
@@ -464,7 +684,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </div>
                       </div>
 
-                      {/* Cartoon Vector Preview (if generated) */}
+                      {/* Cartoon Vector Preview */}
                       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-pink-500/40 bg-white flex items-center justify-center shadow-lg group">
                         {cartoonImageUrl ? (
                           <>
@@ -493,52 +713,123 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center mx-auto mb-2">
                               <Sparkles className="w-5 h-5" />
                             </div>
-                            <p className="text-xs font-bold text-gray-800">No Cartoon Version Yet</p>
+                            <p className="text-xs font-bold text-gray-800">2D Cartoon Vector Sticker</p>
                             <p className="text-[11px] text-gray-500 mb-3">
-                              Turn this car photo into a Miata-style 2D sticker
+                              Turn this vehicle into a stylized 2D decal sticker
                             </p>
                             <button
                               type="button"
                               onClick={() => setIsCartoonStudioOpen(true)}
-                              className="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-colors"
+                              className="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-colors cursor-pointer"
                             >
-                              Open Cartoon Studio
+                              Generate Cartoon Art
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Quick Studio Action Buttons */}
-                    <div className="flex items-center gap-2 pt-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => setIsCropModalOpen(true)}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-[#1C1C1E] hover:bg-[#2C2C2E] border border-[#2C2C2E] text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <Crop className="w-4 h-4 text-blue-400" />
-                        Crop & Adjust Orientation
-                      </button>
+                    {/* Staged Photos Gallery Grid */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                          Staged Photos in Gallery ({stagedPhotos.length})
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => multiFileInputRef.current?.click()}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Add More Photos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => folderInputRef.current?.click()}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <FolderUp className="w-3 h-3" />
+                            Add Folder
+                          </button>
+                        </div>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setIsCartoonStudioOpen(true)}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 border border-pink-500/30 text-xs font-bold text-pink-300 flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <Sparkles className="w-4 h-4 text-pink-400" />
-                        {cartoonImageUrl ? 'Customize Cartoon Art' : 'Turn into 2D Cartoon Art'}
-                      </button>
+                      {/* Thumbnails grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {stagedPhotos.map((photo, idx) => {
+                          const isCover = coverIndex === idx;
+                          return (
+                            <div
+                              key={photo.id}
+                              className={`relative aspect-[4/3] rounded-xl overflow-hidden border group bg-black transition-all ${
+                                isCover
+                                  ? 'border-[var(--ps-primary,#0A84FF)] ring-2 ring-[var(--ps-primary,#0A84FF)]/40 shadow-md'
+                                  : 'border-[#2C2C2E] hover:border-white/40'
+                              }`}
+                            >
+                              <img
+                                src={photo.url}
+                                alt={photo.name}
+                                className="w-full h-full object-cover"
+                              />
 
-                      <label className="py-2.5 px-3 rounded-xl bg-[#1C1C1E] hover:bg-[#2C2C2E] border border-[#2C2C2E] text-xs font-bold text-gray-300 hover:text-white flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
-                        <Upload className="w-3.5 h-3.5" />
-                        Replace
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                          className="hidden"
-                        />
-                      </label>
+                              {/* Index & Cover Badge */}
+                              <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
+                                <span className="bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white font-bold">
+                                  #{idx + 1}
+                                </span>
+                                {isCover && (
+                                  <span className="bg-[var(--ps-primary,#0A84FF)] px-1.5 py-0.5 rounded text-[9px] font-bold text-white">
+                                    Cover
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Action controls */}
+                              <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemovePhoto(photo.id, idx)}
+                                    className="p-1 rounded bg-red-500/80 hover:bg-red-500 text-white transition-colors"
+                                    title="Remove from batch"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCoverIndex(idx)}
+                                    className={`w-full py-1 text-[10px] font-bold rounded flex items-center justify-center gap-1 transition-colors ${
+                                      isCover
+                                        ? 'bg-[var(--ps-primary,#0A84FF)] text-white'
+                                        : 'bg-white/20 hover:bg-white/30 text-white'
+                                    }`}
+                                  >
+                                    <Star className="w-2.5 h-2.5" />
+                                    {isCover ? 'Cover' : 'Set as Cover'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveEditingPhotoIndex(idx);
+                                      setIsCropModalOpen(true);
+                                    }}
+                                    className="w-full py-1 text-[10px] font-bold rounded bg-blue-600/80 hover:bg-blue-600 text-white flex items-center justify-center gap-1 transition-colors"
+                                  >
+                                    <Crop className="w-2.5 h-2.5" />
+                                    Crop
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -546,7 +837,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 {/* Quick Templates / Sample fleet for rapid testing */}
                 <div className="border-t border-[#2C2C2E] pt-4">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5 block">
-                    Quick Sample Fleet (Click to test instantly):
+                    Quick Sample Fleet with Multi-Angle Galleries (Click to test):
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {SAMPLE_PHOTOS.map((sample) => (
@@ -554,7 +845,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         key={sample.plate}
                         type="button"
                         onClick={() => handleSelectSample(sample)}
-                        className="p-2 rounded-xl bg-[#161618] hover:bg-[#222226] border border-[#2C2C2E] text-left transition-colors flex items-center gap-2"
+                        className="p-2 rounded-xl bg-[#161618] hover:bg-[#222226] border border-[#2C2C2E] text-left transition-colors flex items-center gap-2 cursor-pointer"
                       >
                         <img
                           src={sample.url}
@@ -648,82 +939,82 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   )}
 
                   <p className="text-[10px] text-gray-500 mt-1">
-                    Tip: Type plate or VIN and hit <strong className="text-gray-400">Auto-Fill</strong> to automatically retrieve make, model, year, and tags from online registries.
+                    Visitors search by license plate to view this car's full photo gallery.
                   </p>
                 </div>
 
-                {/* Make & Model */}
+                {/* Make & Model Inputs */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Make / Manufacturer
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Manufacturer
                     </label>
-                    <select
+                    <input
+                      type="text"
+                      required
+                      placeholder="Porsche, BMW, Mazda"
                       value={make}
                       onChange={(e) => setMake(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-xs outline-none focus:border-blue-500"
-                    >
-                      <option value="Porsche">Porsche</option>
-                      <option value="Mazda">Mazda</option>
-                      <option value="BMW">BMW</option>
-                      <option value="Chevrolet">Chevrolet</option>
-                      <option value="Nissan">Nissan</option>
-                      <option value="Mercedes-AMG">Mercedes-AMG</option>
-                      <option value="Ferrari">Ferrari</option>
-                      <option value="Lamborghini">Lamborghini</option>
-                      <option value="Audi">Audi</option>
-                      <option value="Toyota">Toyota</option>
-                      <option value="Subaru">Subaru</option>
-                      <option value="Ford">Ford</option>
-                      <option value="Dodge">Dodge</option>
-                      <option value="Honda">Honda</option>
-                      <option value="McLaren">McLaren</option>
-                      <option value="Aston Martin">Aston Martin</option>
-                      <option value="Custom">Custom / Other</option>
-                    </select>
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
+                    />
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
                       Model / Trim
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 911 GT3 RS / MX-5"
+                      placeholder="911 GT3 RS, M4, C8"
                       value={model}
                       onChange={(e) => {
                         setModel(e.target.value);
-                        setCarName(`${make} ${e.target.value}`);
+                        if (!carName) setCarName(`${make} ${e.target.value}`);
                       }}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-xs outline-none focus:border-blue-500"
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
                   </div>
+                </div>
+
+                {/* Car Display Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Car Title (Full Display Name)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="2024 Porsche 911 GT3 RS (992)"
+                    value={carName}
+                    onChange={(e) => setCarName(e.target.value)}
+                    className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
+                  />
                 </div>
 
                 {/* Year & Color */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Year
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Model Year
                     </label>
                     <input
                       type="number"
-                      placeholder="2024"
                       value={year}
                       onChange={(e) => setYear(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
                   </div>
+
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Body Color Finish
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Color / Livery
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Python Green"
+                      placeholder="Python Green, Alpine White"
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -731,82 +1022,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 {/* Event & Location */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Event Name
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Event / Meet
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Supercar Sunday Laguna"
+                      placeholder="Laguna Seca Track Day"
                       value={event}
                       onChange={(e) => setEvent(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
                   </div>
+
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Event Location
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      Location
                     </label>
                     <input
                       type="text"
                       placeholder="Monterey, CA"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2.5 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
 
-                {/* General Tags */}
+                {/* Tags */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                    General Search Tags (Comma separated)
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Tags (Comma separated)
                   </label>
                   <input
                     type="text"
-                    placeholder="TrackDay, Supercar, JDM, PopUpHeadlights, HighRes"
+                    placeholder="TrackDay, Supercar, HighRes, Aero"
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
-                    className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 placeholder:text-gray-600"
+                    className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
                   />
                 </div>
 
-                {/* Photographer attribution */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Photographer
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Alex Rivera"
-                      value={photographerName}
-                      onChange={(e) => setPhotographerName(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 block">
-                      Resolution
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="High Resolution • 300 DPI"
-                      value={resolution}
-                      onChange={(e) => setResolution(e.target.value)}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Submit to Backend Button */}
-                <div className="pt-3">
+                {/* Submit Button */}
+                <div className="pt-3 border-t border-[#2C2C2E]">
                   <button
                     type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold py-4 px-6 rounded-xl text-sm shadow-xl shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={isSubmitting || stagedPhotos.length === 0}
+                    className="w-full bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold text-sm py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Upload className="w-4 h-4" />
-                    {isSubmitting ? 'Uploading to Server...' : 'Save & Publish to Live Gallery'}
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Publishing {stagedPhotos.length} Photos...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>
+                          Publish Vehicle Gallery ({stagedPhotos.length} {stagedPhotos.length === 1 ? 'Photo' : 'Photos'})
+                        </span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -814,91 +1089,78 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         )}
 
-        {/* TAB 2: UI THEME CHANGER & COMPONENT STYLER */}
+        {/* TAB 2: THEME STUDIO */}
         {activeTab === 'theme' && (
-          <div className="space-y-8">
-            {/* Header Description */}
-            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
-                  Live UI Theme & Component Color Customizer
-                </h2>
-                <p className="text-xs text-gray-400 mt-1">
-                  Admins can dynamically alter the colors of different app component types. Changes preview live across both Admin and Visitor interfaces!
-                </p>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-12 bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl space-y-6">
+              <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Palette className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
+                    Global Website Theme & Color Studio
+                  </h2>
+                  <p className="text-xs text-gray-400">
+                    Customize every color, accent, and contrast token in real-time across visitor & admin views
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSaveThemeGlobal}
-                  className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  Save Theme to App Server
-                </button>
-                {themeSavedToast && (
-                  <span className="text-green-400 text-xs font-semibold animate-in fade-in">
-                    Theme Saved!
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Presets Row */}
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 block">
-                1. Select Curated Architectural Preset
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {DEFAULT_THEMES.map((preset) => (
+                <div className="flex items-center gap-3">
+                  {themeSavedToast && (
+                    <span className="text-xs font-bold text-green-400 animate-in fade-in flex items-center gap-1">
+                      <Check className="w-4 h-4" /> Saved Globally!
+                    </span>
+                  )}
                   <button
-                    key={preset.id}
-                    onClick={() => handleApplyPreset(preset)}
-                    className={`p-3.5 rounded-2xl border text-left transition-all ${
-                      themeForm.id === preset.id
-                        ? 'border-[var(--ps-primary,#0A84FF)] bg-blue-500/10 ring-2 ring-blue-500/30'
-                        : 'border-[#2C2C2E] bg-[#141416] hover:border-gray-600'
-                    }`}
+                    onClick={handleSaveThemeGlobal}
+                    className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                   >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span
-                        className="w-4 h-4 rounded-full border border-white/20"
-                        style={{ backgroundColor: preset.primary }}
-                      />
-                      <span
-                        className="w-4 h-4 rounded-full border border-white/20"
-                        style={{ backgroundColor: preset.bg }}
-                      />
-                      <span
-                        className="w-4 h-4 rounded-full border border-white/20"
-                        style={{ backgroundColor: preset.cardBg }}
-                      />
-                    </div>
-                    <p className="text-xs font-bold text-white truncate">{preset.name}</p>
-                    <p className="text-[10px] text-gray-500">{preset.isDark ? 'Dark Mode' : 'Light Mode'}</p>
+                    <Check className="w-4 h-4" />
+                    Save Theme Changes
                   </button>
-                ))}
+                </div>
               </div>
-            </div>
 
-            {/* Detailed Component Pickers Grid */}
-            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-300 mb-6 border-b border-[#2C2C2E] pb-3 flex items-center justify-between">
-                <span>2. Fine Component Color Controls</span>
-                <span className="text-xs font-normal text-blue-400">Applies live in real-time</span>
-              </h3>
+              {/* Theme Presets */}
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 block">
+                  Quick Theme Presets:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {DEFAULT_THEMES.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => handleApplyPreset(preset)}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        themeForm.id === preset.id
+                          ? 'border-[var(--ps-primary,#0A84FF)] ring-2 ring-[var(--ps-primary,#0A84FF)]/40 bg-white/5'
+                          : 'border-[#2C2C2E] hover:border-white/30 bg-[#161618]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="w-4 h-4 rounded-full border border-white/20"
+                          style={{ backgroundColor: preset.primary }}
+                        />
+                        <span className="text-xs font-bold text-white truncate">{preset.name}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <div className="w-4 h-4 rounded" style={{ backgroundColor: preset.bg }} />
+                        <div className="w-4 h-4 rounded" style={{ backgroundColor: preset.cardBg }} />
+                        <div className="w-4 h-4 rounded" style={{ backgroundColor: preset.primary }} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Primary Accent Color */}
+              {/* Color Customizers Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4 border-t border-[#2C2C2E]">
+                {/* Primary Accent */}
                 <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Primary Accent & CTA</span>
+                    <span className="text-xs font-bold text-white">Primary Brand Accent</span>
                     <span className="font-mono text-xs text-gray-400">{themeForm.primary}</span>
                   </div>
-                  <p className="text-[11px] text-gray-400">
-                    Action buttons, search button, focus rings & primary highlights
-                  </p>
                   <div className="flex items-center gap-3 pt-2">
                     <input
                       type="color"
@@ -907,12 +1169,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
                     />
                     <div className="flex-1 flex gap-1.5">
-                      {['#0A84FF', '#00F5D4', '#FF2A54', '#FFB703', '#A855F7', '#10B981'].map((c) => (
+                      {['#0A84FF', '#FF2A54', '#00F5D4', '#FFB703', '#A855F7', '#10B981'].map((c) => (
                         <button
                           key={c}
                           type="button"
                           onClick={() => handleThemeColorChange('primary', c)}
-                          className="w-6 h-6 rounded-lg border border-black/40 hover:scale-110 transition-transform"
+                          className="w-6 h-6 rounded-lg border border-white/20 hover:scale-110 transition-transform"
                           style={{ backgroundColor: c }}
                         />
                       ))}
@@ -920,24 +1182,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Background Canvas Color */}
+                {/* App Canvas Background */}
                 <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">App Background Canvas</span>
+                    <span className="text-xs font-bold text-white">Canvas Background</span>
                     <span className="font-mono text-xs text-gray-400">{themeForm.bg}</span>
                   </div>
-                  <p className="text-[11px] text-gray-400">
-                    Main background tone behind 3D video layer
-                  </p>
                   <div className="flex items-center gap-3 pt-2">
                     <input
                       type="color"
-                      value={themeForm.bg}
+                      value={themeForm.bg.startsWith('#') ? themeForm.bg : '#000000'}
                       onChange={(e) => handleThemeColorChange('bg', e.target.value)}
                       className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
                     />
                     <div className="flex-1 flex gap-1.5">
-                      {['#000000', '#08080C', '#0A0A0A', '#0F172A', '#FAFAFA', '#F5F5F7'].map((c) => (
+                      {['#000000', '#08080C', '#0A0A0A', '#121212', '#FAFAFA', '#F3F4F6'].map((c) => (
                         <button
                           key={c}
                           type="button"
@@ -950,15 +1209,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Card Surface Color */}
+                {/* Card Container Background */}
                 <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Card & Modal Surface</span>
+                    <span className="text-xs font-bold text-white">Card Container Background</span>
                     <span className="font-mono text-xs text-gray-400">{themeForm.cardBg}</span>
                   </div>
-                  <p className="text-[11px] text-gray-400">
-                    Gallery photo cards, modal dialogs, and drawer surfaces
-                  </p>
                   <div className="flex items-center gap-3 pt-2">
                     <input
                       type="color"
@@ -967,7 +1223,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
                     />
                     <div className="flex-1 flex gap-1.5">
-                      {['#111111', '#141416', '#1A1A24', '#1E1B2E', '#FFFFFF', '#F2F2F7'].map((c) => (
+                      {['#111111', '#16161A', '#141414', '#1A1A1E', '#FFFFFF', '#F9FAFB'].map((c) => (
                         <button
                           key={c}
                           type="button"
@@ -977,88 +1233,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         />
                       ))}
                     </div>
-                  </div>
-                </div>
-
-                {/* Card Border Tone */}
-                <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Borders & Dividers</span>
-                    <span className="font-mono text-xs text-gray-400">{themeForm.cardBorder}</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    Card outlines, dividers, and input borders
-                  </p>
-                  <div className="flex items-center gap-3 pt-2">
-                    <input
-                      type="color"
-                      value={themeForm.cardBorder.startsWith('#') ? themeForm.cardBorder : '#2C2C2E'}
-                      onChange={(e) => handleThemeColorChange('cardBorder', e.target.value)}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
-                    />
-                    <div className="flex-1 flex gap-1.5">
-                      {['#2C2C2E', '#3C3C3E', '#242438', '#382848', '#E5E5E7', '#D1D5DB'].map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => handleThemeColorChange('cardBorder', c)}
-                          className="w-6 h-6 rounded-lg border border-white/20 hover:scale-110 transition-transform"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Search Box Background */}
-                <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Search Box Background</span>
-                    <span className="font-mono text-xs text-gray-400">{themeForm.searchBg}</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    Hero license plate search input container background
-                  </p>
-                  <div className="flex items-center gap-3 pt-2">
-                    <input
-                      type="color"
-                      value={themeForm.searchBg.startsWith('#') ? themeForm.searchBg : '#1C1C1E'}
-                      onChange={(e) => handleThemeColorChange('searchBg', e.target.value)}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
-                    />
-                    <div className="flex-1 flex gap-1.5">
-                      {['#1C1C1E', '#181824', '#221C30', '#262626', '#FFFFFF', '#EAEAEA'].map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => handleThemeColorChange('searchBg', c)}
-                          className="w-6 h-6 rounded-lg border border-white/20 hover:scale-110 transition-transform"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Video Background Opacity */}
-                <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">Cinematic Video Intensity</span>
-                    <span className="font-mono text-xs text-gray-400">{Math.round((themeForm.videoOpacity ?? 0.5) * 100)}%</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400">
-                    Atmospheric 3D video layer brightness in background
-                  </p>
-                  <div className="pt-3">
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={themeForm.videoOpacity ?? 0.5}
-                      onChange={(e) => handleThemeColorChange('videoOpacity', parseFloat(e.target.value))}
-                      className="w-full accent-blue-500 bg-[#2C2C2E] h-2 rounded-lg appearance-none cursor-pointer"
-                    />
                   </div>
                 </div>
               </div>
@@ -1076,95 +1250,205 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   Live Gallery Fleet Management ({cars.length} vehicles)
                 </h2>
                 <p className="text-xs text-gray-400">
-                  Search, review plate tags, inspect downloads, and manage cartoon vector attachments
+                  Review plate tags, manage multi-photo collections, and add new captures to existing cars
                 </p>
               </div>
 
               <button
                 onClick={() => setActiveTab('upload')}
-                className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+                className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                Add New Car
+                Upload New Car / Folder
               </button>
             </div>
 
-            {/* Table / Grid of uploaded cars */}
+            {/* Grid of uploaded cars */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cars.map((car) => (
-                <div
-                  key={car.id}
-                  className="bg-[#161618] border border-[#2C2C2E] rounded-2xl overflow-hidden shadow-lg p-4 space-y-3"
-                >
-                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black flex items-center justify-center">
-                    <img
-                      src={car.imageUrl}
-                      alt={car.carName}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-2.5 left-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/10 text-xs font-mono font-bold text-white">
-                      {car.plateNumber}
-                    </div>
-                    {car.hasCartoon && (
-                      <div className="absolute top-2.5 right-2.5 bg-pink-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Cartoon
+              {cars.map((car) => {
+                const photoCount = Array.isArray(car.images) && car.images.length > 0 ? car.images.length : 1;
+                return (
+                  <div
+                    key={car.id}
+                    className="bg-[#161618] border border-[#2C2C2E] rounded-2xl overflow-hidden shadow-lg p-4 space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black flex items-center justify-center">
+                        <img
+                          src={formatMediaUrl(car.imageUrl)}
+                          alt={car.carName}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2.5 left-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/10 text-xs font-mono font-bold text-white">
+                          {car.plateNumber}
+                        </div>
+                        <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-mono font-bold text-gray-200 flex items-center gap-1">
+                          <Images className="w-3 h-3 text-[var(--ps-primary,#0A84FF)]" />
+                          <span>{photoCount} {photoCount === 1 ? 'Shot' : 'Shots'}</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  <div>
-                    <h4 className="font-bold text-sm text-white truncate">{car.carName}</h4>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider">{car.event}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500 mt-2 font-mono">
-                      <span>👁️ {car.views || 0} views</span>
-                      <span>⬇️ {car.downloads || 0} downloads</span>
+                      <div>
+                        <h4 className="font-bold text-sm text-white truncate">{car.carName}</h4>
+                        <p className="text-xs text-gray-400 uppercase tracking-wider">{car.event}</p>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 mt-2 font-mono">
+                          <span>👁️ {car.views || 0} views</span>
+                          <span>⬇️ {car.downloads || 0} downloads</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-[#2C2C2E] flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => setEditingCarGallery(car)}
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
+                        <span>Manage Photos ({photoCount})</span>
+                      </button>
+
+                      <button
+                        onClick={() => onDeleteCar(car.id)}
+                        className="text-red-400 hover:text-red-300 p-2 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                        title="Delete vehicle record"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="pt-2 border-t border-[#2C2C2E] flex items-center justify-between">
-                    <span className="text-[10px] text-gray-500">{car.date}</span>
-                    <button
-                      onClick={() => onDeleteCar(car.id)}
-                      className="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-                      title="Delete car record"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
       </main>
 
+      {/* Editing Car Gallery Modal */}
+      {editingCarGallery && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in">
+          <div className="bg-[#161618] border border-[#2C2C2E] rounded-3xl max-w-3xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Images className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
+                  Manage Photos for [{editingCarGallery.plateNumber}]
+                </h3>
+                <p className="text-xs text-gray-400">{editingCarGallery.carName}</p>
+              </div>
+
+              <button
+                onClick={() => setEditingCarGallery(null)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Hidden Input for Adding to existing car */}
+            <input
+              ref={manageCarFileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => e.target.files && handleAddPhotosToExistingCar(e.target.files)}
+              className="hidden"
+            />
+
+            {/* Add Extra Photos Trigger */}
+            <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
+              <div>
+                <p className="text-xs font-bold text-white">Add Extra Angles & Shots</p>
+                <p className="text-[11px] text-gray-400">Append high-res photos to this car's gallery</p>
+              </div>
+
+              <button
+                onClick={() => manageCarFileInputRef.current?.click()}
+                className="px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Upload More Photos
+              </button>
+            </div>
+
+            {/* Photos Grid */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                Current Photos in Gallery ({(editingCarGallery.images || [editingCarGallery.imageUrl]).length})
+              </span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {(editingCarGallery.images || [editingCarGallery.imageUrl]).map((imgUrl, idx) => (
+                  <div
+                    key={idx}
+                    className="relative aspect-[4/3] rounded-xl overflow-hidden border border-[#2C2C2E] bg-black group"
+                  >
+                    <img
+                      src={formatMediaUrl(imgUrl)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-1.5 left-1.5 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white">
+                      #{idx + 1}
+                    </div>
+
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        onClick={() => handleRemovePhotoFromExistingCar(idx)}
+                        className="p-2 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg transition-transform hover:scale-110 cursor-pointer"
+                        title="Delete photo from gallery"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[#2C2C2E] flex justify-end">
+              <button
+                onClick={() => setEditingCarGallery(null)}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
+              >
+                Close & Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
-      {isCropModalOpen && uploadedImageUrl && (
+      {isCropModalOpen && stagedPhotos[activeEditingPhotoIndex] && (
         <ImageEditorModal
           isOpen={isCropModalOpen}
           onClose={() => setIsCropModalOpen(false)}
-          imageUrl={uploadedImageUrl}
+          imageUrl={stagedPhotos[activeEditingPhotoIndex].url}
           onSave={(editedUrl) => {
-            setUploadedImageUrl(editedUrl);
-            setStatusMsg({ type: 'success', text: 'Cropped and oriented image saved!' });
+            const updated = [...stagedPhotos];
+            updated[activeEditingPhotoIndex] = {
+              ...updated[activeEditingPhotoIndex],
+              url: editedUrl,
+            };
+            setStagedPhotos(updated);
+            setStatusMsg({ type: 'success', text: 'Cropped and oriented image saved in staged batch!' });
           }}
         />
       )}
 
-      {isCartoonStudioOpen && uploadedImageUrl && (
+      {isCartoonStudioOpen && (currentCoverPhoto?.url || stagedPhotos[0]?.url) && (
         <CartoonArtStudio
           isOpen={isCartoonStudioOpen}
           onClose={() => setIsCartoonStudioOpen(false)}
           carName={carName || `${make} ${model}`}
           make={make}
           model={model}
-          originalImageUrl={uploadedImageUrl}
+          originalImageUrl={currentCoverPhoto?.url || stagedPhotos[0]?.url}
           onApplyCartoon={(cartoonUrl) => {
             setCartoonImageUrl(cartoonUrl);
             setHasCartoon(true);
             setStatusMsg({
               type: 'success',
-              text: '2D Cartoon Art vector sticker successfully created and attached to car!',
+              text: '2D Cartoon Art vector sticker successfully attached to car gallery!',
             });
           }}
         />
@@ -1172,3 +1456,4 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     </div>
   );
 };
+export default AdminPortal;

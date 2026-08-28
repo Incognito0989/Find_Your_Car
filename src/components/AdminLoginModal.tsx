@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, ShieldCheck, KeyRound, Eye, EyeOff, AlertCircle, X, CheckCircle2, Sparkles, UserCheck } from 'lucide-react';
+import { Lock, ShieldCheck, KeyRound, Eye, EyeOff, AlertCircle, X } from 'lucide-react';
 import { AppThemeConfig } from '../types';
 
 interface AdminLoginModalProps {
@@ -16,34 +16,18 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onLoginSuccess,
   theme,
 }) => {
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [email, setEmail] = useState('');
-  const [serverAdminEmail, setServerAdminEmail] = useState('admin@platesnapcars.local');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch configured admin info from server
-  React.useEffect(() => {
-    if (isOpen) {
-      fetch('/api/admin/info')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.adminEmail) {
-            setServerAdminEmail(data.adminEmail);
-            setEmail(data.adminEmail);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password.trim()) {
-      setError('Please enter the admin password.');
+      setError('Please enter your admin password.');
       return;
     }
 
@@ -54,7 +38,12 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: password.trim(), email: (email || serverAdminEmail).trim() }),
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          username: identifier.trim(),
+          email: identifier.trim(),
+          password: password.trim(),
+        }),
       });
 
       const data = await response.json();
@@ -69,16 +58,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
       onLoginSuccess(data.token, data.admin);
     } catch (err: any) {
-      setError(err.message || 'Failed to authenticate admin user.');
+      setError(err.message || 'Failed to authenticate. Please check your credentials.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUseDefaultPassword = () => {
-    setPassword('platesnap2026');
-    if (!email) setEmail(serverAdminEmail);
-    setError(null);
   };
 
   return (
@@ -112,6 +95,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           <button
             id="close-admin-login-btn"
             onClick={onClose}
+            aria-label="Close Admin Login Modal"
             className="absolute top-4 right-4 p-2 rounded-lg opacity-70 hover:opacity-100 hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -171,43 +155,37 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium uppercase tracking-wider mb-1.5 opacity-80">
-                Admin Email / Identity
+                Admin Username or Email
               </label>
               <input
-                id="admin-email-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="admin-identifier-input"
+                type="text"
+                name="username"
+                autoComplete="username"
+                autoCapitalize="none"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none transition-colors"
                 style={{
                   backgroundColor: theme.searchBg,
                   borderColor: theme.cardBorder,
                   color: theme.textMain,
                 }}
-                placeholder="admin@platesnapcars.local"
+                placeholder="Enter username or email..."
                 required
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium uppercase tracking-wider opacity-80">
-                  Master Admin Password
-                </label>
-                <button
-                  type="button"
-                  onClick={handleUseDefaultPassword}
-                  className="text-xs hover:underline flex items-center gap-1 font-medium"
-                  style={{ color: theme.primary }}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  Fill Default Pass
-                </button>
-              </div>
+              <label className="block text-xs font-medium uppercase tracking-wider mb-1.5 opacity-80">
+                Admin Password
+              </label>
               <div className="relative">
                 <input
                   id="admin-password-input"
                   type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border text-sm focus:outline-none transition-colors"
@@ -216,13 +194,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                     borderColor: theme.cardBorder,
                     color: theme.textMain,
                   }}
-                  placeholder="Enter admin password..."
-                  autoFocus
+                  placeholder="Enter password..."
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 opacity-60 hover:opacity-100 transition-opacity"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -234,7 +212,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               id="admin-submit-login-btn"
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl font-semibold text-sm tracking-wide shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-[0.99] disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl font-semibold text-sm tracking-wide shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-[0.99] disabled:opacity-50 mt-2"
               style={{
                 backgroundColor: theme.primary,
                 color: '#ffffff',
@@ -250,13 +228,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               )}
             </button>
           </form>
-
-          {/* Master Password Helper note */}
-          <div className="mt-5 pt-4 border-t border-white/10 text-center">
-            <p className="text-[11px] opacity-60">
-              Default Master Password: <code className="px-1.5 py-0.5 rounded bg-black/40 border border-white/10 font-mono text-amber-300">platesnap2026</code>
-            </p>
-          </div>
         </motion.div>
       </div>
     </AnimatePresence>

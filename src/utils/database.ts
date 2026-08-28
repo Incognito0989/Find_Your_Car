@@ -1,6 +1,21 @@
 import { Pool } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { CarPhoto, AppThemeConfig } from '../types';
+import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES } from '../data/initialData';
 
 let pgPool: Pool | null = null;
+let isPostgresAvailable = false;
+let isCheckingPostgres = false;
+
+const DATA_DIR = path.join(process.cwd(), 'data');
+const CARS_JSON_PATH = path.join(DATA_DIR, 'cars.json');
+const THEME_JSON_PATH = path.join(DATA_DIR, 'theme.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 export function getDatabaseUrl(): string {
   if (process.env.DATABASE_URL) {
@@ -17,215 +32,174 @@ export function getDatabaseUrl(): string {
 export function getPgPool(): Pool {
   if (!pgPool) {
     const connectionString = getDatabaseUrl();
-    console.log(`[PostgreSQL] Initializing connection pool (host: ${process.env.POSTGRES_HOST || 'postgres'})...`);
     pgPool = new Pool({
       connectionString,
-      max: 20,
+      max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 2000, // Fast 2s timeout to avoid blocking if host is unreachable
     });
 
     pgPool.on('error', (err) => {
-      console.error('[PostgreSQL] Unexpected client error on idle connection:', err);
+      // Don't crash process on connection drops
+      isPostgresAvailable = false;
     });
   }
   return pgPool;
 }
 
-export async function initializePostgresDatabase(): Promise<void> {
-  const pool = getPgPool();
-  let connected = false;
-  let attempts = 0;
-  const maxAttempts = 15;
+export function getIsPostgresAvailable(): boolean {
+  return isPostgresAvailable;
+}
 
-  while (!connected && attempts < maxAttempts) {
-    try {
-      attempts++;
-      const client = await pool.connect();
-      client.release();
-      connected = true;
-      console.log('[PostgreSQL] Connected to PostgreSQL database successfully!');
-    } catch (err: any) {
-      console.log(`[PostgreSQL] Waiting for PostgreSQL container to boot up... (Attempt ${attempts}/${maxAttempts})`);
-      await new Promise((res) => setTimeout(res, 2000));
+// ----------------------------------------------------
+// File-Backed Fallback Storage Engine (Durable & Fast)
+// ----------------------------------------------------
+export function getLocalCars(): CarPhoto[] {
+  try {
+    if (!fs.existsSync(CARS_JSON_PATH)) {
+      fs.writeFileSync(CARS_JSON_PATH, JSON.stringify(INITIAL_CAR_PHOTOS, null, 2), 'utf-8');
+      return INITIAL_CAR_PHOTOS;
     }
+    const data = fs.readFileSync(CARS_JSON_PATH, 'utf-8');
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return INITIAL_CAR_PHOTOS;
+  } catch (err) {
+    console.warn('[Database Fallback] Reading local cars failed, using initial:', err);
+    return INITIAL_CAR_PHOTOS;
   }
+}
 
-  if (!connected) {
-    console.warn('[PostgreSQL] Could not connect to PostgreSQL immediately. Background retry will occur upon request.');
-    return;
+export function saveLocalCars(cars: CarPhoto[]): void {
+  try {
+    fs.writeFileSync(CARS_JSON_PATH, JSON.stringify(cars, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[Database Fallback] Failed to write cars to disk:', err);
   }
+}
 
-  // Create Schema
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS cars (
-      id VARCHAR(128) PRIMARY KEY,
-      plate_number VARCHAR(64) NOT NULL,
-      car_name VARCHAR(255) NOT NULL,
-      make VARCHAR(128) NOT NULL,
-      model VARCHAR(128) NOT NULL,
-      year INTEGER,
-      color VARCHAR(128),
-      event VARCHAR(255),
-      location VARCHAR(255),
-      date VARCHAR(128),
-      photographer_name VARCHAR(255),
-      photographer_title VARCHAR(255),
-      photographer_avatar TEXT,
-      photographer_bio TEXT,
-      photographer_instagram VARCHAR(128),
-      image_url TEXT NOT NULL,
-      cartoon_image_url TEXT,
-      has_cartoon BOOLEAN DEFAULT FALSE,
-      tags JSONB DEFAULT '[]'::jsonb,
-      views INTEGER DEFAULT 0,
-      downloads INTEGER DEFAULT 0,
-      resolution VARCHAR(128),
-      camera_info VARCHAR(255),
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+export function getLocalTheme(): AppThemeConfig | null {
+  try {
+    if (fs.existsSync(THEME_JSON_PATH)) {
+      const data = fs.readFileSync(THEME_JSON_PATH, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.warn('[Database Fallback] Error reading local theme:', e);
+  }
+  return DEFAULT_THEMES[0] || null;
+}
+
+export function saveLocalTheme(theme: AppThemeConfig): void {
+  try {
+    fs.writeFileSync(THEME_JSON_PATH, JSON.stringify(theme, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[Database Fallback] Error saving local theme:', e);
+  }
+}
+
+// ----------------------------------------------------
+// Database Initialization
+// ----------------------------------------------------
+export async function initializePostgresDatabase(): Promise<void> {
+  if (isCheckingPostgres) return;
+  isCheckingPostgres = true;
+
+  // Initialize local JSON store immediately so app is always responsive
+  getLocalCars();
+
+  try {
+    const pool = getPgPool();
+    // Quick probe with timeout
+    const client = await Promise.race([
+      pool.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('PostgreSQL connection timeout')), 2500)
+      ),
+    ]);
+
+    client.release();
+    isPostgresAvailable = true;
+    console.log('[PostgreSQL] Connected to PostgreSQL database successfully!');
+
+    // Create Schema & ensure images column exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cars (
+        id VARCHAR(128) PRIMARY KEY,
+        plate_number VARCHAR(64) NOT NULL,
+        car_name VARCHAR(255) NOT NULL,
+        make VARCHAR(128) NOT NULL,
+        model VARCHAR(128) NOT NULL,
+        year INTEGER,
+        color VARCHAR(128),
+        event VARCHAR(255),
+        location VARCHAR(255),
+        date VARCHAR(128),
+        photographer_name VARCHAR(255),
+        photographer_title VARCHAR(255),
+        photographer_avatar TEXT,
+        photographer_bio TEXT,
+        photographer_instagram VARCHAR(128),
+        image_url TEXT NOT NULL,
+        images JSONB DEFAULT '[]'::jsonb,
+        cartoon_image_url TEXT,
+        has_cartoon BOOLEAN DEFAULT FALSE,
+        tags JSONB DEFAULT '[]'::jsonb,
+        views INTEGER DEFAULT 0,
+        downloads INTEGER DEFAULT 0,
+        resolution VARCHAR(128),
+        camera_info VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      ALTER TABLE cars ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb;
+
+      CREATE INDEX IF NOT EXISTS idx_cars_plate_number ON cars(plate_number);
+      CREATE INDEX IF NOT EXISTS idx_cars_make ON cars(make);
+      CREATE INDEX IF NOT EXISTS idx_cars_event ON cars(event);
+      CREATE INDEX IF NOT EXISTS idx_cars_created_at ON cars(created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key VARCHAR(128) PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    // Seed default cars if empty
+    const countRes = await pool.query('SELECT COUNT(*) as count FROM cars');
+    const count = parseInt(countRes.rows[0].count, 10);
+    if (count === 0) {
+      console.log('[PostgreSQL] Empty database detected. Seeding initial vehicle vault records...');
+      await seedDefaultCars(pool);
+    }
+  } catch (err: any) {
+    isPostgresAvailable = false;
+    console.log(
+      `[Database Engine] PostgreSQL instance not reachable (${err.message}). Using high-performance file repository at data/cars.json.`
     );
-
-    CREATE INDEX IF NOT EXISTS idx_cars_plate_number ON cars(plate_number);
-    CREATE INDEX IF NOT EXISTS idx_cars_make ON cars(make);
-    CREATE INDEX IF NOT EXISTS idx_cars_event ON cars(event);
-    CREATE INDEX IF NOT EXISTS idx_cars_created_at ON cars(created_at DESC);
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key VARCHAR(128) PRIMARY KEY,
-      value JSONB NOT NULL,
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-  `);
-
-  // Seed default cars if empty
-  const countRes = await pool.query('SELECT COUNT(*) as count FROM cars');
-  const count = parseInt(countRes.rows[0].count, 10);
-  if (count === 0) {
-    console.log('[PostgreSQL] Empty database detected. Seeding initial vehicle vault records...');
-    await seedDefaultCars(pool);
+  } finally {
+    isCheckingPostgres = false;
   }
 }
 
 async function seedDefaultCars(pool: Pool) {
-  const initialCars = [
-    {
-      id: "car-1",
-      plate_number: "7XYZ999",
-      car_name: "Porsche 911 GT3 RS",
-      make: "Porsche",
-      model: "911 GT3 RS (992)",
-      year: 2024,
-      color: "Python Green / Carbon",
-      event: "Apex Laguna Seca Invitational",
-      location: "Laguna Seca Raceway, Monterey CA",
-      date: "October 24, 2023 • 4:32 PM",
-      photographer_name: process.env.ADMIN_NAME || "Alex Rivera",
-      photographer_title: "Automotive Photographer",
-      photographer_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-      photographer_bio: "Motorsport & track day specialist capturing high-velocity supercars worldwide.",
-      photographer_instagram: "@rivera_motorsport",
-      image_url: "https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400",
-      cartoon_image_url: null,
-      has_cartoon: false,
-      tags: JSON.stringify(["Porsche", "GT3RS", "TrackDay", "LagunaSeca", "Supercar", "992"]),
-      views: 1420,
-      downloads: 384,
-      resolution: "High Resolution • 300 DPI",
-      camera_info: "Sony Alpha • 70-200mm f/2.8 GM II • 1/2000s • ISO 100",
-      created_at: new Date("2023-10-24T16:32:00Z")
-    },
-    {
-      id: "car-2",
-      plate_number: "M4-PERF",
-      car_name: "BMW M4 Competition",
-      make: "BMW",
-      model: "M4 Competition G82",
-      year: 2023,
-      color: "Yas Marina Blue",
-      event: "Sunset Canyon Run LA",
-      location: "Angeles Crest Highway, Los Angeles CA",
-      date: "October 24, 2023 • 3:15 PM",
-      photographer_name: "Marcus Vance",
-      photographer_title: "Commercial Car Shooter",
-      photographer_avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
-      photographer_bio: "Automotive commercial director and canyon carving enthusiast.",
-      photographer_instagram: "@vance_visuals",
-      image_url: "https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1400",
-      cartoon_image_url: null,
-      has_cartoon: false,
-      tags: JSON.stringify(["BMW", "M4", "Competition", "CanyonRun", "G82", "Turbo"]),
-      views: 980,
-      downloads: 215,
-      resolution: "High Resolution • 300 DPI",
-      camera_info: "Canon R5 • 50mm f/1.2 L • 1/1600s • ISO 100",
-      created_at: new Date("2023-10-24T15:15:00Z")
-    },
-    {
-      id: "car-3",
-      plate_number: "MIATA-91",
-      car_name: "Mazda Miata MX-5",
-      make: "Mazda",
-      model: "Miata NA Special",
-      year: 1991,
-      color: "Classic Red / White Hardtop",
-      event: "Gridlife Midwest Festival",
-      location: "South Haven, MI",
-      date: "October 22, 2023 • 2:10 PM",
-      photographer_name: "Tyler Chen",
-      photographer_title: "Trackside Journalist",
-      photographer_avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200",
-      photographer_bio: "Covering grassroots drifting and time-attack builds nationwide.",
-      photographer_instagram: "@tchen_shutter",
-      image_url: "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1400",
-      cartoon_image_url: null,
-      has_cartoon: false,
-      tags: JSON.stringify(["Mazda", "Miata", "NA", "JDM", "PopUpHeadlights", "Grassroots"]),
-      views: 2150,
-      downloads: 740,
-      resolution: "High Resolution • 300 DPI",
-      camera_info: "Nikon Z9 • 85mm f/1.4 • 1/3200s • ISO 64",
-      created_at: new Date("2023-10-22T14:10:00Z")
-    },
-    {
-      id: "car-4",
-      plate_number: "GODZLA",
-      car_name: "Nissan Skyline GT-R R34",
-      make: "Nissan",
-      model: "Skyline GT-R V-Spec II",
-      year: 2001,
-      color: "Bayside Blue",
-      event: "Supercar Saturday Cars & Coffee",
-      location: "Irvine, CA",
-      date: "October 20, 2023 • 9:45 AM",
-      photographer_name: process.env.ADMIN_NAME || "Alex Rivera",
-      photographer_title: "Automotive Photographer",
-      photographer_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-      photographer_bio: "Motorsport & track day specialist capturing high-velocity supercars worldwide.",
-      photographer_instagram: "@rivera_motorsport",
-      image_url: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1400",
-      cartoon_image_url: null,
-      has_cartoon: false,
-      tags: JSON.stringify(["Nissan", "Skyline", "GTR", "R34", "BaysideBlue", "JDM", "Legend"]),
-      views: 3410,
-      downloads: 1290,
-      resolution: "High Resolution • 300 DPI",
-      camera_info: "Sony Alpha • 24-70mm f/2.8 GM • 1/1000s • ISO 100",
-      created_at: new Date("2023-10-20T09:45:00Z")
-    }
-  ];
+  const initialCars = getLocalCars();
 
   for (const car of initialCars) {
     await pool.query(
       `INSERT INTO cars (
         id, plate_number, car_name, make, model, year, color, event, location, date,
         photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
-        image_url, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20, $21, $22, $23, $24)
+        image_url, images, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, $19, $20::jsonb, $21, $22, $23, $24, $25)
       ON CONFLICT (id) DO NOTHING`,
       [
         car.id,
-        car.plate_number,
-        car.car_name,
+        car.plateNumber,
+        car.carName,
         car.make,
         car.model,
         car.year,
@@ -233,32 +207,45 @@ async function seedDefaultCars(pool: Pool) {
         car.event,
         car.location,
         car.date,
-        car.photographer_name,
-        car.photographer_title,
-        car.photographer_avatar,
-        car.photographer_bio,
-        car.photographer_instagram,
-        car.image_url,
-        car.cartoon_image_url,
-        car.has_cartoon,
-        car.tags,
-        car.views,
-        car.downloads,
-        car.resolution,
-        car.camera_info,
-        car.created_at,
+        car.photographer?.name || 'Alex Rivera',
+        car.photographer?.title || 'Automotive Photographer',
+        car.photographer?.avatar || '',
+        car.photographer?.bio || '',
+        car.photographer?.instagram || '',
+        car.imageUrl,
+        JSON.stringify(car.images || [car.imageUrl]),
+        car.cartoonImageUrl || null,
+        Boolean(car.hasCartoon),
+        JSON.stringify(car.tags || []),
+        car.views || 0,
+        car.downloads || 0,
+        car.resolution || 'High Resolution • 300 DPI',
+        car.cameraInfo || 'Sony Alpha',
+        car.createdAt || new Date().toISOString(),
       ]
     );
   }
 }
 
-export function mapRowToCar(row: any) {
+export function mapRowToCar(row: any): CarPhoto | null {
   if (!row) return null;
   let parsedTags: string[] = [];
   try {
     parsedTags = typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []);
   } catch {
     parsedTags = row.tags ? String(row.tags).split(',').map((s: string) => s.trim()) : [];
+  }
+
+  let parsedImages: string[] = [];
+  try {
+    if (row.images) {
+      parsedImages = typeof row.images === 'string' ? JSON.parse(row.images) : row.images;
+    }
+  } catch {
+    parsedImages = [];
+  }
+  if (!Array.isArray(parsedImages) || parsedImages.length === 0) {
+    parsedImages = row.image_url ? [row.image_url] : [];
   }
 
   return {
@@ -280,6 +267,7 @@ export function mapRowToCar(row: any) {
       instagram: row.photographer_instagram || "",
     },
     imageUrl: row.image_url,
+    images: parsedImages,
     cartoonImageUrl: row.cartoon_image_url || null,
     hasCartoon: Boolean(row.has_cartoon),
     tags: parsedTags,
@@ -291,46 +279,328 @@ export function mapRowToCar(row: any) {
   };
 }
 
-export async function searchCarsInPostgres(query: string, eventFilter?: string, tagFilter?: string) {
-  const pool = getPgPool();
-  let sql = `SELECT * FROM cars WHERE 1=1`;
-  const params: any[] = [];
-  let paramIdx = 1;
+// ----------------------------------------------------
+// Unified Search Function (Postgres + Fallback)
+// ----------------------------------------------------
+export async function searchCarsInPostgres(query: string, eventFilter?: string, tagFilter?: string): Promise<CarPhoto[]> {
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      let sql = `SELECT * FROM cars WHERE 1=1`;
+      const params: any[] = [];
+      let paramIdx = 1;
 
-  if (query && query.trim()) {
-    const q = query.trim();
-    const cleanPlate = q.replace(/[\s\-_.]/g, '');
+      if (query && query.trim()) {
+        const q = query.trim();
+        const cleanPlate = q.replace(/[\s\-_.]/g, '');
 
-    sql += ` AND (
-      REGEXP_REPLACE(UPPER(plate_number), '[\\s\\-_.]', '', 'g') ILIKE $${paramIdx}
-      OR plate_number ILIKE $${paramIdx + 1}
-      OR car_name ILIKE $${paramIdx + 1}
-      OR make ILIKE $${paramIdx + 1}
-      OR model ILIKE $${paramIdx + 1}
-      OR event ILIKE $${paramIdx + 1}
-      OR location ILIKE $${paramIdx + 1}
-      OR photographer_name ILIKE $${paramIdx + 1}
-      OR tags::text ILIKE $${paramIdx + 1}
-      OR CAST(year AS TEXT) ILIKE $${paramIdx + 1}
-    )`;
-    params.push(`%${cleanPlate}%`, `%${q}%`);
-    paramIdx += 2;
+        sql += ` AND (
+          REGEXP_REPLACE(UPPER(plate_number), '[\\s\\-_.]', '', 'g') ILIKE $${paramIdx}
+          OR plate_number ILIKE $${paramIdx + 1}
+          OR car_name ILIKE $${paramIdx + 1}
+          OR make ILIKE $${paramIdx + 1}
+          OR model ILIKE $${paramIdx + 1}
+          OR event ILIKE $${paramIdx + 1}
+          OR location ILIKE $${paramIdx + 1}
+          OR photographer_name ILIKE $${paramIdx + 1}
+          OR tags::text ILIKE $${paramIdx + 1}
+          OR CAST(year AS TEXT) ILIKE $${paramIdx + 1}
+        )`;
+        params.push(`%${cleanPlate}%`, `%${q}%`);
+        paramIdx += 2;
+      }
+
+      if (eventFilter && eventFilter !== 'All Events' && eventFilter.trim()) {
+        sql += ` AND event = $${paramIdx}`;
+        params.push(eventFilter.trim());
+        paramIdx += 1;
+      }
+
+      if (tagFilter && tagFilter.trim()) {
+        sql += ` AND tags::text ILIKE $${paramIdx}`;
+        params.push(`%${tagFilter.trim()}%`);
+        paramIdx += 1;
+      }
+
+      sql += ` ORDER BY created_at DESC`;
+
+      const result = await pool.query(sql, params);
+      return result.rows.map(mapRowToCar).filter(Boolean) as CarPhoto[];
+    } catch (err: any) {
+      console.warn('[PostgreSQL Search] Query failed, falling back to local store:', err.message);
+      isPostgresAvailable = false;
+    }
   }
 
-  if (eventFilter && eventFilter !== 'All Events' && eventFilter.trim()) {
-    sql += ` AND event = $${paramIdx}`;
-    params.push(eventFilter.trim());
-    paramIdx += 1;
-  }
+  // File repository fallback search with full fuzzy matching
+  const allCars = getLocalCars();
+  const q = (query || '').trim().toLowerCase();
+  const cleanQ = q.replace(/[\s\-_.]/g, '');
 
-  if (tagFilter && tagFilter.trim()) {
-    sql += ` AND tags::text ILIKE $${paramIdx}`;
-    params.push(`%${tagFilter.trim()}%`);
-    paramIdx += 1;
-  }
+  return allCars.filter((car) => {
+    // Event filter check
+    if (eventFilter && eventFilter !== 'All Events' && eventFilter.trim()) {
+      if (car.event !== eventFilter) return false;
+    }
 
-  sql += ` ORDER BY created_at DESC`;
+    // Tag filter check
+    if (tagFilter && tagFilter.trim()) {
+      const matchTag = Array.isArray(car.tags) && car.tags.some((t) => t.toLowerCase() === tagFilter.toLowerCase());
+      if (!matchTag) return false;
+    }
 
-  const result = await pool.query(sql, params);
-  return result.rows.map(mapRowToCar);
+    // Text search query check
+    if (q) {
+      const cleanCarPlate = (car.plateNumber || '').replace(/[\s\-_.]/g, '').toLowerCase();
+      const rawPlate = (car.plateNumber || '').toLowerCase();
+      const carName = (car.carName || '').toLowerCase();
+      const make = (car.make || '').toLowerCase();
+      const model = (car.model || '').toLowerCase();
+      const event = (car.event || '').toLowerCase();
+      const location = (car.location || '').toLowerCase();
+      const photog = (car.photographer?.name || '').toLowerCase();
+      const tags = (car.tags || []).join(' ').toLowerCase();
+      const year = String(car.year || '');
+
+      const matches =
+        cleanCarPlate.includes(cleanQ) ||
+        rawPlate.includes(q) ||
+        carName.includes(q) ||
+        make.includes(q) ||
+        model.includes(q) ||
+        event.includes(q) ||
+        location.includes(q) ||
+        photog.includes(q) ||
+        tags.includes(q) ||
+        year.includes(q);
+
+      if (!matches) return false;
+    }
+
+    return true;
+  });
 }
+
+// ----------------------------------------------------
+// Unified CRUD Operations
+// ----------------------------------------------------
+export async function getCarByIdFromDb(id: string): Promise<CarPhoto | null> {
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const result = await pool.query('SELECT * FROM cars WHERE id = $1', [id]);
+      if (result.rows.length > 0) {
+        await pool.query('UPDATE cars SET views = views + 1 WHERE id = $1', [id]).catch(() => {});
+        return mapRowToCar(result.rows[0]);
+      }
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+
+  // Fallback to local store
+  const cars = getLocalCars();
+  const found = cars.find((c) => c.id === id);
+  if (found) {
+    found.views = (found.views || 0) + 1;
+    saveLocalCars(cars);
+    return found;
+  }
+  return null;
+}
+
+export async function insertCarIntoDb(car: CarPhoto): Promise<CarPhoto> {
+  // Always update local store
+  const cars = getLocalCars();
+  const updatedCars = [car, ...cars.filter((c) => c.id !== car.id)];
+  saveLocalCars(updatedCars);
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query(
+        `INSERT INTO cars (
+          id, plate_number, car_name, make, model, year, color, event, location, date,
+          photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
+          image_url, images, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, $19, $20::jsonb, $21, $22, $23, $24, $25)
+        ON CONFLICT (id) DO UPDATE SET
+          plate_number = EXCLUDED.plate_number,
+          car_name = EXCLUDED.car_name,
+          images = EXCLUDED.images,
+          image_url = EXCLUDED.image_url`,
+        [
+          car.id,
+          car.plateNumber,
+          car.carName,
+          car.make,
+          car.model,
+          car.year,
+          car.color,
+          car.event,
+          car.location,
+          car.date,
+          car.photographer?.name || 'Alex Rivera',
+          car.photographer?.title || 'Automotive Photographer',
+          car.photographer?.avatar || '',
+          car.photographer?.bio || '',
+          car.photographer?.instagram || '',
+          car.imageUrl,
+          JSON.stringify(car.images || [car.imageUrl]),
+          car.cartoonImageUrl || null,
+          Boolean(car.hasCartoon),
+          JSON.stringify(car.tags || []),
+          car.views || 1,
+          car.downloads || 0,
+          car.resolution || 'High Resolution • 300 DPI',
+          car.cameraInfo || 'Sony Alpha',
+          car.createdAt || new Date().toISOString(),
+        ]
+      );
+    } catch (err: any) {
+      console.warn('[PostgreSQL Insert] Postgres unavailable, saved locally only:', err.message);
+      isPostgresAvailable = false;
+    }
+  }
+
+  return car;
+}
+
+export async function updateCarInDb(id: string, updates: Partial<CarPhoto>): Promise<CarPhoto | null> {
+  const cars = getLocalCars();
+  const index = cars.findIndex((c) => c.id === id);
+  if (index === -1) return null;
+
+  const existing = cars[index];
+  const updated: CarPhoto = {
+    ...existing,
+    ...updates,
+    photographer: {
+      ...existing.photographer,
+      ...(updates.photographer || {}),
+    },
+  };
+  cars[index] = updated;
+  saveLocalCars(cars);
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query(
+        `UPDATE cars SET
+          plate_number = COALESCE($1, plate_number),
+          car_name = COALESCE($2, car_name),
+          make = COALESCE($3, make),
+          model = COALESCE($4, model),
+          year = COALESCE($5, year),
+          color = COALESCE($6, color),
+          event = COALESCE($7, event),
+          location = COALESCE($8, location),
+          image_url = COALESCE($9, image_url),
+          images = COALESCE($10::jsonb, images),
+          cartoon_image_url = $11,
+          has_cartoon = COALESCE($12, has_cartoon),
+          tags = COALESCE($13::jsonb, tags)
+        WHERE id = $14`,
+        [
+          updates.plateNumber || null,
+          updates.carName || null,
+          updates.make || null,
+          updates.model || null,
+          updates.year || null,
+          updates.color || null,
+          updates.event || null,
+          updates.location || null,
+          updates.imageUrl || null,
+          updates.images ? JSON.stringify(updates.images) : null,
+          updates.cartoonImageUrl !== undefined ? updates.cartoonImageUrl : existing.cartoonImageUrl,
+          updates.hasCartoon !== undefined ? updates.hasCartoon : existing.hasCartoon,
+          updates.tags ? JSON.stringify(updates.tags) : null,
+          id,
+        ]
+      );
+    } catch (e: any) {
+      console.warn('[PostgreSQL Update] Postgres unavailable, updated locally only:', e.message);
+      isPostgresAvailable = false;
+    }
+  }
+
+  return updated;
+}
+
+export async function deleteCarFromDb(id: string): Promise<boolean> {
+  const cars = getLocalCars();
+  const filtered = cars.filter((c) => c.id !== id);
+  saveLocalCars(filtered);
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query('DELETE FROM cars WHERE id = $1', [id]);
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+
+  return true;
+}
+
+export async function incrementDownloadInDb(id: string): Promise<number> {
+  const cars = getLocalCars();
+  const car = cars.find((c) => c.id === id);
+  let downloads = 1;
+  if (car) {
+    car.downloads = (car.downloads || 0) + 1;
+    downloads = car.downloads;
+    saveLocalCars(cars);
+  }
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const res = await pool.query(
+        'UPDATE cars SET downloads = downloads + 1 WHERE id = $1 RETURNING downloads',
+        [id]
+      );
+      if (res.rows.length > 0) {
+        downloads = res.rows[0].downloads;
+      }
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+
+  return downloads;
+}
+
+export async function getThemeFromDb(): Promise<AppThemeConfig | null> {
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const result = await pool.query("SELECT value FROM app_settings WHERE key = 'theme'");
+      if (result.rows.length > 0) {
+        return result.rows[0].value;
+      }
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+  return getLocalTheme();
+}
+
+export async function saveThemeToDb(theme: AppThemeConfig): Promise<void> {
+  saveLocalTheme(theme);
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', $1::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [JSON.stringify(theme)]
+      );
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+}
+

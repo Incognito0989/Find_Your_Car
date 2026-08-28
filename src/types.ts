@@ -18,7 +18,8 @@ export interface CarPhoto {
   date: string;
   location?: string;
   photographer: Photographer;
-  imageUrl: string;
+  imageUrl: string; // Primary thumbnail / cover photo
+  images?: string[]; // All photos belonging to this car's set/gallery
   cartoonImageUrl?: string;
   hasCartoon: boolean;
   tags: string[];

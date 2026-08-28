@@ -17,6 +17,7 @@ import {
 import { CarPhoto, AppThemeConfig } from '../types';
 import { PhotoCard } from './PhotoCard';
 import { DownloadModal } from './DownloadModal';
+import { CarGalleryPage } from './CarGalleryPage';
 
 interface VisitorPortalProps {
   cars: CarPhoto[];
@@ -36,6 +37,9 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   const [selectedMake, setSelectedMake] = useState<string>('All');
   const [artFilter, setArtFilter] = useState<'all' | 'photos' | 'cartoons'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Active Car Detail / Full Gallery View State
+  const [selectedCarForGallery, setSelectedCarForGallery] = useState<CarPhoto | null>(null);
 
   // Modal State
   const [selectedCarForDownload, setSelectedCarForDownload] = useState<CarPhoto | null>(null);
@@ -96,6 +100,20 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     setInitialCartoonState(defaultToCartoon);
     setIsModalOpen(true);
   };
+
+  // If a car is selected for full gallery view, render the CarGalleryPage!
+  if (selectedCarForGallery) {
+    // Keep reference updated if cars state changes
+    const currentCar = cars.find((c) => c.id === selectedCarForGallery.id) || selectedCarForGallery;
+    return (
+      <CarGalleryPage
+        car={currentCar}
+        onBack={() => setSelectedCarForGallery(null)}
+        currentTheme={currentTheme}
+        onOpenAdmin={onOpenAdmin}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--ps-bg,#000000)] text-[var(--ps-text-main,#ffffff)] relative overflow-x-hidden transition-colors duration-300">
@@ -342,6 +360,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   key={car.id}
                   car={car}
                   onOpenDownloadModal={handleOpenDownload}
+                  onSelectCar={(car) => setSelectedCarForGallery(car)}
                   viewMode={viewMode}
                 />
               ))}
