@@ -1,0 +1,6 @@
+{
+  "name": "Plate Snap Cars - Cinematic Portal",
+  "description": "High-resolution automotive photography portal with license plate search, admin upload suite, image crop and rotation, AI cartoon art stylizer, and component theme customizer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

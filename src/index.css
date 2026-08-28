@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --ps-primary: #0A84FF;
+  --ps-primary-hover: #0070E0;
+  --ps-bg: #000000;
+  --ps-bg-gradient: radial-gradient(circle at 50% 20%, rgba(10, 132, 255, 0.08), transparent 70%), #000000;
+  --ps-card-bg: #111111;
+  --ps-card-border: #2C2C2E;
+  --ps-text-main: #FFFFFF;
+  --ps-text-muted: #9CA3AF;
+  --ps-nav-bg: rgba(0, 0, 0, 0.55);
+  --ps-search-bg: #1C1C1E;
+  --ps-badge-bg: rgba(0, 0, 0, 0.7);
+  --ps-badge-border: #2C2C2E;
+  --ps-badge-text: #FFFFFF;
+  --ps-glow: 0 0 25px rgba(10, 132, 255, 0.25);
+  --ps-radius: 24px;
+  --ps-video-opacity: 0.45;
+}
+
+[data-theme="light"] {
+  --ps-primary: #0A84FF;
+  --ps-primary-hover: #0070E0;
+  --ps-bg: #F5F5F7;
+  --ps-bg-gradient: radial-gradient(circle at 50% 10%, rgba(10, 132, 255, 0.05), transparent 60%), #F5F5F7;
+  --ps-card-bg: #FFFFFF;
+  --ps-card-border: #E5E5EA;
+  --ps-text-main: #1C1C1E;
+  --ps-text-muted: #636366;
+  --ps-nav-bg: rgba(255, 255, 255, 0.8);
+  --ps-search-bg: #FFFFFF;
+  --ps-badge-bg: rgba(255, 255, 255, 0.9);
+  --ps-badge-border: #E5E5EA;
+  --ps-badge-text: #1C1C1E;
+  --ps-glow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  --ps-radius: 24px;
+  --ps-video-opacity: 0.12;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--ps-bg);
+  color: var(--ps-text-main);
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.font-display {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+.font-mono-plate {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+}
+
+/* Glassmorphism navigation & cards */
+.ps-glass-nav {
+  background: var(--ps-nav-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--ps-card-border);
+}
+
+.ps-glass-card {
+  background: var(--ps-card-bg);
+  border: 1px solid var(--ps-card-border);
+  box-shadow: var(--ps-glow);
+}
+
+.ps-search-container:focus-within {
+  box-shadow: 0 0 0 2px var(--ps-primary), 0 10px 30px rgba(10, 132, 255, 0.2);
+}
+
+.photo-card-overlay {
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.photo-card:hover .photo-card-overlay {
+  opacity: 1;
+}
+
+.photo-card:hover img {
+  transform: scale(1.04);
+}
+
+.modal-blur {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Custom sleek scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ps-card-border);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--ps-text-muted);
+}
+
