@@ -12,12 +12,14 @@ import {
   X,
   Lock,
   ChevronRight,
-  Server,
+  Users,
+  Heart,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig } from '../types';
+import { CarPhoto, AppThemeConfig, Photographer } from '../types';
 import { PhotoCard } from './PhotoCard';
 import { DownloadModal } from './DownloadModal';
 import { CarGalleryPage } from './CarGalleryPage';
+import { TipModal } from './TipModal';
 
 interface VisitorPortalProps {
   cars: CarPhoto[];
@@ -30,21 +32,24 @@ interface VisitorPortalProps {
 export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   cars,
   onOpenAdmin,
-  onOpenServerConfig,
   currentTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedMake, setSelectedMake] = useState<string>('All');
+  const [selectedAuthor, setSelectedAuthor] = useState<string>('All');
   const [artFilter, setArtFilter] = useState<'all' | 'photos' | 'cartoons'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // Active Car Detail / Full Gallery View State
   const [selectedCarForGallery, setSelectedCarForGallery] = useState<CarPhoto | null>(null);
 
-  // Modal State
+  // Download & Tip Modal States
   const [selectedCarForDownload, setSelectedCarForDownload] = useState<CarPhoto | null>(null);
   const [initialCartoonState, setInitialCartoonState] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  const [tippingCar, setTippingCar] = useState<CarPhoto | null>(null);
+  const [isTipModalOpen, setIsTipModalOpen] = useState<boolean>(false);
 
   // Quick sample plates for user click
   const QUICK_PLATES = ['7XYZ999', 'M4-PERF', 'VETTE-8', 'MIATA-91', 'ABC1234', 'E55-AM-G'];
@@ -58,16 +63,41 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     return ['All', ...Array.from(set)];
   }, [cars]);
 
+  // All distinct photographers
+  const distinctPhotographers = useMemo(() => {
+    const map = new Map<string, Photographer>();
+    cars.forEach((c) => {
+      if (c.photographer?.name) {
+        map.set(c.photographer.name, c.photographer);
+      }
+      if (c.photoAuthors) {
+        Object.values(c.photoAuthors as Record<string, Photographer>).forEach((p: Photographer) => {
+          if (p && p.name) map.set(p.name, p);
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [cars]);
+
   // Filtered Cars
   const filteredCars = useMemo(() => {
     let result = [...cars];
 
-    // Search query filter (matches plate, name, make, model, event, tags)
+    // Search query filter (matches plate, name, make, model, event, author name, bio, tags)
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().replace(/[\s\-_]/g, '');
+      const q = searchQuery.toLowerCase().replace(/[\s\-_.]/g, '');
       const rawQ = searchQuery.toLowerCase().trim();
       result = result.filter((c) => {
-        const cleanPlate = c.plateNumber.toLowerCase().replace(/[\s\-_]/g, '');
+        const cleanPlate = c.plateNumber.toLowerCase().replace(/[\s\-_.]/g, '');
+        const photogName = (c.photographer?.name || '').toLowerCase();
+        const photogBio = (c.photographer?.bio || '').toLowerCase();
+        const photogInsta = (c.photographer?.instagram || '').toLowerCase();
+        const authorMatch = c.photoAuthors
+          ? Object.values(c.photoAuthors as Record<string, Photographer>).some(
+              (p: Photographer) => (p.name && p.name.toLowerCase().includes(rawQ)) || (p.bio && p.bio.toLowerCase().includes(rawQ))
+            )
+          : false;
+
         return (
           cleanPlate.includes(q) ||
           c.plateNumber.toLowerCase().includes(rawQ) ||
@@ -75,6 +105,11 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           c.make.toLowerCase().includes(rawQ) ||
           c.model.toLowerCase().includes(rawQ) ||
           c.event.toLowerCase().includes(rawQ) ||
+          c.location.toLowerCase().includes(rawQ) ||
+          photogName.includes(rawQ) ||
+          photogBio.includes(rawQ) ||
+          photogInsta.includes(rawQ) ||
+          authorMatch ||
           c.tags.some((t) => t.toLowerCase().includes(rawQ))
         );
       });
@@ -85,6 +120,19 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
       result = result.filter((c) => c.make.toLowerCase() === selectedMake.toLowerCase());
     }
 
+    // Author / Photographer filter
+    if (selectedAuthor !== 'All') {
+      result = result.filter((c) => {
+        if (c.photographer?.name.toLowerCase() === selectedAuthor.toLowerCase()) return true;
+        if (c.photoAuthors) {
+          return Object.values(c.photoAuthors as Record<string, Photographer>).some(
+            (p: Photographer) => p.name && p.name.toLowerCase() === selectedAuthor.toLowerCase()
+          );
+        }
+        return false;
+      });
+    }
+
     // Art type filter
     if (artFilter === 'cartoons') {
       result = result.filter((c) => c.hasCartoon);
@@ -93,7 +141,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     }
 
     return result;
-  }, [cars, searchQuery, selectedMake, artFilter]);
+  }, [cars, searchQuery, selectedMake, selectedAuthor, artFilter]);
 
   const handleOpenDownload = (car: CarPhoto, defaultToCartoon: boolean = false) => {
     setSelectedCarForDownload(car);
@@ -101,9 +149,13 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     setIsModalOpen(true);
   };
 
+  const handleOpenTipModal = (car: CarPhoto) => {
+    setTippingCar(car);
+    setIsTipModalOpen(true);
+  };
+
   // If a car is selected for full gallery view, render the CarGalleryPage!
   if (selectedCarForGallery) {
-    // Keep reference updated if cars state changes
     const currentCar = cars.find((c) => c.id === selectedCarForGallery.id) || selectedCarForGallery;
     return (
       <CarGalleryPage
@@ -111,13 +163,14 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         onBack={() => setSelectedCarForGallery(null)}
         currentTheme={currentTheme}
         onOpenAdmin={onOpenAdmin}
+        onOpenTipModal={() => handleOpenTipModal(currentCar)}
       />
     );
   }
 
   return (
     <div className="min-h-screen bg-[var(--ps-bg,#000000)] text-[var(--ps-text-main,#ffffff)] relative overflow-x-hidden transition-colors duration-300">
-      {/* 3D Cinematic Background Video Layer (Matching user reference) */}
+      {/* 3D Cinematic Background Video Layer */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <video
           id="bg-cinematic-video"
@@ -138,7 +191,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(10,132,255,0.08),transparent_70%)]" />
       </div>
 
-      {/* Top Glassmorphic Navigation (Matching Reference) */}
+      {/* Top Glassmorphic Navigation */}
       <nav className="sticky top-0 z-40 ps-glass-nav bg-[var(--ps-nav-bg,rgba(0,0,0,0.6))] border-b border-[var(--ps-card-border,#2C2C2E)] backdrop-blur-xl transition-colors">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Logo & Title */}
@@ -160,20 +213,17 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             </div>
           </div>
 
-          {/* Right Header Navigation Actions */}
-          <div className="flex items-center gap-3">
-            {/* Live Server Status / Configuration Button */}
-            {onOpenServerConfig && (
-              <button
-                onClick={onOpenServerConfig}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 font-mono transition-colors cursor-pointer"
-                title="Configure Backend Docker Server URL"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="hidden sm:inline">SQL VAULT ONLINE</span>
-                <Server className="w-3 h-3 text-blue-400 ml-1" />
-              </button>
-            )}
+          {/* Discrete Admin Lock Icon */}
+          <div className="flex items-center">
+            <button
+              id="admin-portal-lock-btn"
+              onClick={onOpenAdmin}
+              className="p-2 rounded-xl text-gray-500 hover:text-gray-200 hover:bg-white/10 transition-all active:scale-90 cursor-pointer"
+              title="Admin"
+              aria-label="Admin"
+            >
+              <Lock className="w-4 h-4 opacity-40 hover:opacity-100 transition-opacity" />
+            </button>
           </div>
         </div>
       </nav>
@@ -192,12 +242,12 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--ps-text-muted,#9ca3af)] max-w-2xl mx-auto leading-relaxed">
-            Search our curated gallery from premier track days and meets. Download high-resolution
-            photography or stylized cartoon sticker art stored securely on your local server.
+            Search our curated gallery from premier track days and meets by plate or photographer.
+            Download high-resolution photography and support shooters with direct tipping.
           </p>
         </section>
 
-        {/* Hero License Plate Search Component (Matching Reference HTML) */}
+        {/* Hero License Plate & Author Search Component */}
         <section className="max-w-2xl mx-auto space-y-4">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-[var(--ps-primary,#0A84FF)] to-blue-600 rounded-[28px] blur-md opacity-25 group-hover:opacity-40 transition duration-500" />
@@ -209,7 +259,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Enter license plate # (e.g. 7XYZ999, M4-PERF)..."
+                placeholder="Search by license plate (7XYZ999), car name, or photographer..."
                 className="w-full bg-transparent border-none py-3.5 text-base sm:text-lg text-[var(--ps-text-main,#ffffff)] font-mono font-medium outline-none placeholder:text-gray-500 placeholder:font-sans"
               />
               {searchQuery && (
@@ -248,62 +298,31 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
         </section>
 
-        {/* Filter Controls Bar */}
-        <section className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 pt-6 border-t border-[var(--ps-card-border,#2C2C2E)]">
-          {/* Make / Manufacturer Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-            {distinctMakes.map((make) => (
-              <button
-                key={make}
-                onClick={() => setSelectedMake(make)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
-                  selectedMake === make
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
-                    : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white hover:border-gray-600'
-                }`}
-              >
-                {make}
-              </button>
-            ))}
-          </div>
-
-          {/* Art Style Toggle & View Switcher */}
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Art Style Tabs */}
-            <div className="flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E]">
-              <button
-                onClick={() => setArtFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  artFilter === 'all' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                All Works
-              </button>
-              <button
-                onClick={() => setArtFilter('photos')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  artFilter === 'photos'
-                    ? 'bg-white/15 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Photos Only
-              </button>
-              <button
-                onClick={() => setArtFilter('cartoons')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
-                  artFilter === 'cartoons'
-                    ? 'bg-pink-500/20 text-pink-300 font-bold'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Sparkles className="w-3 h-3 text-pink-400" />
-                <span>Cartoons</span>
-              </button>
+        {/* Filter Controls Bar (Makes + Photographers + Art Styles) */}
+        <section className="space-y-4 pt-6 border-t border-[var(--ps-card-border,#2C2C2E)]">
+          {/* Row 1: Make filter chips */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-2">
+              <span className="text-xs font-bold text-gray-400 uppercase font-mono mr-1.5 shrink-0">
+                Make:
+              </span>
+              {distinctMakes.map((make) => (
+                <button
+                  key={make}
+                  onClick={() => setSelectedMake(make)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
+                    selectedMake === make
+                      ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
+                      : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white hover:border-gray-600'
+                  }`}
+                >
+                  {make}
+                </button>
+              ))}
             </div>
 
             {/* Grid / List Switcher */}
-            <div className="flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E]">
+            <div className="hidden sm:flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E] shrink-0">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
@@ -324,6 +343,77 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Row 2: Photographer / Author Search Filter & Art Style Toggle */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-1">
+            {/* Photographer chips */}
+            <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase font-mono mr-1 shrink-0">
+                <Users className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
+                <span>Author:</span>
+              </div>
+              <button
+                onClick={() => setSelectedAuthor('All')}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
+                  selectedAuthor === 'All'
+                    ? 'bg-white/20 text-white border-white/30'
+                    : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white'
+                }`}
+              >
+                All Photographers
+              </button>
+
+              {distinctPhotographers.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => setSelectedAuthor(p.name)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
+                    selectedAuthor === p.name
+                      ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
+                      : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white'
+                  }`}
+                >
+                  <img
+                    src={p.avatar}
+                    alt={p.name}
+                    className="w-4 h-4 rounded-full object-cover border border-white/20"
+                  />
+                  <span>{p.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Art Style Toggle */}
+            <div className="flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E] shrink-0 self-end sm:self-auto">
+              <button
+                onClick={() => setArtFilter('all')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  artFilter === 'all' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                All Works
+              </button>
+              <button
+                onClick={() => setArtFilter('photos')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  artFilter === 'photos' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Photos Only
+              </button>
+              <button
+                onClick={() => setArtFilter('cartoons')}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  artFilter === 'cartoons'
+                    ? 'bg-pink-500/20 text-pink-300 font-bold'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-pink-400" />
+                <span>Cartoons</span>
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* Results Gallery Section */}
@@ -334,14 +424,24 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-white/10 text-gray-300">
                 {filteredCars.length} {filteredCars.length === 1 ? 'result' : 'results'}
               </span>
+              {selectedAuthor !== 'All' && (
+                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                  By {selectedAuthor}
+                </span>
+              )}
             </div>
 
-            {searchQuery && (
+            {(searchQuery || selectedAuthor !== 'All' || selectedMake !== 'All') && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedAuthor('All');
+                  setSelectedMake('All');
+                  setArtFilter('all');
+                }}
                 className="text-xs text-gray-400 hover:text-white flex items-center gap-1 cursor-pointer"
               >
-                <span>Clear search filter</span>
+                <span>Reset all filters</span>
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -361,6 +461,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   car={car}
                   onOpenDownloadModal={handleOpenDownload}
                   onSelectCar={(car) => setSelectedCarForGallery(car)}
+                  onSelectAuthor={(authorName) => setSelectedAuthor(authorName)}
                   viewMode={viewMode}
                 />
               ))}
@@ -370,14 +471,15 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-gray-400">
                 <Search className="w-8 h-8 text-[var(--ps-primary,#0A84FF)]" />
               </div>
-              <h3 className="text-lg font-bold text-white">No cars found for "{searchQuery}"</h3>
+              <h3 className="text-lg font-bold text-white">No cars found</h3>
               <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                Try searching by different characters, manufacturer (e.g. Porsche, BMW, Mazda), or clear the search.
+                Try searching by different license plate characters, car make, or select another photographer.
               </p>
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedMake('All');
+                  setSelectedAuthor('All');
                   setArtFilter('all');
                 }}
                 className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
@@ -415,7 +517,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         </section>
       </main>
 
-      {/* Footer */}
+      {/* Footer (Lock removed from bottom right) */}
       <footer className="border-t border-[var(--ps-card-border,#2C2C2E)] bg-black/80 backdrop-blur-md py-12 px-6 relative z-10 text-xs text-gray-500">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
@@ -435,16 +537,6 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               Privacy Policy
             </span>
             <span className="hover:text-white transition-colors cursor-pointer">Support</span>
-
-            {/* Discreet Admin Lock Button */}
-            <button
-              onClick={onOpenAdmin}
-              className="text-gray-600 hover:text-gray-400 p-1.5 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
-              title="Studio Portal"
-              aria-label="Admin Login"
-            >
-              <Lock className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
       </footer>
@@ -459,6 +551,23 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         }}
         initialCartoonState={initialCartoonState}
       />
+
+      {/* Direct Tip Modal */}
+      {isTipModalOpen && tippingCar && (
+        <TipModal
+          isOpen={isTipModalOpen}
+          onClose={() => {
+            setIsTipModalOpen(false);
+            setTippingCar(null);
+          }}
+          car={tippingCar}
+          allPhotographers={
+            tippingCar.photoAuthors && Object.keys(tippingCar.photoAuthors).length > 0
+              ? Object.values(tippingCar.photoAuthors)
+              : [tippingCar.photographer]
+          }
+        />
+      )}
     </div>
   );
 };

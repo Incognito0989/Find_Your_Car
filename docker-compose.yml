@@ -58,6 +58,23 @@ services:
       retries: 3
       start_period: 10s
 
+  # Cloudflare Tunnel (Automatically creates an HTTPS public URL for Vercel)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: platesnap-tunnel
+    restart: unless-stopped
+    depends_on:
+      plate-snap-server:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    # If CLOUDFLARE_TUNNEL_TOKEN is set in .env, it runs your permanent custom domain tunnel.
+    # Otherwise, it runs a free quick tunnel with automatic HTTPS.
+    command: ${CLOUDFLARE_TUNNEL_COMMAND:-tunnel --no-autoupdate --url http://plate-snap-server:3000}
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+
 volumes:
   postgres_data:
     driver: local

@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { CarPhoto, AppThemeConfig } from '../types';
-import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES } from '../data/initialData';
+import { CarPhoto, AppThemeConfig, UserAccount, Photographer } from '../types';
+import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES, INITIAL_USERS } from '../data/initialData';
 
 let pgPool: Pool | null = null;
 let isPostgresAvailable = false;
@@ -11,6 +11,7 @@ let isCheckingPostgres = false;
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CARS_JSON_PATH = path.join(DATA_DIR, 'cars.json');
 const THEME_JSON_PATH = path.join(DATA_DIR, 'theme.json');
+const USERS_JSON_PATH = path.join(DATA_DIR, 'users.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -39,8 +40,7 @@ export function getPgPool(): Pool {
       connectionTimeoutMillis: 2000, // Fast 2s timeout to avoid blocking if host is unreachable
     });
 
-    pgPool.on('error', (err) => {
-      // Don't crash process on connection drops
+    pgPool.on('error', () => {
       isPostgresAvailable = false;
     });
   }
@@ -80,6 +80,42 @@ export function saveLocalCars(cars: CarPhoto[]): void {
   }
 }
 
+export function getLocalUsers(): (UserAccount & { password?: string })[] {
+  try {
+    if (!fs.existsSync(USERS_JSON_PATH)) {
+      const defaultUsersWithPass = INITIAL_USERS.map((u) => ({
+        ...u,
+        password: u.role === 'admin' ? (process.env.ADMIN_PASSWORD || 'platesnap2026') : 'shooter2026',
+      }));
+      fs.writeFileSync(USERS_JSON_PATH, JSON.stringify(defaultUsersWithPass, null, 2), 'utf-8');
+      return defaultUsersWithPass;
+    }
+    const data = fs.readFileSync(USERS_JSON_PATH, 'utf-8');
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return INITIAL_USERS.map((u) => ({
+      ...u,
+      password: u.role === 'admin' ? (process.env.ADMIN_PASSWORD || 'platesnap2026') : 'shooter2026',
+    }));
+  } catch (err) {
+    console.warn('[Database Fallback] Reading local users failed, using initial:', err);
+    return INITIAL_USERS.map((u) => ({
+      ...u,
+      password: u.role === 'admin' ? (process.env.ADMIN_PASSWORD || 'platesnap2026') : 'shooter2026',
+    }));
+  }
+}
+
+export function saveLocalUsers(users: (UserAccount & { password?: string })[]): void {
+  try {
+    fs.writeFileSync(USERS_JSON_PATH, JSON.stringify(users, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[Database Fallback] Failed to write users to disk:', err);
+  }
+}
+
 export function getLocalTheme(): AppThemeConfig | null {
   try {
     if (fs.existsSync(THEME_JSON_PATH)) {
@@ -109,6 +145,7 @@ export async function initializePostgresDatabase(): Promise<void> {
 
   // Initialize local JSON store immediately so app is always responsive
   getLocalCars();
+  getLocalUsers();
 
   try {
     const pool = getPgPool();
@@ -124,8 +161,24 @@ export async function initializePostgresDatabase(): Promise<void> {
     isPostgresAvailable = true;
     console.log('[PostgreSQL] Connected to PostgreSQL database successfully!');
 
-    // Create Schema & ensure images column exists
+    // Create Schema & ensure images and users tables exist
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(128) PRIMARY KEY,
+        username VARCHAR(128) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(64) DEFAULT 'photographer',
+        avatar TEXT,
+        bio TEXT,
+        instagram VARCHAR(128),
+        venmo_handle VARCHAR(128),
+        paypal_handle VARCHAR(128),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS cars (
         id VARCHAR(128) PRIMARY KEY,
         plate_number VARCHAR(64) NOT NULL,
@@ -142,8 +195,11 @@ export async function initializePostgresDatabase(): Promise<void> {
         photographer_avatar TEXT,
         photographer_bio TEXT,
         photographer_instagram VARCHAR(128),
+        photographer_venmo VARCHAR(128),
+        photographer_paypal VARCHAR(128),
         image_url TEXT NOT NULL,
         images JSONB DEFAULT '[]'::jsonb,
+        photo_authors JSONB DEFAULT '{}'::jsonb,
         cartoon_image_url TEXT,
         has_cartoon BOOLEAN DEFAULT FALSE,
         tags JSONB DEFAULT '[]'::jsonb,
@@ -155,10 +211,14 @@ export async function initializePostgresDatabase(): Promise<void> {
       );
 
       ALTER TABLE cars ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE cars ADD COLUMN IF NOT EXISTS photo_authors JSONB DEFAULT '{}'::jsonb;
+      ALTER TABLE cars ADD COLUMN IF NOT EXISTS photographer_venmo VARCHAR(128);
+      ALTER TABLE cars ADD COLUMN IF NOT EXISTS photographer_paypal VARCHAR(128);
 
       CREATE INDEX IF NOT EXISTS idx_cars_plate_number ON cars(plate_number);
       CREATE INDEX IF NOT EXISTS idx_cars_make ON cars(make);
       CREATE INDEX IF NOT EXISTS idx_cars_event ON cars(event);
+      CREATE INDEX IF NOT EXISTS idx_cars_photographer ON cars(photographer_name);
       CREATE INDEX IF NOT EXISTS idx_cars_created_at ON cars(created_at DESC);
 
       CREATE TABLE IF NOT EXISTS app_settings (
@@ -167,6 +227,13 @@ export async function initializePostgresDatabase(): Promise<void> {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
+
+    // Seed default users if empty
+    const usersCountRes = await pool.query('SELECT COUNT(*) as count FROM users');
+    if (parseInt(usersCountRes.rows[0].count, 10) === 0) {
+      console.log('[PostgreSQL] Empty users table. Seeding initial photographers and admin accounts...');
+      await seedDefaultUsers(pool);
+    }
 
     // Seed default cars if empty
     const countRes = await pool.query('SELECT COUNT(*) as count FROM cars');
@@ -178,10 +245,37 @@ export async function initializePostgresDatabase(): Promise<void> {
   } catch (err: any) {
     isPostgresAvailable = false;
     console.log(
-      `[Database Engine] PostgreSQL instance not reachable (${err.message}). Using high-performance file repository at data/cars.json.`
+      `[Database Engine] PostgreSQL instance not reachable (${err.message}). Using high-performance file repository at data/cars.json & data/users.json.`
     );
   } finally {
     isCheckingPostgres = false;
+  }
+}
+
+async function seedDefaultUsers(pool: Pool) {
+  const localUsers = getLocalUsers();
+  for (const u of localUsers) {
+    await pool.query(
+      `INSERT INTO users (
+        id, username, name, email, password, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ON CONFLICT (id) DO NOTHING`,
+      [
+        u.id,
+        u.username.toLowerCase(),
+        u.name,
+        u.email,
+        u.password || 'platesnap2026',
+        u.role,
+        u.avatar,
+        u.bio,
+        u.instagram || '',
+        u.venmoHandle || '',
+        u.payPalHandle || '',
+        u.isActive ?? true,
+        u.createdAt || new Date().toISOString(),
+      ]
+    );
   }
 }
 
@@ -193,8 +287,9 @@ async function seedDefaultCars(pool: Pool) {
       `INSERT INTO cars (
         id, plate_number, car_name, make, model, year, color, event, location, date,
         photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
-        image_url, images, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, $19, $20::jsonb, $21, $22, $23, $24, $25)
+        photographer_venmo, photographer_paypal,
+        image_url, images, photo_authors, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23::jsonb, $24, $25, $26, $27, $28)
       ON CONFLICT (id) DO NOTHING`,
       [
         car.id,
@@ -212,8 +307,11 @@ async function seedDefaultCars(pool: Pool) {
         car.photographer?.avatar || '',
         car.photographer?.bio || '',
         car.photographer?.instagram || '',
+        car.photographer?.venmoHandle || 'alex-rivera-photo',
+        car.photographer?.payPalHandle || 'alexriveraphoto',
         car.imageUrl,
         JSON.stringify(car.images || [car.imageUrl]),
+        JSON.stringify(car.photoAuthors || {}),
         car.cartoonImageUrl || null,
         Boolean(car.hasCartoon),
         JSON.stringify(car.tags || []),
@@ -231,7 +329,7 @@ export function mapRowToCar(row: any): CarPhoto | null {
   if (!row) return null;
   let parsedTags: string[] = [];
   try {
-    parsedTags = typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []);
+    parsedTags = typeof row.tags === 'string' ? JSON.parse(row.tags) : row.tags || [];
   } catch {
     parsedTags = row.tags ? String(row.tags).split(',').map((s: string) => s.trim()) : [];
   }
@@ -248,6 +346,15 @@ export function mapRowToCar(row: any): CarPhoto | null {
     parsedImages = row.image_url ? [row.image_url] : [];
   }
 
+  let parsedPhotoAuthors: Record<string, Photographer> = {};
+  try {
+    if (row.photo_authors) {
+      parsedPhotoAuthors = typeof row.photo_authors === 'string' ? JSON.parse(row.photo_authors) : row.photo_authors;
+    }
+  } catch {
+    parsedPhotoAuthors = {};
+  }
+
   return {
     id: row.id,
     plateNumber: row.plate_number,
@@ -260,29 +367,285 @@ export function mapRowToCar(row: any): CarPhoto | null {
     location: row.location,
     date: row.date,
     photographer: {
-      name: row.photographer_name || "Unknown Shooter",
-      title: row.photographer_title || "Automotive Photographer",
-      avatar: row.photographer_avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-      bio: row.photographer_bio || "",
-      instagram: row.photographer_instagram || "",
+      name: row.photographer_name || 'Alex Rivera',
+      title: row.photographer_title || 'Automotive Photographer',
+      avatar: row.photographer_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+      bio: row.photographer_bio || '',
+      instagram: row.photographer_instagram || '',
+      venmoHandle: row.photographer_venmo || '',
+      payPalHandle: row.photographer_paypal || '',
     },
     imageUrl: row.image_url,
     images: parsedImages,
+    photoAuthors: parsedPhotoAuthors,
     cartoonImageUrl: row.cartoon_image_url || null,
     hasCartoon: Boolean(row.has_cartoon),
     tags: parsedTags,
     views: row.views || 0,
     downloads: row.downloads || 0,
-    resolution: row.resolution || "High Resolution • 300 DPI",
-    cameraInfo: row.camera_info || "Pro Camera • 50mm",
+    resolution: row.resolution || 'High Resolution • 300 DPI',
+    cameraInfo: row.camera_info || 'Pro Camera • 50mm',
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
   };
+}
+
+export function mapRowToUser(row: any): UserAccount & { password?: string } {
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    email: row.email || '',
+    role: row.role || 'photographer',
+    avatar: row.avatar || '',
+    bio: row.bio || '',
+    instagram: row.instagram || '',
+    venmoHandle: row.venmo_handle || '',
+    payPalHandle: row.paypal_handle || '',
+    isActive: row.is_active ?? true,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    password: row.password,
+  };
+}
+
+// ----------------------------------------------------
+// User Management Functions (Postgres + Fallback)
+// ----------------------------------------------------
+export async function getAllUsersFromDb(): Promise<UserAccount[]> {
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const result = await pool.query('SELECT id, username, name, email, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, created_at FROM users ORDER BY created_at ASC');
+      return result.rows.map((row) => {
+        const u = mapRowToUser(row);
+        delete (u as any).password;
+        return u;
+      });
+    } catch (e: any) {
+      console.warn('[PostgreSQL Users] Get users failed, falling back to local file:', e.message);
+      isPostgresAvailable = false;
+    }
+  }
+
+  const local = getLocalUsers();
+  return local.map((u) => {
+    const { password, ...safeUser } = u;
+    return safeUser;
+  });
+}
+
+export async function getUserByIdFromDb(id: string): Promise<(UserAccount & { password?: string }) | null> {
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const res = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+      if (res.rows.length > 0) {
+        return mapRowToUser(res.rows[0]);
+      }
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+
+  const local = getLocalUsers();
+  return local.find((u) => u.id === id) || null;
+}
+
+export async function getUserByUsernameOrEmailFromDb(identifier: string): Promise<(UserAccount & { password?: string }) | null> {
+  const clean = identifier.trim().toLowerCase();
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const res = await pool.query(
+        'SELECT * FROM users WHERE LOWER(username) = $1 OR LOWER(email) = $1',
+        [clean]
+      );
+      if (res.rows.length > 0) {
+        return mapRowToUser(res.rows[0]);
+      }
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+
+  const local = getLocalUsers();
+  return (
+    local.find(
+      (u) => u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean)
+    ) || null
+  );
+}
+
+export async function createUserInDb(
+  userData: Partial<UserAccount>,
+  password = 'shooter2026'
+): Promise<UserAccount> {
+  const newUser: UserAccount & { password?: string } = {
+    id: userData.id || `user-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    username: (userData.username || `photog_${Date.now()}`).toLowerCase().trim(),
+    name: userData.name || 'Automotive Photographer',
+    email: userData.email || '',
+    role: userData.role === 'admin' ? 'admin' : 'photographer',
+    avatar: userData.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    bio: userData.bio || 'Automotive shooter and car enthusiast.',
+    instagram: userData.instagram || '',
+    venmoHandle: userData.venmoHandle || '',
+    payPalHandle: userData.payPalHandle || '',
+    isActive: userData.isActive ?? true,
+    createdAt: new Date().toISOString(),
+    password,
+  };
+
+  // Update local file store
+  const localUsers = getLocalUsers();
+  const existingIdx = localUsers.findIndex((u) => u.username.toLowerCase() === newUser.username.toLowerCase());
+  if (existingIdx >= 0) {
+    localUsers[existingIdx] = newUser;
+  } else {
+    localUsers.push(newUser);
+  }
+  saveLocalUsers(localUsers);
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query(
+        `INSERT INTO users (
+          id, username, name, email, password, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id) DO UPDATE SET
+          username = EXCLUDED.username,
+          name = EXCLUDED.name,
+          email = EXCLUDED.email,
+          password = EXCLUDED.password,
+          role = EXCLUDED.role,
+          avatar = EXCLUDED.avatar,
+          bio = EXCLUDED.bio,
+          instagram = EXCLUDED.instagram,
+          venmo_handle = EXCLUDED.venmo_handle,
+          paypal_handle = EXCLUDED.paypal_handle,
+          is_active = EXCLUDED.is_active`,
+        [
+          newUser.id,
+          newUser.username,
+          newUser.name,
+          newUser.email,
+          newUser.password,
+          newUser.role,
+          newUser.avatar,
+          newUser.bio,
+          newUser.instagram,
+          newUser.venmoHandle,
+          newUser.payPalHandle,
+          newUser.isActive,
+          newUser.createdAt,
+        ]
+      );
+    } catch (e: any) {
+      console.warn('[PostgreSQL Users] Insert user failed, stored locally:', e.message);
+      isPostgresAvailable = false;
+    }
+  }
+
+  const { password: _, ...safe } = newUser;
+  return safe;
+}
+
+export async function updateUserInDb(
+  id: string,
+  updates: Partial<UserAccount & { password?: string }>
+): Promise<UserAccount | null> {
+  const local = getLocalUsers();
+  const idx = local.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+
+  const existing = local[idx];
+  const updatedUser: UserAccount & { password?: string } = {
+    ...existing,
+    ...updates,
+    password: updates.password ? updates.password : existing.password,
+  };
+  local[idx] = updatedUser;
+  saveLocalUsers(local);
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query(
+        `UPDATE users SET
+          name = COALESCE($1, name),
+          email = COALESCE($2, email),
+          role = COALESCE($3, role),
+          avatar = COALESCE($4, avatar),
+          bio = COALESCE($5, bio),
+          instagram = COALESCE($6, instagram),
+          venmo_handle = COALESCE($7, venmo_handle),
+          paypal_handle = COALESCE($8, paypal_handle),
+          is_active = COALESCE($9, is_active),
+          password = COALESCE($10, password)
+        WHERE id = $11`,
+        [
+          updates.name || null,
+          updates.email !== undefined ? updates.email : null,
+          updates.role || null,
+          updates.avatar !== undefined ? updates.avatar : null,
+          updates.bio !== undefined ? updates.bio : null,
+          updates.instagram !== undefined ? updates.instagram : null,
+          updates.venmoHandle !== undefined ? updates.venmoHandle : null,
+          updates.payPalHandle !== undefined ? updates.payPalHandle : null,
+          updates.isActive !== undefined ? updates.isActive : null,
+          updates.password || null,
+          id,
+        ]
+      );
+    } catch (e: any) {
+      console.warn('[PostgreSQL Users] Update failed, updated locally:', e.message);
+      isPostgresAvailable = false;
+    }
+  }
+
+  const { password: _, ...safe } = updatedUser;
+  return safe;
+}
+
+export async function deleteUserInDb(id: string): Promise<boolean> {
+  const local = getLocalUsers();
+  const filtered = local.filter((u) => u.id !== id);
+  saveLocalUsers(filtered);
+
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+  return true;
+}
+
+export async function getPublicPhotographersFromDb(): Promise<Photographer[]> {
+  const users = await getAllUsersFromDb();
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    title: u.role === 'admin' ? 'Lead Automotive Photographer' : 'Automotive Photographer',
+    avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    bio: u.bio,
+    instagram: u.instagram,
+    venmoHandle: u.venmoHandle,
+    payPalHandle: u.payPalHandle,
+  }));
 }
 
 // ----------------------------------------------------
 // Unified Search Function (Postgres + Fallback)
 // ----------------------------------------------------
-export async function searchCarsInPostgres(query: string, eventFilter?: string, tagFilter?: string): Promise<CarPhoto[]> {
+export async function searchCarsInPostgres(
+  query: string,
+  eventFilter?: string,
+  tagFilter?: string,
+  authorFilter?: string
+): Promise<CarPhoto[]> {
   if (isPostgresAvailable) {
     try {
       const pool = getPgPool();
@@ -303,6 +666,10 @@ export async function searchCarsInPostgres(query: string, eventFilter?: string, 
           OR event ILIKE $${paramIdx + 1}
           OR location ILIKE $${paramIdx + 1}
           OR photographer_name ILIKE $${paramIdx + 1}
+          OR photographer_bio ILIKE $${paramIdx + 1}
+          OR photographer_instagram ILIKE $${paramIdx + 1}
+          OR photographer_venmo ILIKE $${paramIdx + 1}
+          OR photographer_paypal ILIKE $${paramIdx + 1}
           OR tags::text ILIKE $${paramIdx + 1}
           OR CAST(year AS TEXT) ILIKE $${paramIdx + 1}
         )`;
@@ -319,6 +686,12 @@ export async function searchCarsInPostgres(query: string, eventFilter?: string, 
       if (tagFilter && tagFilter.trim()) {
         sql += ` AND tags::text ILIKE $${paramIdx}`;
         params.push(`%${tagFilter.trim()}%`);
+        paramIdx += 1;
+      }
+
+      if (authorFilter && authorFilter !== 'All Photographers' && authorFilter.trim()) {
+        sql += ` AND photographer_name ILIKE $${paramIdx}`;
+        params.push(`%${authorFilter.trim()}%`);
         paramIdx += 1;
       }
 
@@ -349,6 +722,14 @@ export async function searchCarsInPostgres(query: string, eventFilter?: string, 
       if (!matchTag) return false;
     }
 
+    // Author filter check
+    if (authorFilter && authorFilter !== 'All Photographers' && authorFilter.trim()) {
+      const photogName = (car.photographer?.name || '').toLowerCase();
+      if (!photogName.includes(authorFilter.toLowerCase().trim())) {
+        return false;
+      }
+    }
+
     // Text search query check
     if (q) {
       const cleanCarPlate = (car.plateNumber || '').replace(/[\s\-_.]/g, '').toLowerCase();
@@ -359,6 +740,8 @@ export async function searchCarsInPostgres(query: string, eventFilter?: string, 
       const event = (car.event || '').toLowerCase();
       const location = (car.location || '').toLowerCase();
       const photog = (car.photographer?.name || '').toLowerCase();
+      const photogBio = (car.photographer?.bio || '').toLowerCase();
+      const photogInsta = (car.photographer?.instagram || '').toLowerCase();
       const tags = (car.tags || []).join(' ').toLowerCase();
       const year = String(car.year || '');
 
@@ -371,6 +754,8 @@ export async function searchCarsInPostgres(query: string, eventFilter?: string, 
         event.includes(q) ||
         location.includes(q) ||
         photog.includes(q) ||
+        photogBio.includes(q) ||
+        photogInsta.includes(q) ||
         tags.includes(q) ||
         year.includes(q);
 
@@ -422,13 +807,34 @@ export async function insertCarIntoDb(car: CarPhoto): Promise<CarPhoto> {
         `INSERT INTO cars (
           id, plate_number, car_name, make, model, year, color, event, location, date,
           photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
-          image_url, images, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18, $19, $20::jsonb, $21, $22, $23, $24, $25)
+          photographer_venmo, photographer_paypal,
+          image_url, images, photo_authors, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23::jsonb, $24, $25, $26, $27, $28)
         ON CONFLICT (id) DO UPDATE SET
           plate_number = EXCLUDED.plate_number,
           car_name = EXCLUDED.car_name,
+          make = EXCLUDED.make,
+          model = EXCLUDED.model,
+          year = EXCLUDED.year,
+          color = EXCLUDED.color,
+          event = EXCLUDED.event,
+          location = EXCLUDED.location,
+          date = EXCLUDED.date,
+          photographer_name = EXCLUDED.photographer_name,
+          photographer_title = EXCLUDED.photographer_title,
+          photographer_avatar = EXCLUDED.photographer_avatar,
+          photographer_bio = EXCLUDED.photographer_bio,
+          photographer_instagram = EXCLUDED.photographer_instagram,
+          photographer_venmo = EXCLUDED.photographer_venmo,
+          photographer_paypal = EXCLUDED.photographer_paypal,
           images = EXCLUDED.images,
-          image_url = EXCLUDED.image_url`,
+          photo_authors = EXCLUDED.photo_authors,
+          image_url = EXCLUDED.image_url,
+          cartoon_image_url = EXCLUDED.cartoon_image_url,
+          has_cartoon = EXCLUDED.has_cartoon,
+          tags = EXCLUDED.tags,
+          resolution = EXCLUDED.resolution,
+          camera_info = EXCLUDED.camera_info`,
         [
           car.id,
           car.plateNumber,
@@ -445,8 +851,11 @@ export async function insertCarIntoDb(car: CarPhoto): Promise<CarPhoto> {
           car.photographer?.avatar || '',
           car.photographer?.bio || '',
           car.photographer?.instagram || '',
+          car.photographer?.venmoHandle || '',
+          car.photographer?.payPalHandle || '',
           car.imageUrl,
           JSON.stringify(car.images || [car.imageUrl]),
+          JSON.stringify(car.photoAuthors || {}),
           car.cartoonImageUrl || null,
           Boolean(car.hasCartoon),
           JSON.stringify(car.tags || []),
@@ -479,6 +888,10 @@ export async function updateCarInDb(id: string, updates: Partial<CarPhoto>): Pro
       ...existing.photographer,
       ...(updates.photographer || {}),
     },
+    photoAuthors: {
+      ...(existing.photoAuthors || {}),
+      ...(updates.photoAuthors || {}),
+    },
   };
   cars[index] = updated;
   saveLocalCars(cars);
@@ -498,10 +911,18 @@ export async function updateCarInDb(id: string, updates: Partial<CarPhoto>): Pro
           location = COALESCE($8, location),
           image_url = COALESCE($9, image_url),
           images = COALESCE($10::jsonb, images),
-          cartoon_image_url = $11,
-          has_cartoon = COALESCE($12, has_cartoon),
-          tags = COALESCE($13::jsonb, tags)
-        WHERE id = $14`,
+          photo_authors = COALESCE($11::jsonb, photo_authors),
+          cartoon_image_url = $12,
+          has_cartoon = COALESCE($13, has_cartoon),
+          tags = COALESCE($14::jsonb, tags),
+          photographer_name = COALESCE($15, photographer_name),
+          photographer_title = COALESCE($16, photographer_title),
+          photographer_avatar = COALESCE($17, photographer_avatar),
+          photographer_bio = COALESCE($18, photographer_bio),
+          photographer_instagram = COALESCE($19, photographer_instagram),
+          photographer_venmo = COALESCE($20, photographer_venmo),
+          photographer_paypal = COALESCE($21, photographer_paypal)
+        WHERE id = $22`,
         [
           updates.plateNumber || null,
           updates.carName || null,
@@ -513,9 +934,17 @@ export async function updateCarInDb(id: string, updates: Partial<CarPhoto>): Pro
           updates.location || null,
           updates.imageUrl || null,
           updates.images ? JSON.stringify(updates.images) : null,
+          updates.photoAuthors ? JSON.stringify(updates.photoAuthors) : null,
           updates.cartoonImageUrl !== undefined ? updates.cartoonImageUrl : existing.cartoonImageUrl,
           updates.hasCartoon !== undefined ? updates.hasCartoon : existing.hasCartoon,
           updates.tags ? JSON.stringify(updates.tags) : null,
+          updates.photographer?.name || null,
+          updates.photographer?.title || null,
+          updates.photographer?.avatar || null,
+          updates.photographer?.bio || null,
+          updates.photographer?.instagram || null,
+          updates.photographer?.venmoHandle || null,
+          updates.photographer?.payPalHandle || null,
           id,
         ]
       );
@@ -603,4 +1032,3 @@ export async function saveThemeToDb(theme: AppThemeConfig): Promise<void> {
     }
   }
 }
-

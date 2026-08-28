@@ -19,16 +19,23 @@ import {
   ZoomIn,
   X,
   FileArchive,
+  Heart,
+  CreditCard,
+  Smartphone,
+  Users,
+  Lock,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig } from '../types';
+import { CarPhoto, AppThemeConfig, Photographer } from '../types';
 import { formatMediaUrl } from '../utils/apiConfig';
 import { DownloadModal } from './DownloadModal';
+import { TipModal } from './TipModal';
 
 interface CarGalleryPageProps {
   car: CarPhoto;
   onBack: () => void;
   currentTheme: AppThemeConfig;
   onOpenAdmin?: () => void;
+  onOpenTipModal?: () => void;
 }
 
 export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
@@ -50,9 +57,12 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState<boolean>(false);
   const [downloadModalCartoon, setDownloadModalCartoon] = useState<boolean>(false);
-  const [showCartoonView, setShowCartoonView] = useState<boolean>(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState<boolean>(false);
   const [downloadAllProgress, setDownloadAllProgress] = useState<string>('');
+
+  // Tipping Modal State
+  const [isTipModalOpen, setIsTipModalOpen] = useState<boolean>(false);
+  const [tippingPhotographers, setTippingPhotographers] = useState<Photographer[]>([]);
 
   // Scroll to top on mount
   useEffect(() => {
@@ -76,6 +86,28 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
   const activePhotoUrl = formatMediaUrl(allImages[activeIndex] || car.imageUrl);
 
+  // Get author for specific photo
+  const getAuthorForPhoto = (imgUrl: string): Photographer => {
+    if (car.photoAuthors && car.photoAuthors[imgUrl]) {
+      return car.photoAuthors[imgUrl];
+    }
+    return car.photographer;
+  };
+
+  const activeAuthor = getAuthorForPhoto(allImages[activeIndex]);
+
+  // Get all distinct authors who took photos for this car
+  const allSetAuthors = React.useMemo(() => {
+    const map = new Map<string, Photographer>();
+    if (car.photographer) map.set(car.photographer.name, car.photographer);
+    if (car.photoAuthors) {
+      Object.values(car.photoAuthors as Record<string, Photographer>).forEach((p: Photographer) => {
+        if (p && p.name) map.set(p.name, p);
+      });
+    }
+    return Array.from(map.values());
+  }, [car]);
+
   // Copy shareable link
   const handleShare = () => {
     const shareUrl = window.location.href;
@@ -97,13 +129,24 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
     fetch(`/api/cars/${car.id}/download`, { method: 'POST' }).catch(() => {});
   };
 
+  // Open Tip for Single Author
+  const handleTipSingleAuthor = (photog: Photographer) => {
+    setTippingPhotographers([photog]);
+    setIsTipModalOpen(true);
+  };
+
+  // Open Tip Split for All Authors
+  const handleTipAllAuthors = () => {
+    setTippingPhotographers(allSetAuthors);
+    setIsTipModalOpen(true);
+  };
+
   // Batch download all photos for this car
   const handleDownloadAllPhotos = async () => {
     setIsDownloadingAll(true);
     setDownloadAllProgress('Preparing photo archive...');
 
     try {
-      // Trigger individual downloads sequentially with slight delay to prevent browser block
       for (let i = 0; i < allImages.length; i++) {
         setDownloadAllProgress(`Downloading photo ${i + 1} of ${allImages.length}...`);
         const imgUrl = formatMediaUrl(allImages[i]);
@@ -117,7 +160,6 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
         await new Promise((res) => setTimeout(res, 400));
       }
 
-      // Track download in backend
       fetch(`/api/cars/${car.id}/download`, { method: 'POST' }).catch(() => {});
       setDownloadAllProgress('All photos queued for download!');
       setTimeout(() => {
@@ -163,6 +205,18 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           {/* Right Action Buttons */}
           <div className="flex items-center gap-2">
             <button
+              onClick={handleTipAllAuthors}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer"
+              title="Tip Photographers"
+            >
+              <Heart className="w-3.5 h-3.5 text-amber-400 fill-amber-400/50" />
+              <span className="hidden sm:inline">
+                {allSetAuthors.length > 1 ? `Tip Authors (Split ${allSetAuthors.length})` : 'Tip Author'}
+              </span>
+              <span className="sm:hidden">Tip</span>
+            </button>
+
+            <button
               onClick={handleShare}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-medium border border-white/10 transition-colors cursor-pointer"
               title="Share Gallery Link"
@@ -191,6 +245,17 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
               </span>
               <span className="sm:hidden">Download</span>
             </button>
+
+            {onOpenAdmin && (
+              <button
+                onClick={onOpenAdmin}
+                className="p-2 rounded-xl text-gray-500 hover:text-gray-200 hover:bg-white/10 transition-all active:scale-90 cursor-pointer ml-0.5"
+                title="Admin"
+                aria-label="Admin"
+              >
+                <Lock className="w-4 h-4 opacity-40 hover:opacity-100 transition-opacity" />
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -241,9 +306,9 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
               </div>
             </div>
 
-            {/* Right: Photographer Details & Cartoon Switch */}
+            {/* Right: Photographer Details & Tipping */}
             <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-4 shrink-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-[#2C2C2E]">
-              {/* Photographer badge card */}
+              {/* Primary Photographer / Set Authors */}
               <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2.5 rounded-2xl">
                 <img
                   src={car.photographer.avatar}
@@ -251,14 +316,23 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                   className="w-10 h-10 rounded-full object-cover border border-white/20 shadow-md"
                 />
                 <div>
-                  <p className="text-xs text-gray-400 uppercase font-mono tracking-wider">Photographer</p>
+                  <p className="text-[10px] text-gray-400 uppercase font-mono tracking-wider">
+                    {allSetAuthors.length > 1 ? `Lead Shooter (${allSetAuthors.length} in set)` : 'Photographer'}
+                  </p>
                   <p className="text-sm font-bold text-white">{car.photographer.name}</p>
                   {car.photographer.instagram && (
-                    <p className="text-[11px] text-[var(--ps-primary,#0A84FF)]">
+                    <p className="text-[11px] text-[var(--ps-primary,#0A84FF)] font-mono">
                       {car.photographer.instagram}
                     </p>
                   )}
                 </div>
+                <button
+                  onClick={() => handleTipSingleAuthor(car.photographer)}
+                  className="p-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors ml-1 cursor-pointer"
+                  title={`Tip ${car.photographer.name}`}
+                >
+                  <Heart className="w-4 h-4 fill-amber-400/40 text-amber-400" />
+                </button>
               </div>
 
               {/* Cartoon Sticker Quick Action */}
@@ -291,6 +365,15 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {/* Quick Actions for active photo */}
             <div className="flex items-center gap-2">
               <button
+                onClick={() => handleTipSingleAuthor(activeAuthor)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer"
+                title={`Tip ${activeAuthor.name}`}
+              >
+                <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
+                <span>Tip Author</span>
+              </button>
+
+              <button
                 onClick={() => setIsFullscreenOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
                 title="Open Fullscreen Lightbox"
@@ -304,7 +387,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Download This Photo</span>
+                <span>Download Photo</span>
               </button>
             </div>
           </div>
@@ -340,6 +423,19 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                 <ChevronRight className="w-6 h-6" />
               </button>
             )}
+
+            {/* Author Attribution Tag in Top Right */}
+            <div className="absolute top-4 right-4 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-lg">
+              <img
+                src={activeAuthor.avatar}
+                alt={activeAuthor.name}
+                className="w-5 h-5 rounded-full object-cover border border-white/20"
+              />
+              <div className="text-[11px]">
+                <span className="text-gray-400 block text-[9px] leading-tight">Shot by</span>
+                <span className="text-white font-bold">{activeAuthor.name}</span>
+              </div>
+            </div>
 
             {/* Bottom Metadata Bar */}
             <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pointer-events-none">
@@ -385,7 +481,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           )}
         </section>
 
-        {/* Complete Car Photo Gallery Grid */}
+        {/* Complete Car Photo Gallery Grid with Author attribution per picture */}
         <section className="space-y-6 pt-4 border-t border-[var(--ps-card-border,#2C2C2E)]">
           <div className="flex items-center justify-between">
             <div>
@@ -395,14 +491,24 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={handleDownloadAllPhotos}
-              disabled={isDownloadingAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <FileArchive className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-              <span>Batch Download Set</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleTipAllAuthors}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
+                <span>Tip Set Authors</span>
+              </button>
+
+              <button
+                onClick={handleDownloadAllPhotos}
+                disabled={isDownloadingAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <FileArchive className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
+                <span>Batch Download Set</span>
+              </button>
+            </div>
           </div>
 
           {/* Responsive Gallery Grid */}
@@ -410,6 +516,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {allImages.map((imgUrl, idx) => {
               const formattedUrl = formatMediaUrl(imgUrl);
               const isSelected = activeIndex === idx;
+              const author = getAuthorForPhoto(imgUrl);
 
               return (
                 <div
@@ -459,6 +566,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleTipSingleAuthor(author);
+                        }}
+                        className="p-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                        title={`Tip ${author.name}`}
+                      >
+                        <Heart className="w-4 h-4 fill-black" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDownloadSinglePhoto(imgUrl, idx);
                         }}
                         className="p-2.5 rounded-full bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
@@ -469,24 +586,41 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Card Info Footer */}
+                  {/* Card Info Footer with Author Info */}
                   <div className="p-4 flex items-center justify-between border-t border-[var(--ps-card-border,#2C2C2E)] bg-white/2">
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-bold text-white">
+                    <div className="space-y-1 min-w-0 pr-2">
+                      <p className="text-xs font-bold text-white truncate">
                         {idx === 0 ? 'Primary Front Shot' : `Angle Capture #${idx + 1}`}
                       </p>
-                      <p className="text-[10px] font-mono text-gray-400">
-                        {car.resolution || 'High Resolution • 300 DPI'}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={author.avatar}
+                          alt={author.name}
+                          className="w-4 h-4 rounded-full object-cover border border-white/20"
+                        />
+                        <span className="text-[11px] text-gray-300 font-medium truncate">
+                          {author.name}
+                        </span>
+                      </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDownloadSinglePhoto(imgUrl, idx)}
-                      className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-                      <span>Download</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => handleTipSingleAuthor(author)}
+                        className="p-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+                        title={`Tip ${author.name}`}
+                      >
+                        <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDownloadSinglePhoto(imgUrl, idx)}
+                        className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
+                        <span>Download</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -494,7 +628,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           </div>
         </section>
 
-        {/* 2D Cartoon Sticker Section (if available) */}
+        {/* 2D Cartoon Sticker Section */}
         {car.hasCartoon && car.cartoonImageUrl && (
           <section className="bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-transparent border border-pink-500/30 rounded-3xl p-6 sm:p-8 shadow-xl">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
@@ -565,9 +699,18 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                 [ {car.plateNumber} ] • Photo {activeIndex + 1} of {allImages.length}
               </span>
               <span className="hidden sm:inline text-xs text-gray-400">{car.carName}</span>
+              <span className="text-xs text-blue-400 font-medium">By {activeAuthor.name}</span>
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleTipSingleAuthor(activeAuthor)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold cursor-pointer hover:bg-amber-500/30"
+              >
+                <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
+                <span className="hidden sm:inline">Tip {activeAuthor.name}</span>
+              </button>
+
               <button
                 onClick={() => handleDownloadSinglePhoto(allImages[activeIndex], activeIndex)}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] text-white text-xs font-bold shadow-md cursor-pointer hover:brightness-110"
@@ -639,6 +782,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           isOpen={isDownloadModalOpen}
           onClose={() => setIsDownloadModalOpen(false)}
           defaultToCartoon={downloadModalCartoon}
+        />
+      )}
+
+      {/* Tip Modal */}
+      {isTipModalOpen && (
+        <TipModal
+          isOpen={isTipModalOpen}
+          onClose={() => setIsTipModalOpen(false)}
+          car={car}
+          allPhotographers={tippingPhotographers}
         />
       )}
     </div>

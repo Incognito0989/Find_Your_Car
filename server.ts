@@ -18,12 +18,21 @@ import {
   saveThemeToDb,
   getLocalCars,
   mapRowToCar,
+  getAllUsersFromDb,
+  getUserByIdFromDb,
+  getUserByUsernameOrEmailFromDb,
+  createUserInDb,
+  updateUserInDb,
+  deleteUserInDb,
+  getPublicPhotographersFromDb,
 } from "./src/utils/database";
+import { UserAccount } from "./src/types";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
+const AVATARS_DIR = path.join(UPLOADS_DIR, "avatars");
 
 // Enable CORS so the Vercel-hosted frontend can connect directly to this backend
 app.use(
@@ -37,13 +46,16 @@ app.use(
   })
 );
 
-// Increase JSON payload limit for high-res automotive photos
+// Increase JSON payload limit for high-res automotive photos & profiles
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Ensure upload directory exists
+// Ensure upload directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+if (!fs.existsSync(AVATARS_DIR)) {
+  fs.mkdirSync(AVATARS_DIR, { recursive: true });
 }
 
 // Serve uploaded photos statically
@@ -111,8 +123,38 @@ function saveBase64ImageToDisk(dataUrl: string, prefix = "car", plateNumber?: st
   }
 }
 
-// Admin configuration helper
-const activeSessions = new Set<string>();
+// Save avatar images to /uploads/avatars/
+function saveAvatarToDisk(dataUrl: string, username = "avatar"): string {
+  if (!dataUrl || !dataUrl.startsWith("data:image/")) {
+    return dataUrl;
+  }
+
+  try {
+    const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches) return dataUrl;
+
+    const ext = matches[1] === "svg+xml" ? "svg" : matches[1] === "jpeg" ? "jpg" : matches[1];
+    const base64Data = matches[2];
+
+    const filename = `avatar_${username.replace(/[^a-zA-Z0-9_-]/g, "_")}_${Date.now()}.${ext}`;
+    const filePath = path.join(AVATARS_DIR, filename);
+
+    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+    console.log(`[Storage] Saved profile avatar: ${filename}`);
+    return `/uploads/avatars/${filename}`;
+  } catch (err) {
+    console.error("Failed to save avatar:", err);
+    return dataUrl;
+  }
+}
+
+// Session store mapping tokens to user profiles
+interface SessionInfo {
+  token: string;
+  user: UserAccount;
+  createdAt: number;
+}
+const sessionUserMap = new Map<string, SessionInfo>();
 
 function getAdminCredentials() {
   const email = (process.env.ADMIN_EMAIL || "admin@platesnapcars.local").toLowerCase().trim();
@@ -128,15 +170,47 @@ function getAdminCredentials() {
   };
 }
 
-// Middleware: Verify Admin Token
+// Middleware: Extract and verify user session
+function authenticateSession(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  const adminTokenHeader = req.headers["x-admin-token"] as string;
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : adminTokenHeader;
+
+  if (!token) {
+    return res.status(401).json({ error: "Authentication token required." });
+  }
+
+  const session = sessionUserMap.get(token);
+  if (!session) {
+    return res.status(401).json({ error: "Session expired or invalid. Please sign in again." });
+  }
+
+  (req as any).user = session.user;
+  (req as any).token = token;
+  next();
+}
+
+// Middleware: Verify Admin Token / Admin Role
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const adminTokenHeader = req.headers["x-admin-token"] as string;
   const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : adminTokenHeader;
 
-  if (!token || !activeSessions.has(token)) {
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized. Admin session token required." });
+  }
+
+  const session = sessionUserMap.get(token);
+  if (!session) {
     return res.status(401).json({ error: "Unauthorized. Admin session invalid or expired." });
   }
+
+  if (session.user.role !== "admin") {
+    return res.status(403).json({ error: "Forbidden. Admin privileges required for this action." });
+  }
+
+  (req as any).user = session.user;
+  (req as any).token = token;
   next();
 }
 
@@ -161,6 +235,16 @@ app.get("/api/health", async (req: Request, res: Response) => {
   });
 });
 
+// Public Photographers List (with Venmo, PayPal, Bios & Avatars for tipping & filters)
+app.get("/api/photographers", async (req: Request, res: Response) => {
+  try {
+    const photogs = await getPublicPhotographersFromDb();
+    res.json({ photographers: photogs, total: photogs.length });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch photographers." });
+  }
+});
+
 // Admin public info (for public photographer credit display)
 app.get("/api/admin/info", (req: Request, res: Response) => {
   const creds = getAdminCredentials();
@@ -169,60 +253,283 @@ app.get("/api/admin/info", (req: Request, res: Response) => {
   });
 });
 
-// Admin Login
-app.post("/api/admin/login", (req: Request, res: Response) => {
-  const { password, email, username, identifier } = req.body;
-  if (!password) {
-    return res.status(400).json({ error: "Password is required." });
+// Admin & Photographer Unified Login
+app.post("/api/admin/login", async (req: Request, res: Response) => {
+  try {
+    const { password, email, username, identifier } = req.body;
+    if (!password) {
+      return res.status(400).json({ error: "Password is required." });
+    }
+
+    const inputIdentifier = (identifier || username || email || "").toLowerCase().trim();
+    const inputPassword = String(password).trim();
+    const creds = getAdminCredentials();
+
+    let authenticatedUser: UserAccount | null = null;
+
+    // 1. Check if matching specific database user
+    if (inputIdentifier) {
+      const user = await getUserByUsernameOrEmailFromDb(inputIdentifier);
+      if (user && user.password && user.password === inputPassword) {
+        const { password: _, ...safeUser } = user;
+        authenticatedUser = safeUser;
+      }
+    }
+
+    // 2. Check environment admin credentials fallback
+    if (!authenticatedUser) {
+      const validAdminIdentifiers = new Set([
+        creds.email.toLowerCase().trim(),
+        creds.name.toLowerCase().trim(),
+        "admin",
+        "administrator",
+        "admin@platesnapcars.local",
+      ]);
+      if (process.env.ADMIN_EMAIL) {
+        validAdminIdentifiers.add(process.env.ADMIN_EMAIL.toLowerCase().trim());
+      }
+
+      const isPasswordAdmin =
+        inputPassword === creds.password ||
+        inputPassword === (process.env.ADMIN_PASSWORD || "platesnap2026");
+
+      const isIdentifierAdmin = !inputIdentifier || validAdminIdentifiers.has(inputIdentifier);
+
+      if (isPasswordAdmin && isIdentifierAdmin) {
+        // Fetch or create master admin profile
+        const existingAdmin = await getUserByUsernameOrEmailFromDb("admin");
+        if (existingAdmin) {
+          const { password: _, ...safeAdmin } = existingAdmin;
+          authenticatedUser = safeAdmin;
+        } else {
+          authenticatedUser = {
+            id: "user-admin-master",
+            username: "admin",
+            name: creds.name,
+            email: creds.email,
+            role: "admin",
+            avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+            bio: "Lead Automotive Photographer & Studio Administrator.",
+            instagram: "@rivera_motorsport",
+            venmoHandle: "alex-rivera-photo",
+            payPalHandle: "alexriveraphoto",
+            createdAt: new Date().toISOString(),
+            isActive: true,
+          };
+        }
+      }
+    }
+
+    if (!authenticatedUser) {
+      return res.status(401).json({
+        error: "Invalid credentials. Please verify your username/email and password.",
+      });
+    }
+
+    const token = `adm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    sessionUserMap.set(token, {
+      token,
+      user: authenticatedUser,
+      createdAt: Date.now(),
+    });
+
+    res.json({
+      success: true,
+      token,
+      admin: {
+        id: authenticatedUser.id,
+        name: authenticatedUser.name,
+        username: authenticatedUser.username,
+        email: authenticatedUser.email,
+        role: authenticatedUser.role,
+        avatar: authenticatedUser.avatar,
+        bio: authenticatedUser.bio,
+        instagram: authenticatedUser.instagram,
+        venmoHandle: authenticatedUser.venmoHandle,
+        payPalHandle: authenticatedUser.payPalHandle,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Authentication system error: " + err.message });
   }
-
-  const creds = getAdminCredentials();
-  const inputIdentifier = (identifier || username || email || "").toLowerCase().trim();
-  const inputPassword = String(password).trim();
-
-  // Valid identifiers include configured email/username, name, and standard admin aliases
-  const validIdentifiers = new Set([
-    creds.email.toLowerCase().trim(),
-    creds.name.toLowerCase().trim(),
-    "admin",
-    "administrator",
-    "admin@platesnapcars.local",
-  ]);
-
-  if (process.env.ADMIN_EMAIL) {
-    validIdentifiers.add(process.env.ADMIN_EMAIL.toLowerCase().trim());
-  }
-
-  const isPasswordValid =
-    inputPassword === creds.password ||
-    inputPassword === (process.env.ADMIN_PASSWORD || "platesnap2026");
-
-  const isIdentifierValid = !inputIdentifier || validIdentifiers.has(inputIdentifier);
-
-  if (!isPasswordValid || !isIdentifierValid) {
-    return res.status(401).json({ error: "Invalid credentials. Please verify your username/email and password." });
-  }
-
-  const token = `adm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-  activeSessions.add(token);
-
-  res.json({
-    success: true,
-    token,
-    admin: {
-      name: creds.name,
-      email: creds.email,
-      role: "SuperAdmin",
-    },
-  });
 });
 
-// Admin Logout
+// Admin / User Logout
 app.post("/api/admin/logout", (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : (req.headers["x-admin-token"] as string);
-  if (token) activeSessions.delete(token);
+  if (token) sessionUserMap.delete(token);
   res.json({ success: true, message: "Logged out successfully" });
+});
+
+// Get Current User Profile (Authenticated)
+app.get("/api/user/me", authenticateSession, (req: Request, res: Response) => {
+  const user = (req as any).user as UserAccount;
+  res.json({ user });
+});
+
+// ==========================================
+// USER MANAGEMENT ENDPOINTS (Admin Only)
+// ==========================================
+
+// GET all users (Admin only)
+app.get("/api/users", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const users = await getAllUsersFromDb();
+    res.json({ users, total: users.length });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch users: " + err.message });
+  }
+});
+
+// POST create new user (Admin only)
+app.post("/api/users", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const {
+      username,
+      name,
+      email,
+      password,
+      role,
+      avatar,
+      bio,
+      instagram,
+      venmoHandle,
+      payPalHandle,
+    } = req.body;
+
+    if (!username || !name) {
+      return res.status(400).json({ error: "Username and display name are required." });
+    }
+
+    const existing = await getUserByUsernameOrEmailFromDb(username);
+    if (existing) {
+      return res.status(400).json({ error: "A user with this username already exists." });
+    }
+
+    let processedAvatar = avatar || "";
+    if (avatar && avatar.startsWith("data:image/")) {
+      processedAvatar = saveAvatarToDisk(avatar, username);
+    }
+
+    const newUser = await createUserInDb(
+      {
+        username: username.toLowerCase().trim(),
+        name: name.trim(),
+        email: (email || "").trim(),
+        role: role === "admin" ? "admin" : "photographer",
+        avatar: processedAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+        bio: bio || "Automotive photographer and content creator.",
+        instagram: (instagram || "").trim(),
+        venmoHandle: (venmoHandle || "").replace(/^@/, "").trim(),
+        payPalHandle: (payPalHandle || "").replace(/^@/, "").trim(),
+        isActive: true,
+      },
+      password || "shooter2026"
+    );
+
+    res.status(201).json({ success: true, user: newUser });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to create user: " + err.message });
+  }
+});
+
+// PUT update user profile (Admin or Self)
+app.put("/api/users/:id", authenticateSession, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const currentUser = (req as any).user as UserAccount;
+
+    // Check permissions: Admin can edit anyone, non-admins can only edit themselves
+    if (currentUser.role !== "admin" && currentUser.id !== id) {
+      return res.status(403).json({ error: "You are not authorized to edit this user." });
+    }
+
+    const {
+      name,
+      email,
+      password,
+      role,
+      avatar,
+      bio,
+      instagram,
+      venmoHandle,
+      payPalHandle,
+      isActive,
+    } = req.body;
+
+    let processedAvatar = avatar;
+    if (avatar && avatar.startsWith("data:image/")) {
+      processedAvatar = saveAvatarToDisk(avatar, currentUser.username);
+    }
+
+    const updates: Partial<UserAccount & { password?: string }> = {
+      ...(name ? { name } : {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(bio !== undefined ? { bio } : {}),
+      ...(instagram !== undefined ? { instagram } : {}),
+      ...(venmoHandle !== undefined ? { venmoHandle: venmoHandle.replace(/^@/, "").trim() } : {}),
+      ...(payPalHandle !== undefined ? { payPalHandle: payPalHandle.replace(/^@/, "").trim() } : {}),
+      ...(processedAvatar !== undefined ? { avatar: processedAvatar } : {}),
+      ...(password ? { password } : {}),
+    };
+
+    // Only admins can change user roles and active status
+    if (currentUser.role === "admin") {
+      if (role) updates.role = role === "admin" ? "admin" : "photographer";
+      if (isActive !== undefined) updates.isActive = Boolean(isActive);
+    }
+
+    const updated = await updateUserInDb(id, updates);
+    if (!updated) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // Refresh session if editing self
+    const token = (req as any).token as string;
+    if (token && currentUser.id === id) {
+      const currentSession = sessionUserMap.get(token);
+      if (currentSession) {
+        currentSession.user = updated;
+      }
+    }
+
+    res.json({ success: true, user: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update user: " + err.message });
+  }
+});
+
+// DELETE user (Admin only)
+app.delete("/api/users/:id", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const currentUser = (req as any).user as UserAccount;
+
+    if (currentUser.id === id) {
+      return res.status(400).json({ error: "Cannot delete your own admin account while logged in." });
+    }
+
+    await deleteUserInDb(id);
+    res.json({ success: true, message: "User deleted successfully." });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete user: " + err.message });
+  }
+});
+
+// Upload profile avatar directly
+app.post("/api/upload-avatar", authenticateSession, (req: Request, res: Response) => {
+  try {
+    const { image, username } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: "Image data is required." });
+    }
+
+    const url = saveAvatarToDisk(image, username || "user");
+    res.json({ success: true, url });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to upload avatar: " + err.message });
+  }
 });
 
 // ==========================================
@@ -248,60 +555,49 @@ app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
     let mimeType = "image/jpeg";
 
     if (typeof image === "string" && image.startsWith("data:image/")) {
-      const match = image.match(/^data:([^;]+);base64,(.+)$/);
+      const match = image.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
       if (match) {
-        mimeType = match[1];
+        mimeType = match[1] === "svg+xml" ? "image/svg+xml" : `image/${match[1]}`;
         base64Data = match[2];
       }
     } else if (typeof image === "string" && image.startsWith("/uploads/")) {
-      const relativeUploadPath = image.replace(/^\/uploads\//, "");
-      const localPath = path.join(UPLOADS_DIR, relativeUploadPath);
-      if (fs.existsSync(localPath)) {
-        const fileBuf = fs.readFileSync(localPath);
+      const localFilePath = path.join(process.cwd(), "data", image.replace(/^\//, ""));
+      if (fs.existsSync(localFilePath)) {
+        const fileBuf = fs.readFileSync(localFilePath);
         base64Data = fileBuf.toString("base64");
-        const ext = path.extname(localPath).toLowerCase();
+        const ext = path.extname(localFilePath).toLowerCase();
         mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-      }
-    } else if (typeof image === "string" && (image.startsWith("http://") || image.startsWith("https://"))) {
-      try {
-        const fetchRes = await fetch(image);
-        const arrayBuf = await fetchRes.arrayBuffer();
-        base64Data = Buffer.from(arrayBuf).toString("base64");
-        const contentType = fetchRes.headers.get("content-type");
-        if (contentType) mimeType = contentType.split(";")[0];
-      } catch (fetchErr) {
-        console.warn("[Cartoon AI] Failed to fetch remote image url for Gemini:", fetchErr);
       }
     }
 
     if (!base64Data) {
       return res.json({
         fallback: true,
-        message: "Input image data could not be parsed for AI vision model. Using local processor.",
+        message: "Remote URL passed; switching to fast client-side artistic pipeline.",
       });
     }
 
-    const vehicleTitle = carName || `${make || ""} ${model || "Vehicle"}`.trim();
-    const promptText = `You are a master automotive comic artist and sticker designer.
-Transform this exact car photograph of a ${vehicleTitle} ${color ? `(paint color: ${color})` : ""} into a clean, stylized 2D cartoon vector sticker illustration.
+    const promptText = `
+Convert this automotive photograph into a clean, stylized cartoon illustration sticker of the vehicle.
+Vehicle Details: ${carName || "Sports Car"} (${make || ""} ${model || ""}), Color: ${color || "Vibrant"}.
+License Plate: ${plateNumber || "Custom Plate"}.
+Style Requirements:
+- Bold black comic outline, vibrant cel-shaded automotive colors, exaggerated cute/aggressive proportions (chibi / Initial D / Hot Wheels inspired style).
+- Isolated subject on a crisp pure solid white background suitable for die-cut stickers.
+- Preserve key distinctive vehicle body lines, wheels, stance, spoilers, headlights, and badges.
+- Return ONLY the clean graphic image.
+`;
 
-Requirements:
-- Stylized 2D cel-shaded automotive illustration capturing the exact body shape, wheel stance, headlights, and paint tone of this vehicle.
-- Bold, dark, clean comic inking outlines.
-- Vibrant, flat pop-art colors with smooth cel-shading highlights and reflections.
-- Thick white die-cut sticker silhouette outline framing the car.
-- Pure solid white background (#FFFFFF) with no background scenery or floor clutter.
-${specialFeatures ? `- Special user focus: ${specialFeatures}` : ""}`;
-
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-image",
-        contents: {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
           parts: [
             {
               inlineData: {
                 data: base64Data,
-                mimeType,
+                mimeType: mimeType,
               },
             },
             {
@@ -309,42 +605,21 @@ ${specialFeatures ? `- Special user focus: ${specialFeatures}` : ""}`;
             },
           ],
         },
+      ],
+    });
+
+    const candidate = response.candidates?.[0];
+    if (candidate) {
+      return res.json({
+        success: true,
+        generatedAt: new Date().toISOString(),
       });
-
-      let generatedDataUrl: string | null = null;
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData?.data) {
-            const outMime = part.inlineData.mimeType || "image/png";
-            generatedDataUrl = `data:${outMime};base64,${part.inlineData.data}`;
-            break;
-          }
-        }
-      }
-
-      if (generatedDataUrl) {
-        const savedUrl = saveBase64ImageToDisk(
-          generatedDataUrl,
-          `cartoon_ai`,
-          plateNumber || vehicleTitle || "cartoon"
-        );
-        return res.json({
-          success: true,
-          dataUrl: savedUrl,
-          source: "gemini-ai",
-        });
-      }
-    } catch (genError: any) {
-      console.warn("[Cartoon AI] Gemini image generation attempt noted:", genError?.message || genError);
     }
 
-    return res.json({
-      fallback: true,
-      message: "AI image model unavailable or returned text. Seamlessly applied algorithmic vector processor.",
-    });
+    res.json({ fallback: true });
   } catch (err: any) {
-    console.error("Cartoon generation handler error:", err);
-    res.status(500).json({ error: err.message || "Failed to generate cartoon art." });
+    console.warn("[Gemini Cartoon Generation] Fallback triggered:", err.message);
+    res.json({ fallback: true, error: err.message });
   }
 });
 
@@ -358,8 +633,9 @@ app.get("/api/cars", async (req: Request, res: Response) => {
     const q = (req.query.q as string) || "";
     const event = (req.query.event as string) || "";
     const tag = (req.query.tag as string) || "";
+    const author = (req.query.author as string) || "";
 
-    const results = await searchCarsInPostgres(q, event, tag);
+    const results = await searchCarsInPostgres(q, event, tag, author);
     res.json({ cars: results, total: results.length });
   } catch (err: any) {
     console.error("Search error:", err);
@@ -383,8 +659,8 @@ app.get("/api/cars/:id", async (req: Request, res: Response) => {
   }
 });
 
-// POST new car upload (Admin only)
-app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
+// POST new car upload (Authenticated Admin or Photographer)
+app.post("/api/cars", authenticateSession, async (req: Request, res: Response) => {
   try {
     const {
       plateNumber,
@@ -395,6 +671,7 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
       color,
       event,
       photographer,
+      photoAuthors,
       imageUrl,
       images,
       cartoonImageUrl,
@@ -437,7 +714,17 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
       ` • ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 
     const tagsArray = Array.isArray(tags) ? tags : ["CarMeet", make || "Automotive"];
-    const creds = getAdminCredentials();
+    const currentUser = (req as any).user as UserAccount;
+
+    const assignedPhotog = {
+      name: photographer?.name || currentUser.name || "Alex Rivera",
+      title: photographer?.title || "Automotive Photographer",
+      avatar: photographer?.avatar || currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+      bio: photographer?.bio || currentUser.bio || "Official Plate Snap Cars verified shooter.",
+      instagram: photographer?.instagram || currentUser.instagram || "",
+      venmoHandle: photographer?.venmoHandle || currentUser.venmoHandle || "",
+      payPalHandle: photographer?.payPalHandle || currentUser.payPalHandle || "",
+    };
 
     const newCar = {
       id: carId,
@@ -450,15 +737,10 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
       event: event || "Automotive Gathering",
       location: location || "Metropolitan Car Meet",
       date: formattedDate,
-      photographer: {
-        name: photographer?.name || creds.name,
-        title: photographer?.title || "Automotive Photographer",
-        avatar: photographer?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-        bio: photographer?.bio || "Official Plate Snap Cars verified shooter.",
-        instagram: photographer?.instagram || "",
-      },
+      photographer: assignedPhotog,
       imageUrl: primaryImageUrl,
       images: savedImages,
+      photoAuthors: photoAuthors || {},
       cartoonImageUrl: savedCartoonUrl,
       hasCartoon: Boolean(hasCartoon || savedCartoonUrl),
       tags: tagsArray,
@@ -477,8 +759,8 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
-// PUT update car photo (Admin only)
-app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
+// PUT update car photo (Admin or Photographers)
+app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     let {
@@ -492,9 +774,11 @@ app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
       location,
       imageUrl,
       images,
+      photoAuthors,
       cartoonImageUrl,
       hasCartoon,
       tags,
+      photographer,
     } = req.body;
 
     const existingCar = await getCarByIdFromDb(id);
@@ -531,9 +815,11 @@ app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
       ...(location ? { location } : {}),
       ...(imageUrl ? { imageUrl } : {}),
       ...(savedImages.length > 0 ? { images: savedImages } : {}),
+      ...(photoAuthors ? { photoAuthors } : {}),
       ...(cartoonImageUrl !== undefined ? { cartoonImageUrl } : {}),
       ...(hasCartoon !== undefined ? { hasCartoon: Boolean(hasCartoon) } : {}),
       ...(tags ? { tags: Array.isArray(tags) ? tags : [tags] } : {}),
+      ...(photographer ? { photographer } : {}),
     };
 
     const updated = await updateCarInDb(id, updates);
@@ -615,6 +901,8 @@ async function startServer() {
         apiEndpoints: [
           "/api/health",
           "/api/cars?q=7XYZ999",
+          "/api/photographers",
+          "/api/users",
           "/api/admin/login",
           "/uploads/*",
         ],
@@ -643,6 +931,7 @@ async function startServer() {
           apiEndpoints: [
             "/api/health",
             "/api/cars",
+            "/api/photographers",
             "/api/admin/login",
           ],
         });
@@ -656,10 +945,10 @@ async function startServer() {
     console.log(`📡 URL: http://0.0.0.0:${PORT}`);
     console.log(`🐘 Database Engine: PostgreSQL / Resilient Multi-Storage`);
     console.log(`🖼️ Media Storage: -> ${UPLOADS_DIR}`);
+    console.log(`👥 User & Photographer Vault Online`);
     console.log(`🔌 Mode: ${isExplicitlyBackendOnly && !hasDistIndex ? "Headless Backend API" : "Fullstack"}`);
     console.log(`====================================================`);
   });
 }
 
 startServer();
-

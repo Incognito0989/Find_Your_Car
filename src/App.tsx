@@ -241,6 +241,8 @@ export function App() {
           onBackToVisitor={() => setCurrentView('visitor')}
           onLogoutAdmin={handleLogoutAdmin}
           adminName={adminUser?.name || 'Admin Photographer'}
+          adminUser={adminUser}
+          adminToken={adminToken}
         />
       )}
 

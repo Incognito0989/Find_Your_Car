@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload,
   Crop,
@@ -32,10 +32,15 @@ import {
   Images,
   Maximize2,
   X,
+  Users,
+  Heart,
+  Smartphone,
+  CreditCard,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig, VehicleLookupResult } from '../types';
+import { CarPhoto, AppThemeConfig, VehicleLookupResult, UserAccount, Photographer } from '../types';
 import { ImageEditorModal } from './ImageEditorModal';
 import { CartoonArtStudio } from './CartoonArtStudio';
+import { UserManagementSection } from './UserManagementSection';
 import { convertPhotoToCartoonSticker, normalizeMediaForCanvas } from '../utils/cartoonEngine';
 import { DEFAULT_THEMES } from '../data/initialData';
 import { applyThemeToDocument } from '../utils/themeUtils';
@@ -51,6 +56,8 @@ interface AdminPortalProps {
   onBackToVisitor: () => void;
   onLogoutAdmin?: () => void;
   adminName?: string;
+  adminUser?: UserAccount | null;
+  adminToken?: string | null;
 }
 
 interface StagedPhoto {
@@ -69,8 +76,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onBackToVisitor,
   onLogoutAdmin,
   adminName = 'Admin Photographer',
+  adminUser,
+  adminToken,
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'theme' | 'fleet'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'theme' | 'fleet' | 'users'>('upload');
+
+  // Registered Photographers List
+  const [usersList, setUsersList] = useState<UserAccount[]>([]);
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsersList(data.users || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch photographers/users:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // Upload Form State
   const [plateNumber, setPlateNumber] = useState<string>('');
@@ -81,8 +108,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [color, setColor] = useState<string>('');
   const [event, setEvent] = useState<string>('Sunset Track Day Laguna');
   const [location, setLocation] = useState<string>('Monterey, CA');
+
+  // Photographer profile selection
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [photographerName, setPhotographerName] = useState<string>(adminName || 'Alex Rivera');
-  const [photographerTitle, setPhotographerTitle] = useState<string>('Automotive Photographer');
+  const [photographerTitle, setPhotographerTitle] = useState<string>('Lead Automotive Photographer');
+  const [photographerAvatar, setPhotographerAvatar] = useState<string>(
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
+  );
+  const [photographerBio, setPhotographerBio] = useState<string>(
+    'Motorsport & track day specialist capturing high-velocity supercars.'
+  );
+  const [photographerVenmo, setPhotographerVenmo] = useState<string>('alex-rivera-photo');
+  const [photographerPayPal, setPhotographerPayPal] = useState<string>('alexriveraphoto');
+  const [photographerInstagram, setPhotographerInstagram] = useState<string>('@alexrivera.raw');
+
   const [tagsInput, setTagsInput] = useState<string>('TrackDay, Supercar, HighRes');
 
   // Multi-image Staging State
@@ -471,6 +511,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const coverPhoto = stagedPhotos[coverIndex] || stagedPhotos[0];
       const allImagesUrls = stagedPhotos.map((p) => p.url);
 
+      const photogObject: Photographer = {
+        name: photographerName || 'Alex Rivera',
+        title: photographerTitle || 'Automotive Photographer',
+        avatar: photographerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        bio: photographerBio || 'Verified Plate Snap Cars high-resolution event photographer.',
+        venmoHandle: photographerVenmo || undefined,
+        payPalHandle: photographerPayPal || undefined,
+        instagram: photographerInstagram || undefined,
+      };
+
+      // Create photo authors mapping
+      const photoAuthorsMap: Record<string, Photographer> = {};
+      allImagesUrls.forEach((url) => {
+        photoAuthorsMap[url] = photogObject;
+      });
+
       await onAddCar({
         plateNumber: plateNumber.toUpperCase().trim(),
         carName: carName || `${make} ${model || 'Vehicle'}`,
@@ -480,12 +536,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         color: color || 'Custom Finish',
         event: event || 'Automotive Gathering',
         location: location || 'Laguna Seca, CA',
-        photographer: {
-          name: photographerName || 'Alex Rivera',
-          title: photographerTitle || 'Automotive Photographer',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-          bio: 'Verified Plate Snap Cars high-resolution event photographer.',
-        },
+        photographer: photogObject,
+        photoAuthors: photoAuthorsMap,
         imageUrl: coverPhoto.url,
         images: allImagesUrls,
         cartoonImageUrl: cartoonImageUrl || undefined,
@@ -655,6 +707,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               >
                 <Layers className="w-3.5 h-3.5" />
                 Manage Fleet ({cars.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'users'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Photographer Team ({usersList.length || '3+'})</span>
               </button>
             </div>
 
@@ -1229,6 +1292,119 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
+                {/* Photographer Attribution & Payment Handles */}
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
+                      <label className="text-xs font-bold uppercase tracking-wider text-white">
+                        Photographer & Tipping Attribution
+                      </label>
+                    </div>
+                    {adminUser?.role === 'admin' && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('users')}
+                        className="text-[11px] text-[var(--ps-primary,#0A84FF)] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Manage Team
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick Pick User Profile Dropdown */}
+                  <div>
+                    <label className="block text-[11px] text-gray-400 mb-1">
+                      Select Registered Photographer Profile
+                    </label>
+                    <select
+                      value={selectedUserId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setSelectedUserId(id);
+                        const user = usersList.find((u) => u.id === id);
+                        if (user) {
+                          setPhotographerName(user.name);
+                          setPhotographerTitle(user.title || 'Automotive Photographer');
+                          setPhotographerAvatar(user.avatar || photographerAvatar);
+                          setPhotographerBio(user.bio || photographerBio);
+                          setPhotographerVenmo(user.venmoHandle || '');
+                          setPhotographerPayPal(user.payPalHandle || '');
+                          setPhotographerInstagram(user.instagram || '');
+                        }
+                      }}
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                    >
+                      <option value="">-- Choose Photographer Account or Custom --</option>
+                      {usersList.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role.toUpperCase()}) {u.venmoHandle ? `• @${u.venmoHandle}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Photographer Name & Title */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1">Photographer Name</label>
+                      <input
+                        type="text"
+                        value={photographerName}
+                        onChange={(e) => setPhotographerName(e.target.value)}
+                        placeholder="Alex Rivera"
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1">Instagram (@handle)</label>
+                      <input
+                        type="text"
+                        value={photographerInstagram}
+                        onChange={(e) => setPhotographerInstagram(e.target.value)}
+                        placeholder="@alexrivera.raw"
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tipping Payment Handles */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1 flex items-center gap-1">
+                        <Smartphone className="w-3 h-3 text-blue-400" />
+                        <span>Venmo Username</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={photographerVenmo}
+                        onChange={(e) => setPhotographerVenmo(e.target.value)}
+                        placeholder="alex-rivera-photo"
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-gray-400 mb-1 flex items-center gap-1">
+                        <CreditCard className="w-3 h-3 text-sky-400" />
+                        <span>PayPal.me Handle</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={photographerPayPal}
+                        onChange={(e) => setPhotographerPayPal(e.target.value)}
+                        placeholder="alexriveraphoto"
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                    <Heart className="w-3 h-3 text-amber-400" />
+                    <span>Tips from photo downloads will be sent directly to these Venmo and PayPal handles.</span>
+                  </p>
+                </div>
+
                 {/* Tags */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1">
@@ -1501,6 +1677,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               })}
             </div>
           </div>
+        )}
+
+        {/* TAB 4: PHOTOGRAPHER & USER MANAGEMENT */}
+        {activeTab === 'users' && (
+          <UserManagementSection
+            currentUser={adminUser}
+            adminToken={adminToken}
+            onUserListChanged={fetchUsers}
+          />
         )}
       </main>
 

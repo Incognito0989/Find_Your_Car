@@ -1,9 +1,27 @@
 export interface Photographer {
+  id?: string;
   name: string;
   title: string;
   avatar: string;
   bio?: string;
   instagram?: string;
+  venmoHandle?: string;
+  payPalHandle?: string;
+}
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'photographer';
+  avatar: string;
+  bio: string;
+  instagram?: string;
+  venmoHandle?: string;
+  payPalHandle?: string;
+  createdAt: string;
+  isActive: boolean;
 }
 
 export interface CarPhoto {
@@ -20,6 +38,7 @@ export interface CarPhoto {
   photographer: Photographer;
   imageUrl: string; // Primary thumbnail / cover photo
   images?: string[]; // All photos belonging to this car's set/gallery
+  photoAuthors?: Record<string, Photographer>; // Optional mapping of image index/URL to specific photographer
   cartoonImageUrl?: string;
   hasCartoon: boolean;
   tags: string[];

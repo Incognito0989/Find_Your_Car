@@ -1,4 +1,63 @@
-import { CarPhoto, AppThemeConfig } from '../types';
+import { CarPhoto, AppThemeConfig, UserAccount } from '../types';
+
+export const INITIAL_USERS: UserAccount[] = [
+  {
+    id: 'user-admin-1',
+    username: 'admin',
+    name: 'Alex Rivera',
+    email: 'alex@platesnapcars.local',
+    role: 'admin',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    bio: 'Lead Automotive Photographer & Studio Admin. Specializing in high-velocity track events and supercar exhibitions worldwide.',
+    instagram: '@rivera_motorsport',
+    venmoHandle: 'alex-rivera-photo',
+    payPalHandle: 'alexriveraphoto',
+    createdAt: '2023-01-15T08:00:00Z',
+    isActive: true,
+  },
+  {
+    id: 'user-photog-2',
+    username: 'elena',
+    name: 'Elena Rostova',
+    email: 'elena@platesnapcars.local',
+    role: 'photographer',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=200',
+    bio: 'Trackside & golden-hour street photographer capturing exotic body lines and midnight meets.',
+    instagram: '@rostova_lens',
+    venmoHandle: 'elena-rostova-lens',
+    payPalHandle: 'elenarostovalens',
+    createdAt: '2023-03-20T10:30:00Z',
+    isActive: true,
+  },
+  {
+    id: 'user-photog-3',
+    username: 'marcus',
+    name: 'Marcus Vance',
+    email: 'marcus@platesnapcars.local',
+    role: 'photographer',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+    bio: 'Commercial car shooter and canyon carving enthusiast documenting the west coast car scene.',
+    instagram: '@vance_visuals',
+    venmoHandle: 'marcus-vance-shots',
+    payPalHandle: 'marcusvancephoto',
+    createdAt: '2023-05-12T14:15:00Z',
+    isActive: true,
+  },
+  {
+    id: 'user-photog-4',
+    username: 'kenji',
+    name: 'Kenji Takahashi',
+    email: 'kenji@platesnapcars.local',
+    role: 'photographer',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
+    bio: 'Capturing the heart and soul of Japanese car meets, midnight touge runs, and retro legends.',
+    instagram: '@kenji_jdm',
+    venmoHandle: 'kenji-takahashi-jdm',
+    payPalHandle: 'kenjitakahashi',
+    createdAt: '2023-06-08T18:45:00Z',
+    isActive: true,
+  },
+];
 
 export const DEFAULT_THEMES: AppThemeConfig[] = [
   {
@@ -267,7 +326,9 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       title: 'Automotive Photographer',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
       bio: 'Motorsport & track day specialist capturing high-velocity supercars worldwide.',
-      instagram: '@rivera_motorsport'
+      instagram: '@rivera_motorsport',
+      venmoHandle: 'alex-rivera-photo',
+      payPalHandle: 'alexriveraphoto',
     },
     imageUrl: 'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1400',
     images: [
@@ -303,7 +364,9 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       title: 'Commercial Car Shooter',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
       bio: 'Automotive commercial director and canyon carving enthusiast.',
-      instagram: '@vance_visuals'
+      instagram: '@vance_visuals',
+      venmoHandle: 'marcus-vance-shots',
+      payPalHandle: 'marcusvancephoto',
     },
     imageUrl: 'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1400',
     images: [
@@ -338,7 +401,9 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       title: 'Trackside & Street Photographer',
       avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=200',
       bio: 'Documenting golden hour automotive culture and hypercars.',
-      instagram: '@rostova_lens'
+      instagram: '@rostova_lens',
+      venmoHandle: 'elena-rostova-lens',
+      payPalHandle: 'elenarostovalens',
     },
     imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1400',
     images: [
@@ -372,7 +437,9 @@ export const INITIAL_CAR_PHOTOS: CarPhoto[] = [
       title: 'JDM Culture Documentarian',
       avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
       bio: 'Capturing the heart and soul of Japanese car meets and retro legends.',
-      instagram: '@kenji_jdm'
+      instagram: '@kenji_jdm',
+      venmoHandle: 'kenji-takahashi-jdm',
+      payPalHandle: 'kenjitakahashi',
     },
     imageUrl: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1400',
     images: [

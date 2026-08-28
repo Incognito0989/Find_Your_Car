@@ -7,6 +7,7 @@ interface PhotoCardProps {
   car: CarPhoto;
   onOpenDownloadModal: (car: CarPhoto, defaultToCartoon?: boolean) => void;
   onSelectCar?: (car: CarPhoto) => void;
+  onSelectAuthor?: (authorName: string) => void;
   viewMode?: 'grid' | 'list';
 }
 
@@ -14,6 +15,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   car,
   onOpenDownloadModal,
   onSelectCar,
+  onSelectAuthor,
   viewMode = 'grid',
 }) => {
   const [showCartoon, setShowCartoon] = useState<boolean>(false);
@@ -28,6 +30,13 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       onSelectCar(car);
     } else {
       onOpenDownloadModal(car, false);
+    }
+  };
+
+  const handleAuthorClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelectAuthor && car.photographer?.name) {
+      onSelectAuthor(car.photographer.name);
     }
   };
 
@@ -96,13 +105,19 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             <span>{car.location}</span>
           </p>
 
-          <div className="flex items-center gap-2 pt-2">
+          <div
+            onClick={handleAuthorClick}
+            className="flex items-center gap-2 pt-2 hover:opacity-80 transition-opacity w-fit"
+            title="Filter by this photographer"
+          >
             <img
               src={car.photographer.avatar}
               alt={car.photographer.name}
               className="w-5 h-5 rounded-full object-cover border border-white/20"
             />
-            <span className="text-xs text-gray-300 font-medium">{car.photographer.name}</span>
+            <span className="text-xs text-gray-300 font-medium hover:text-[var(--ps-primary,#0A84FF)]">
+              {car.photographer.name}
+            </span>
           </div>
         </div>
 
@@ -233,13 +248,17 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
 
         {/* Photographer & Action */}
         <div className="pt-3 border-t border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div
+            onClick={handleAuthorClick}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+            title={`Filter by photographer ${car.photographer.name}`}
+          >
             <img
               src={car.photographer.avatar}
               alt={car.photographer.name}
               className="w-6 h-6 rounded-full object-cover border border-white/15"
             />
-            <span className="text-xs text-gray-300 font-medium truncate max-w-[100px]">
+            <span className="text-xs text-gray-300 font-medium truncate max-w-[100px] hover:text-[var(--ps-primary,#0A84FF)]">
               {car.photographer.name}
             </span>
           </div>
@@ -273,4 +292,3 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
     </div>
   );
 };
-
