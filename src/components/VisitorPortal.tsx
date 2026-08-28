@@ -156,15 +156,6 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                 <Server className="w-3 h-3 text-blue-400 ml-1" />
               </button>
             )}
-
-            {/* Switch to Admin Portal Button */}
-            <button
-              onClick={onOpenAdmin}
-              className="flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white active:scale-95 transition-all shadow-md cursor-pointer"
-            >
-              <Lock className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-              <span>Admin Studio</span>
-            </button>
           </div>
         </div>
       </nav>
@@ -395,10 +386,11 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
 
           <button
-            onClick={onOpenAdmin}
+            onClick={() => setArtFilter('cartoons')}
             className="bg-white text-black hover:bg-gray-100 font-bold px-6 py-3.5 rounded-2xl text-xs sm:text-sm shadow-xl active:scale-95 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
           >
-            <span>Open Studio in Admin</span>
+            <Sparkles className="w-4 h-4 text-pink-500" />
+            <span>Explore Stickers</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </section>
@@ -417,9 +409,6 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
 
           <div className="flex items-center gap-6 text-gray-400">
-            <button onClick={onOpenAdmin} className="hover:text-white transition-colors cursor-pointer">
-              Admin Portal
-            </button>
             <span className="hover:text-white transition-colors cursor-pointer">
               Photographer Terms
             </span>
@@ -427,6 +416,16 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               Privacy Policy
             </span>
             <span className="hover:text-white transition-colors cursor-pointer">Support</span>
+
+            {/* Discreet Admin Lock Button */}
+            <button
+              onClick={onOpenAdmin}
+              className="text-gray-600 hover:text-gray-400 p-1.5 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
+              title="Studio Portal"
+              aria-label="Admin Login"
+            >
+              <Lock className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </footer>
