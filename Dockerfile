@@ -22,7 +22,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV BACKEND_ONLY=true
+ENV BACKEND_ONLY=false
 
 # Copy built bundle and install production dependencies
 COPY package*.json ./

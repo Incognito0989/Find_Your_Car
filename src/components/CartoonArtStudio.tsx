@@ -18,6 +18,7 @@ import { formatMediaUrl } from '../utils/apiConfig';
 interface CartoonArtStudioProps {
   isOpen: boolean;
   onClose: () => void;
+  plateNumber?: string;
   carName: string;
   make: string;
   model: string;
@@ -30,6 +31,7 @@ interface CartoonArtStudioProps {
 export const CartoonArtStudio: React.FC<CartoonArtStudioProps> = ({
   isOpen,
   onClose,
+  plateNumber,
   carName,
   make,
   model,
@@ -106,6 +108,7 @@ export const CartoonArtStudio: React.FC<CartoonArtStudioProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: normalized,
+          plateNumber: plateNumber || '',
           carName,
           make,
           model,

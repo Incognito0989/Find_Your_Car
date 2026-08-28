@@ -68,8 +68,19 @@ function getGemini(): GoogleGenAI | null {
   return genAI;
 }
 
-// Save base64 image data directly as files to disk
-function saveBase64ImageToDisk(dataUrl: string, prefix = "car"): string {
+// Helper to create a clean, safe folder name for a license plate
+function getPlateFolderSlug(plateNumber?: string): string {
+  if (!plateNumber) return "unassigned";
+  const trimmed = plateNumber.toUpperCase().trim();
+  const sanitized = trimmed
+    .replace(/[^A-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return sanitized || "unassigned";
+}
+
+// Save base64 image data directly as files to disk inside the plate folder
+function saveBase64ImageToDisk(dataUrl: string, prefix = "car", plateNumber?: string): string {
   if (!dataUrl || !dataUrl.startsWith("data:image/")) {
     return dataUrl;
   }
@@ -80,12 +91,20 @@ function saveBase64ImageToDisk(dataUrl: string, prefix = "car"): string {
 
     const ext = matches[1] === "svg+xml" ? "svg" : matches[1] === "jpeg" ? "jpg" : matches[1];
     const base64Data = matches[2];
+
+    const plateFolder = getPlateFolderSlug(plateNumber);
+    const targetDir = path.join(UPLOADS_DIR, plateFolder);
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
     const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, filename);
+    const filePath = path.join(targetDir, filename);
 
     fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
-    console.log(`[Storage] Saved image file to disk: ${filename}`);
-    return `/uploads/${filename}`;
+    console.log(`[Storage] Saved image file to plate folder [${plateFolder}]: ${filename}`);
+    return `/uploads/${plateFolder}/${filename}`;
   } catch (err) {
     console.error("Failed to save image to disk:", err);
     return dataUrl;
@@ -211,7 +230,7 @@ app.post("/api/admin/logout", (req: Request, res: Response) => {
 // ==========================================
 app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
   try {
-    const { image, carName, make, model, color, specialFeatures } = req.body;
+    const { image, carName, make, model, color, specialFeatures, plateNumber } = req.body;
     if (!image) {
       return res.status(400).json({ error: "Image data or URL is required for cartoon generation." });
     }
@@ -235,8 +254,8 @@ app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
         base64Data = match[2];
       }
     } else if (typeof image === "string" && image.startsWith("/uploads/")) {
-      const filename = path.basename(image);
-      const localPath = path.join(UPLOADS_DIR, filename);
+      const relativeUploadPath = image.replace(/^\/uploads\//, "");
+      const localPath = path.join(UPLOADS_DIR, relativeUploadPath);
       if (fs.existsSync(localPath)) {
         const fileBuf = fs.readFileSync(localPath);
         base64Data = fileBuf.toString("base64");
@@ -304,7 +323,11 @@ ${specialFeatures ? `- Special user focus: ${specialFeatures}` : ""}`;
       }
 
       if (generatedDataUrl) {
-        const savedUrl = saveBase64ImageToDisk(generatedDataUrl, `cartoon_ai_${Date.now()}`);
+        const savedUrl = saveBase64ImageToDisk(
+          generatedDataUrl,
+          `cartoon_ai`,
+          plateNumber || vehicleTitle || "cartoon"
+        );
         return res.json({
           success: true,
           dataUrl: savedUrl,
@@ -389,23 +412,22 @@ app.post("/api/cars", requireAdmin, async (req: Request, res: Response) => {
     }
 
     const cleanPlate = plateNumber.toUpperCase().trim();
-    const cleanPlateSlug = cleanPlate.replace(/[^a-zA-Z0-9]/g, "");
 
-    // Process all images in the set/folder
+    // Process all images into the license plate's folder
     const savedImages: string[] = rawImagesList.map((img: string, idx: number) => {
       if (img && img.startsWith("data:image/")) {
-        return saveBase64ImageToDisk(img, `plate_${cleanPlateSlug}_${idx + 1}_${Date.now()}`);
+        return saveBase64ImageToDisk(img, `photo_${idx + 1}`, cleanPlate);
       }
       return img;
     });
 
     const primaryImageUrl = imageUrl && imageUrl.startsWith("data:image/")
-      ? savedImages[0]
+      ? saveBase64ImageToDisk(imageUrl, "cover", cleanPlate)
       : (imageUrl || savedImages[0]);
 
     const savedCartoonUrl = cartoonImageUrl
       ? (cartoonImageUrl.startsWith("data:image/")
-          ? saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${cleanPlateSlug}`)
+          ? saveBase64ImageToDisk(cartoonImageUrl, "cartoon", cleanPlate)
           : cartoonImageUrl)
       : null;
 
@@ -475,24 +497,27 @@ app.put("/api/cars/:id", requireAdmin, async (req: Request, res: Response) => {
       tags,
     } = req.body;
 
+    const existingCar = await getCarByIdFromDb(id);
+    const targetPlate = plateNumber || existingCar?.plateNumber || id;
+
     let savedImages: string[] = [];
     if (Array.isArray(images) && images.length > 0) {
       savedImages = images.map((img: string, idx: number) => {
         if (img && img.startsWith("data:image/")) {
-          return saveBase64ImageToDisk(img, `plate_${id}_${idx + 1}_${Date.now()}`);
+          return saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetPlate);
         }
         return img;
       });
     }
 
     if (imageUrl && imageUrl.startsWith("data:image/")) {
-      imageUrl = saveBase64ImageToDisk(imageUrl, `plate_${id}_cover_${Date.now()}`);
+      imageUrl = saveBase64ImageToDisk(imageUrl, `cover`, targetPlate);
     } else if (!imageUrl && savedImages.length > 0) {
       imageUrl = savedImages[0];
     }
 
     if (cartoonImageUrl && cartoonImageUrl.startsWith("data:image/")) {
-      cartoonImageUrl = saveBase64ImageToDisk(cartoonImageUrl, `cartoon_${id}_${Date.now()}`);
+      cartoonImageUrl = saveBase64ImageToDisk(cartoonImageUrl, `cartoon`, targetPlate);
     }
 
     const updates: any = {
@@ -576,9 +601,11 @@ async function startServer() {
     console.log("[Database] Local store ready, background PostgreSQL probe noticed:", err.message);
   });
 
-  const isBackendOnly = process.env.BACKEND_ONLY === "true";
+  const isExplicitlyBackendOnly = process.env.BACKEND_ONLY === "true";
+  const distPath = path.join(process.cwd(), "dist");
+  const hasDistIndex = fs.existsSync(path.join(distPath, "index.html"));
 
-  if (isBackendOnly) {
+  if (isExplicitlyBackendOnly && !hasDistIndex) {
     console.log("[PlateSnap Server] Running in Headless Backend Mode (No frontend bundle served).");
     app.get("/", (req: Request, res: Response) => {
       res.json({
@@ -601,12 +628,24 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Production SPA serving fallback
-    const distPath = path.join(process.cwd(), "dist");
-    if (fs.existsSync(distPath)) {
+    // Production SPA serving
+    if (hasDistIndex) {
       app.use(express.static(distPath));
       app.get("*", (req: Request, res: Response) => {
         res.sendFile(path.join(distPath, "index.html"));
+      });
+    } else {
+      app.get("/", (req: Request, res: Response) => {
+        res.json({
+          service: "PlateSnap Automotive Fullstack Server (Building Static Assets...)",
+          database: "PostgreSQL",
+          status: "online",
+          apiEndpoints: [
+            "/api/health",
+            "/api/cars",
+            "/api/admin/login",
+          ],
+        });
       });
     }
   }
@@ -617,7 +656,7 @@ async function startServer() {
     console.log(`📡 URL: http://0.0.0.0:${PORT}`);
     console.log(`🐘 Database Engine: PostgreSQL / Resilient Multi-Storage`);
     console.log(`🖼️ Media Storage: -> ${UPLOADS_DIR}`);
-    console.log(`🔌 Mode: ${isBackendOnly ? "Headless Backend API" : "Fullstack"}`);
+    console.log(`🔌 Mode: ${isExplicitlyBackendOnly && !hasDistIndex ? "Headless Backend API" : "Fullstack"}`);
     console.log(`====================================================`);
   });
 }

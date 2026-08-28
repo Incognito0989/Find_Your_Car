@@ -126,6 +126,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             image: normalized,
+            plateNumber: plateNumber || '',
             carName: carName || `${make} ${model}`,
             make,
             model,
@@ -186,6 +187,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             image: normalized,
+            plateNumber: car.plateNumber || '',
             carName: car.carName,
             make: car.make,
             model: car.model,
@@ -1630,6 +1632,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         <CartoonArtStudio
           isOpen={isCartoonStudioOpen}
           onClose={() => setIsCartoonStudioOpen(false)}
+          plateNumber={plateNumber || editingCarGallery?.plateNumber || ''}
           carName={carName || `${make} ${model}`}
           make={make}
           model={model}
