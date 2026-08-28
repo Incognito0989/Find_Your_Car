@@ -56,7 +56,14 @@ function getGemini(): GoogleGenAI | null {
     return null;
   }
   if (!genAI) {
-    genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    genAI = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
   }
   return genAI;
 }
@@ -197,6 +204,125 @@ app.post("/api/admin/logout", (req: Request, res: Response) => {
   const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : (req.headers["x-admin-token"] as string);
   if (token) activeSessions.delete(token);
   res.json({ success: true, message: "Logged out successfully" });
+});
+
+// ==========================================
+// GEMINI AI CARTOON GENERATION ENDPOINT
+// ==========================================
+app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
+  try {
+    const { image, carName, make, model, color, specialFeatures } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: "Image data or URL is required for cartoon generation." });
+    }
+
+    const ai = getGemini();
+    if (!ai) {
+      return res.json({
+        fallback: true,
+        message: "Gemini API key not configured on server. Switching to high-definition algorithmic engine.",
+      });
+    }
+
+    // Extract base64 and mime type from image input (can be data URL, local /uploads/ URL, or remote URL)
+    let base64Data = "";
+    let mimeType = "image/jpeg";
+
+    if (typeof image === "string" && image.startsWith("data:image/")) {
+      const match = image.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        base64Data = match[2];
+      }
+    } else if (typeof image === "string" && image.startsWith("/uploads/")) {
+      const filename = path.basename(image);
+      const localPath = path.join(UPLOADS_DIR, filename);
+      if (fs.existsSync(localPath)) {
+        const fileBuf = fs.readFileSync(localPath);
+        base64Data = fileBuf.toString("base64");
+        const ext = path.extname(localPath).toLowerCase();
+        mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+      }
+    } else if (typeof image === "string" && (image.startsWith("http://") || image.startsWith("https://"))) {
+      try {
+        const fetchRes = await fetch(image);
+        const arrayBuf = await fetchRes.arrayBuffer();
+        base64Data = Buffer.from(arrayBuf).toString("base64");
+        const contentType = fetchRes.headers.get("content-type");
+        if (contentType) mimeType = contentType.split(";")[0];
+      } catch (fetchErr) {
+        console.warn("[Cartoon AI] Failed to fetch remote image url for Gemini:", fetchErr);
+      }
+    }
+
+    if (!base64Data) {
+      return res.json({
+        fallback: true,
+        message: "Input image data could not be parsed for AI vision model. Using local processor.",
+      });
+    }
+
+    const vehicleTitle = carName || `${make || ""} ${model || "Vehicle"}`.trim();
+    const promptText = `You are a master automotive comic artist and sticker designer.
+Transform this exact car photograph of a ${vehicleTitle} ${color ? `(paint color: ${color})` : ""} into a clean, stylized 2D cartoon vector sticker illustration.
+
+Requirements:
+- Stylized 2D cel-shaded automotive illustration capturing the exact body shape, wheel stance, headlights, and paint tone of this vehicle.
+- Bold, dark, clean comic inking outlines.
+- Vibrant, flat pop-art colors with smooth cel-shading highlights and reflections.
+- Thick white die-cut sticker silhouette outline framing the car.
+- Pure solid white background (#FFFFFF) with no background scenery or floor clutter.
+${specialFeatures ? `- Special user focus: ${specialFeatures}` : ""}`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-image",
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                data: base64Data,
+                mimeType,
+              },
+            },
+            {
+              text: promptText,
+            },
+          ],
+        },
+      });
+
+      let generatedDataUrl: string | null = null;
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData?.data) {
+            const outMime = part.inlineData.mimeType || "image/png";
+            generatedDataUrl = `data:${outMime};base64,${part.inlineData.data}`;
+            break;
+          }
+        }
+      }
+
+      if (generatedDataUrl) {
+        const savedUrl = saveBase64ImageToDisk(generatedDataUrl, `cartoon_ai_${Date.now()}`);
+        return res.json({
+          success: true,
+          dataUrl: savedUrl,
+          source: "gemini-ai",
+        });
+      }
+    } catch (genError: any) {
+      console.warn("[Cartoon AI] Gemini image generation attempt noted:", genError?.message || genError);
+    }
+
+    return res.json({
+      fallback: true,
+      message: "AI image model unavailable or returned text. Seamlessly applied algorithmic vector processor.",
+    });
+  } catch (err: any) {
+    console.error("Cartoon generation handler error:", err);
+    res.status(500).json({ error: err.message || "Failed to generate cartoon art." });
+  }
 });
 
 // ==========================================

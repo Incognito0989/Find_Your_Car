@@ -1,26 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles,
   Wand2,
   Check,
   X,
-  Palette,
-  Eye,
   SlidersHorizontal,
+  RefreshCw,
+  Image as ImageIcon,
+  Layers,
+  ArrowRightLeft,
+  Bot,
   Zap,
-  Download,
 } from 'lucide-react';
-import {
-  generateCarVectorSvg,
-  CartoonStyleOptions,
-  applyCartoonCanvasFilter,
-} from '../utils/cartoonEngine';
-import {
-  SAMPLE_CARTOON_MIATA_SVG,
-  SAMPLE_CARTOON_PORSCHE_SVG,
-  SAMPLE_CARTOON_BMW_SVG,
-  SAMPLE_CARTOON_CORVETTE_SVG,
-} from '../data/initialData';
+import { convertPhotoToCartoonSticker, normalizeMediaForCanvas } from '../utils/cartoonEngine';
+import { formatMediaUrl } from '../utils/apiConfig';
 
 interface CartoonArtStudioProps {
   isOpen: boolean;
@@ -28,8 +21,10 @@ interface CartoonArtStudioProps {
   carName: string;
   make: string;
   model: string;
+  color?: string;
   originalImageUrl: string;
-  onApplyCartoon: (cartoonSvgUrl: string) => void;
+  availableImages?: string[];
+  onApplyCartoon: (cartoonUrl: string) => void;
 }
 
 export const CartoonArtStudio: React.FC<CartoonArtStudioProps> = ({
@@ -38,142 +33,154 @@ export const CartoonArtStudio: React.FC<CartoonArtStudioProps> = ({
   carName,
   make,
   model,
+  color,
   originalImageUrl,
+  availableImages = [],
   onApplyCartoon,
 }) => {
-  const [selectedPreset, setSelectedPreset] = useState<string>('miata-popup');
-  const [carColor, setCarColor] = useState<string>('#FA7B8C'); // Iconic cute pink
-  const [headlightStyle, setHeadlightStyle] = useState<'popup' | 'popup-taped-x' | 'laser' | 'round-classic' | 'sharp-aggressive'>('popup-taped-x');
-  const [wingStyle, setWingStyle] = useState<'none' | 'ducktail' | 'gt-wing' | 'carbon-spoiler'>('none');
-  const [smileGrille, setSmileGrille] = useState<boolean>(true);
-  const [outlineWidth, setOutlineWidth] = useState<number>(10);
-  const [isGeneratingAi, setIsGeneratingAi] = useState<boolean>(false);
-  const [customSvgResult, setCustomSvgResult] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'side-by-side' | 'cartoon-only' | 'overlay'>('side-by-side');
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string>(originalImageUrl);
+  const [cartoonResult, setCartoonResult] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isAiGenerating, setIsAiGenerating] = useState<boolean>(false);
+  const [engineSource, setEngineSource] = useState<'ai' | 'canvas'>('canvas');
+  const [viewMode, setViewMode] = useState<'side-by-side' | 'cartoon-only' | 'split'>('side-by-side');
 
-  // Compute current cartoon vector SVG
-  const currentCartoonSvg =
-    customSvgResult ||
-    generateCarVectorSvg({
-      primaryColor: carColor,
-      headlightStyle,
-      wingStyle,
-      smileGrille,
-      outlineWidth,
-    });
+  // Algorithmic stylization parameters
+  const [edgeThickness, setEdgeThickness] = useState<number>(2);
+  const [edgeThreshold, setEdgeThreshold] = useState<number>(26);
+  const [colorSteps, setColorSteps] = useState<number>(6);
+  const [saturationBoost, setSaturationBoost] = useState<number>(1.35);
+  const [stickerBorder, setStickerBorder] = useState<boolean>(true);
 
-  // Presets mapping
-  const handlePresetSelect = (presetId: string) => {
-    setSelectedPreset(presetId);
-    setCustomSvgResult(null);
-    if (presetId === 'miata-popup') {
-      setCarColor('#FA7B8C'); // Signature cute pink
-      setHeadlightStyle('popup-taped-x');
-      setWingStyle('none');
-      setSmileGrille(true);
-      setOutlineWidth(10);
-    } else if (presetId === 'gt3rs-track') {
-      setCarColor('#68D391'); // Lizard green
-      setHeadlightStyle('round-classic');
-      setWingStyle('gt-wing');
-      setSmileGrille(false);
-      setOutlineWidth(11);
-    } else if (presetId === 'm4-competition') {
-      setCarColor('#38BDF8'); // Yas marina blue
-      setHeadlightStyle('laser');
-      setWingStyle('none');
-      setSmileGrille(false);
-      setOutlineWidth(10);
-    } else if (presetId === 'corvette-c8') {
-      setCarColor('#F97316'); // Sebring orange
-      setHeadlightStyle('laser');
-      setWingStyle('none');
-      setSmileGrille(false);
-      setOutlineWidth(10);
-    } else if (presetId === 'jdm-midnight') {
-      setCarColor('#818CF8'); // Bayside violet / blue
-      setHeadlightStyle('popup');
-      setWingStyle('ducktail');
-      setSmileGrille(true);
-      setOutlineWidth(12);
+  // Sync selected photo when props change
+  useEffect(() => {
+    if (originalImageUrl) {
+      setSelectedPhotoUrl(originalImageUrl);
     }
-  };
+  }, [originalImageUrl]);
 
-  // AI Generation via Backend Gemini API Endpoint
+  // Core processing function: runs algorithmic cel-shading & inking on the exact selected picture
+  const processSelectedPhoto = useCallback(
+    async (sourceUrl: string) => {
+      if (!sourceUrl) return;
+      setIsProcessing(true);
+      try {
+        const normalized = normalizeMediaForCanvas(sourceUrl);
+        const result = await convertPhotoToCartoonSticker(normalized, {
+          edgeThickness,
+          edgeThreshold,
+          colorSteps,
+          saturationBoost,
+          stickerBorder,
+          stickerBorderWidth: 10,
+        });
+        setCartoonResult(result);
+        setEngineSource('canvas');
+      } catch (err) {
+        console.error('Error generating cartoon sticker from photo:', err);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [edgeThickness, edgeThreshold, colorSteps, saturationBoost, stickerBorder]
+  );
+
+  // Auto-apply to selected picture whenever it or the settings change
+  useEffect(() => {
+    if (isOpen && selectedPhotoUrl && engineSource !== 'ai') {
+      const timer = setTimeout(() => {
+        processSelectedPhoto(selectedPhotoUrl);
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, selectedPhotoUrl, processSelectedPhoto, engineSource]);
+
+  // Trigger Gemini AI Generation from Selected Picture
   const handleGenerateWithGemini = async () => {
-    setIsGeneratingAi(true);
+    if (!selectedPhotoUrl) return;
+    setIsAiGenerating(true);
     try {
+      const normalized = normalizeMediaForCanvas(selectedPhotoUrl);
       const res = await fetch('/api/generate-cartoon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          image: normalized,
           carName,
           make,
           model,
-          color: carColor,
-          specialFeatures: `${headlightStyle} headlights, ${wingStyle} wing, 2D sticker aesthetic`,
+          color: color || '',
+          specialFeatures: '2D comic sticker art, bold ink outlines, cel-shaded reflections, white die-cut border',
         }),
       });
       const data = await res.json();
       if (data.dataUrl) {
-        setCustomSvgResult(data.dataUrl);
+        setCartoonResult(data.dataUrl);
+        setEngineSource('ai');
       } else {
-        // Fallback to stylized vector
-        setCustomSvgResult(currentCartoonSvg);
+        // Fallback to high-definition algorithmic processor
+        await processSelectedPhoto(selectedPhotoUrl);
       }
     } catch (e) {
-      console.warn('Backend AI generation fell back to instant vector studio:', e);
-      setCustomSvgResult(currentCartoonSvg);
+      console.warn('Gemini API call fell back to local cartoonizer:', e);
+      await processSelectedPhoto(selectedPhotoUrl);
     } finally {
-      setIsGeneratingAi(false);
+      setIsAiGenerating(false);
     }
   };
 
   const handleApply = () => {
-    onApplyCartoon(currentCartoonSvg);
-    onClose();
+    if (cartoonResult) {
+      onApplyCartoon(cartoonResult);
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
 
-  return (
-    <div id="cartoon-art-studio-modal" className="fixed inset-0 z-[120] flex items-center justify-center p-4 md:p-6">
-      {/* Modal backdrop */}
-      <div className="absolute inset-0 modal-blur bg-black/80" onClick={onClose} />
+  const imageList = availableImages.length > 0 ? availableImages : [originalImageUrl];
 
-      <div className="relative w-full max-w-5xl bg-[#111111] border border-[#2C2C2E] rounded-[28px] overflow-hidden shadow-2xl flex flex-col max-h-[92vh] z-10 animate-in fade-in zoom-in-95 duration-200">
+  return (
+    <div id="cartoon-art-studio-modal" className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-md" onClick={onClose} />
+
+      <div className="relative w-full max-w-5xl bg-[#111113] border border-[#2C2C2E] rounded-[24px] overflow-hidden shadow-2xl flex flex-col max-h-[94vh] z-10 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[#2C2C2E] flex items-center justify-between bg-[#161618]">
+        <div className="px-5 py-3.5 border-b border-[#2C2C2E] flex items-center justify-between bg-[#18181B]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 to-amber-400 text-black font-black flex items-center justify-center shadow-lg">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 to-violet-500 text-white flex items-center justify-center shadow-md">
+              <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white">2D Cartoon Vector Sticker Studio</h2>
-                <span className="bg-pink-500/20 text-pink-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-pink-500/30 uppercase tracking-wider">
-                  Miata Style
+                <h2 className="text-sm sm:text-base font-bold text-white">2D Cartoon Sticker Studio</h2>
+                <span className="bg-pink-500/20 text-pink-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-pink-500/30 uppercase tracking-wider">
+                  Auto-Applied to Selected Photo
                 </span>
               </div>
               <p className="text-xs text-gray-400">
-                Transform photo of <span className="text-white font-medium">{carName || 'your vehicle'}</span> into clean pop-up cartoon sticker art
+                Vehicle: <span className="text-white font-medium">{carName || `${make} ${model}`}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2C2C2E]">
+          <div className="flex items-center gap-2">
+            {/* View Mode Switcher */}
+            <div className="hidden sm:flex items-center gap-1 bg-[#222225] p-1 rounded-xl border border-[#333338]">
               <button
+                type="button"
                 onClick={() => setViewMode('side-by-side')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   viewMode === 'side-by-side' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >
                 Side-by-Side
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode('cartoon-only')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   viewMode === 'cartoon-only' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >
@@ -182,8 +189,9 @@ export const CartoonArtStudio: React.FC<CartoonArtStudioProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -191,224 +199,289 @@ export const CartoonArtStudio: React.FC<CartoonArtStudioProps> = ({
         </div>
 
         {/* Studio Body */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          {/* Visual Showcase Stage */}
-          <div className="flex-1 bg-black/90 p-6 flex flex-col items-center justify-center overflow-hidden relative min-h-[360px]">
-            {/* Grid backdrop */}
-            <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(#FA7B8C_1px,transparent_1px)] [background-size:32px_32px]" />
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Main Visual Preview Area */}
+          <div className="flex-1 bg-black/95 p-4 sm:p-6 flex flex-col items-center justify-center overflow-y-auto relative min-h-[320px]">
+            {/* Subtle background grid */}
+            <div className="absolute inset-0 pointer-events-none opacity-15 bg-[radial-gradient(#ec4899_1px,transparent_1px)] [background-size:24px_24px]" />
 
+            {/* Preview Stage */}
             {viewMode === 'side-by-side' ? (
-              <div className="w-full h-full max-h-[55vh] grid grid-cols-1 sm:grid-cols-2 gap-4 items-center justify-center z-10">
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl z-10">
                 {/* Original Photo */}
-                <div className="relative rounded-2xl overflow-hidden border border-[#2C2C2E] bg-[#141416] aspect-[4/3] flex flex-col shadow-xl">
-                  <div className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] font-bold text-gray-300 uppercase tracking-wider">
-                    Original Capture
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs text-gray-400 font-semibold px-1">
+                    <span className="flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                      Original Selected Photo
+                    </span>
                   </div>
-                  <img
-                    src={originalImageUrl}
-                    alt="Original"
-                    className="w-full h-full object-cover"
-                  />
+                  <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-[#2C2C2E] bg-[#141416] flex items-center justify-center shadow-lg">
+                    <img
+                      src={formatMediaUrl(selectedPhotoUrl)}
+                      alt="Original Car"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
 
-                {/* Cartoon Art Result */}
-                <div className="relative rounded-2xl overflow-hidden border border-pink-500/40 bg-white aspect-[4/3] flex flex-col items-center justify-center shadow-2xl group">
-                  <div className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] font-bold text-pink-400 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-pink-400" />
-                    2D Cartoon Sticker
+                {/* Auto-Generated 2D Cartoon */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs text-pink-400 font-semibold px-1">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                      2D Cartoon Sticker Result
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-normal">
+                      {engineSource === 'ai' ? 'Powered by Gemini AI' : 'Cel-Shade Algorithm'}
+                    </span>
                   </div>
-                  <img
-                    src={currentCartoonSvg}
-                    alt="Cartoon Vector Art"
-                    className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-                  />
+                  <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-pink-500/50 bg-white flex items-center justify-center shadow-xl">
+                    {cartoonResult ? (
+                      <img
+                        src={formatMediaUrl(cartoonResult)}
+                        alt="2D Cartoon Car"
+                        className="w-full h-full object-contain p-2"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-gray-400">
+                        <RefreshCw className="w-6 h-6 animate-spin text-pink-500" />
+                        <span className="text-xs">Generating 2D Cartoon...</span>
+                      </div>
+                    )}
+
+                    {/* Processing overlay badge */}
+                    {(isProcessing || isAiGenerating) && (
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white gap-2">
+                        <RefreshCw className="w-6 h-6 animate-spin text-pink-400" />
+                        <span className="text-xs font-semibold">
+                          {isAiGenerating ? 'Generating with Gemini AI...' : 'Stylizing vehicle contours...'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="relative rounded-2xl overflow-hidden border border-pink-500/40 bg-white max-w-md w-full aspect-[4/3] flex items-center justify-center shadow-2xl z-10">
-                <img
-                  src={currentCartoonSvg}
-                  alt="Cartoon Vector Art"
-                  className="w-full h-full object-contain p-4"
-                />
+              /* Cartoon Only mode */
+              <div className="w-full max-w-xl z-10 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-pink-400 font-semibold px-1">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                    2D Vector Cartoon Sticker
+                  </span>
+                </div>
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-pink-500/50 bg-white flex items-center justify-center shadow-2xl">
+                  {cartoonResult ? (
+                    <img
+                      src={formatMediaUrl(cartoonResult)}
+                      alt="2D Cartoon Car"
+                      className="w-full h-full object-contain p-4"
+                    />
+                  ) : (
+                    <RefreshCw className="w-8 h-8 animate-spin text-pink-500" />
+                  )}
+                </div>
               </div>
             )}
 
-            {/* AI Generation Status Pill */}
-            {isGeneratingAi && (
-              <div className="absolute bottom-6 bg-black/90 backdrop-blur-md border border-pink-500/50 px-4 py-2 rounded-full text-xs font-semibold text-pink-300 flex items-center gap-2 shadow-2xl animate-pulse z-20">
-                <Wand2 className="w-4 h-4 animate-spin text-pink-400" />
-                Gemini AI generating custom cel-shaded vector sticker...
+            {/* Photo Selector Thumbnail Strip (if multiple photos staged for this vehicle) */}
+            {imageList.length > 1 && (
+              <div className="w-full max-w-4xl mt-4 pt-3 border-t border-white/10 z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                    Select Which Picture to Cartoonize ({imageList.length} Photos):
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+                  {imageList.map((url, idx) => {
+                    const isSelected = selectedPhotoUrl === url;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPhotoUrl(url);
+                          setEngineSource('canvas');
+                        }}
+                        className={`relative w-16 h-12 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-pink-500 ring-2 ring-pink-500/40 scale-105 shadow-md'
+                            : 'border-[#333338] opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={formatMediaUrl(url)}
+                          alt={`Angle ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-pink-500/20 flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Customizer Panel */}
-          <div className="w-full md:w-[380px] bg-[#141416] border-t md:border-t-0 md:border-l border-[#2C2C2E] p-6 flex flex-col justify-between overflow-y-auto custom-scrollbar">
-            <div className="space-y-6">
-              {/* Presets */}
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2.5 block flex items-center justify-between">
-                  <span>Vehicle Character Presets</span>
-                  <span className="text-pink-400 text-[11px] font-normal">Matching Reference</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'miata-popup', label: 'Miata Pop-Up (Ref)', color: '#FA7B8C' },
-                    { id: 'gt3rs-track', label: 'Porsche GT Wing', color: '#68D391' },
-                    { id: 'm4-competition', label: 'BMW M Twin Grille', color: '#38BDF8' },
-                    { id: 'corvette-c8', label: 'Corvette C8 Wedge', color: '#F97316' },
-                    { id: 'jdm-midnight', label: 'JDM Touge Legend', color: '#818CF8' },
-                  ].map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => handlePresetSelect(p.id)}
-                      className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center gap-2 ${
-                        selectedPreset === p.id
-                          ? 'border-pink-500 bg-pink-500/10 text-white font-semibold'
-                          : 'border-[#2C2C2E] bg-[#1C1C1E] text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      <span
-                        className="w-3.5 h-3.5 rounded-full border border-black/30 shrink-0"
-                        style={{ backgroundColor: p.color }}
-                      />
-                      <span className="truncate">{p.label}</span>
-                    </button>
-                  ))}
+          {/* Right Sidebar: Stylization Controls & Gemini AI trigger */}
+          <div className="w-full lg:w-80 bg-[#161618] border-t lg:border-t-0 lg:border-l border-[#2C2C2E] p-5 flex flex-col justify-between overflow-y-auto space-y-5">
+            <div className="space-y-4">
+              {/* Gemini AI Action Card */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-blue-500/10 border border-pink-500/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Bot className="w-4 h-4 text-pink-400" />
+                    Gemini AI Vision Studio
+                  </span>
+                  <span className="text-[10px] bg-pink-500 text-white font-bold px-2 py-0.5 rounded-full">
+                    AI Key
+                  </span>
                 </div>
-              </div>
-
-              {/* Color Customizer */}
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2.5 block flex items-center justify-between">
-                  <span>Car Body Cel Color</span>
-                  <span className="font-mono text-white text-[11px]">{carColor}</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={carColor}
-                    onChange={(e) => {
-                      setCarColor(e.target.value);
-                      setCustomSvgResult(null);
-                    }}
-                    className="w-10 h-10 rounded-xl bg-transparent border border-[#2C2C2E] cursor-pointer p-0.5"
-                  />
-                  {/* Quick palette shortcuts */}
-                  <div className="flex-1 flex items-center justify-between gap-1.5 bg-[#1C1C1E] p-1.5 rounded-xl border border-[#2C2C2E]">
-                    {['#FA7B8C', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#FFFFFF', '#18181B'].map((col) => (
-                      <button
-                        key={col}
-                        onClick={() => {
-                          setCarColor(col);
-                          setCustomSvgResult(null);
-                        }}
-                        className={`w-6 h-6 rounded-lg border transition-transform ${
-                          carColor === col ? 'scale-110 border-white ring-2 ring-pink-500' : 'border-black/30 hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: col }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Headlight Style */}
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2.5 block">
-                  Headlight Character
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: 'popup-taped-x', label: 'Pop-Up X Tape' },
-                    { id: 'popup', label: 'Pop-Up Dual' },
-                    { id: 'round-classic', label: 'Classic Round' },
-                    { id: 'laser', label: 'Laser Angle' },
-                  ].map((hl) => (
-                    <button
-                      key={hl.id}
-                      onClick={() => {
-                        setHeadlightStyle(hl.id as any);
-                        setCustomSvgResult(null);
-                      }}
-                      className={`py-2 px-1 rounded-xl text-[11px] font-semibold border text-center transition-all ${
-                        headlightStyle === hl.id
-                          ? 'border-pink-500 bg-pink-500/15 text-pink-300'
-                          : 'border-[#2C2C2E] bg-[#1C1C1E] text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {hl.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Outline & Stance Thickness */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-gray-400">Black Sticker Outline Width</span>
-                  <span className="text-white font-mono">{outlineWidth}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="6"
-                  max="16"
-                  value={outlineWidth}
-                  onChange={(e) => {
-                    setOutlineWidth(parseInt(e.target.value, 10));
-                    setCustomSvgResult(null);
-                  }}
-                  className="w-full accent-pink-500 bg-[#2C2C2E] h-1.5 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-
-              {/* Grille Expression */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-[#1C1C1E] border border-[#2C2C2E]">
-                <div>
-                  <span className="text-xs font-bold text-white block">Miata Smile / Grille</span>
-                  <span className="text-[10px] text-gray-400">Iconic cute front bumper smile</span>
-                </div>
+                <p className="text-[11px] text-gray-300 leading-relaxed">
+                  Use the Gemini image model to transform the selected photo into a custom stylized sticker with comic reflections and die-cut borders.
+                </p>
                 <button
-                  onClick={() => {
-                    setSmileGrille(!smileGrille);
-                    setCustomSvgResult(null);
-                  }}
-                  className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${
-                    smileGrille ? 'bg-pink-500' : 'bg-[#2C2C2E]'
-                  }`}
+                  type="button"
+                  onClick={handleGenerateWithGemini}
+                  disabled={isAiGenerating}
+                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                      smileGrille ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
+                  {isAiGenerating ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Gemini Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5" />
+                      Generate with Gemini AI
+                    </>
+                  )}
                 </button>
               </div>
 
-              {/* AI Redraw Button */}
-              <button
-                onClick={handleGenerateWithGemini}
-                disabled={isGeneratingAi}
-                className="w-full py-2.5 px-3 rounded-xl border border-pink-500/40 bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 text-xs font-semibold flex items-center justify-center gap-2 transition-colors active:scale-98"
-              >
-                <Wand2 className="w-3.5 h-3.5 text-pink-400" />
-                {isGeneratingAi ? 'AI Stylizing...' : 'Redraw with Gemini AI Vision'}
-              </button>
+              {/* Fine-Tuning Sliders for Exact Photo Contour Styling */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-pink-400" />
+                    Stylization Sliders
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEdgeThickness(2);
+                      setEdgeThreshold(26);
+                      setColorSteps(6);
+                      setSaturationBoost(1.35);
+                      setStickerBorder(true);
+                      setEngineSource('canvas');
+                    }}
+                    className="text-[10px] text-gray-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Edge Inking Thickness */}
+                <div className="space-y-1 bg-[#1E1E22] p-2.5 rounded-xl border border-[#2E2E33]">
+                  <div className="flex items-center justify-between text-[11px] text-gray-300">
+                    <span>Comic Inking Outlines</span>
+                    <span className="text-pink-400 font-mono font-bold">{edgeThickness}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="4"
+                    step="1"
+                    value={edgeThickness}
+                    onChange={(e) => {
+                      setEdgeThickness(Number(e.target.value));
+                      setEngineSource('canvas');
+                    }}
+                    className="w-full accent-pink-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Cel-Shading Color Quantization */}
+                <div className="space-y-1 bg-[#1E1E22] p-2.5 rounded-xl border border-[#2E2E33]">
+                  <div className="flex items-center justify-between text-[11px] text-gray-300">
+                    <span>Cel-Shading Bands</span>
+                    <span className="text-pink-400 font-mono font-bold">{colorSteps} levels</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="3"
+                    max="10"
+                    step="1"
+                    value={colorSteps}
+                    onChange={(e) => {
+                      setColorSteps(Number(e.target.value));
+                      setEngineSource('canvas');
+                    }}
+                    className="w-full accent-pink-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Color Saturation */}
+                <div className="space-y-1 bg-[#1E1E22] p-2.5 rounded-xl border border-[#2E2E33]">
+                  <div className="flex items-center justify-between text-[11px] text-gray-300">
+                    <span>Vibrancy & Saturation</span>
+                    <span className="text-pink-400 font-mono font-bold">
+                      +{Math.round((saturationBoost - 1) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="1.8"
+                    step="0.05"
+                    value={saturationBoost}
+                    onChange={(e) => {
+                      setSaturationBoost(Number(e.target.value));
+                      setEngineSource('canvas');
+                    }}
+                    className="w-full accent-pink-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Die-Cut Sticker Outline */}
+                <div className="flex items-center justify-between bg-[#1E1E22] p-2.5 rounded-xl border border-[#2E2E33]">
+                  <span className="text-[11px] text-gray-300">White Die-Cut Sticker Frame</span>
+                  <input
+                    type="checkbox"
+                    checked={stickerBorder}
+                    onChange={(e) => {
+                      setStickerBorder(e.target.checked);
+                      setEngineSource('canvas');
+                    }}
+                    className="w-4 h-4 accent-pink-500 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Bottom Actions */}
-            <div className="pt-6 border-t border-[#2C2C2E] space-y-2.5">
+            <div className="space-y-2 pt-3 border-t border-[#2C2C2E]">
               <button
+                type="button"
                 onClick={handleApply}
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:brightness-110 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-pink-500/25 active:scale-95 transition-all text-sm"
+                disabled={!cartoonResult || isProcessing || isAiGenerating}
+                className="w-full py-2.5 px-4 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
               >
                 <Check className="w-4 h-4" />
                 Attach 2D Cartoon Art to Car
               </button>
+
               <button
+                type="button"
                 onClick={onClose}
-                className="w-full py-2 text-xs text-gray-400 hover:text-white transition-colors"
+                className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cancel
               </button>

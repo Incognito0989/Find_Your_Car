@@ -36,6 +36,7 @@ import {
 import { CarPhoto, AppThemeConfig, VehicleLookupResult } from '../types';
 import { ImageEditorModal } from './ImageEditorModal';
 import { CartoonArtStudio } from './CartoonArtStudio';
+import { convertPhotoToCartoonSticker, normalizeMediaForCanvas } from '../utils/cartoonEngine';
 import { DEFAULT_THEMES } from '../data/initialData';
 import { applyThemeToDocument } from '../utils/themeUtils';
 import { formatMediaUrl } from '../utils/apiConfig';
@@ -91,6 +92,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const [cartoonImageUrl, setCartoonImageUrl] = useState<string | null>(null);
   const [hasCartoon, setHasCartoon] = useState<boolean>(false);
+  const [selectedCartoonPhotoUrl, setSelectedCartoonPhotoUrl] = useState<string | null>(null);
+  const [isAutoGeneratingCartoon, setIsAutoGeneratingCartoon] = useState<boolean>(false);
   const [resolution, setResolution] = useState<string>('High Resolution • 300 DPI');
   const [cameraInfo, setCameraInfo] = useState<string>('Sony Alpha • 70-200mm f/2.8 GM • ISO 100');
 
@@ -101,6 +104,137 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const manageCarFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Direct Auto-Generation of 2D Cartoon Sticker from specific photo
+  const handleAutoGenerateCartoonFromPhoto = async (photoUrl: string) => {
+    if (!photoUrl) return;
+    setSelectedCartoonPhotoUrl(photoUrl);
+    setIsAutoGeneratingCartoon(true);
+    setStatusMsg({
+      type: 'success',
+      text: 'Auto-applying 2D Cartoon vector sticker to selected picture...',
+    });
+
+    try {
+      const normalized = normalizeMediaForCanvas(photoUrl);
+      let resultUrl: string | null = null;
+
+      // 1. Attempt server-side Gemini AI generation
+      try {
+        const res = await fetch('/api/generate-cartoon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: normalized,
+            carName: carName || `${make} ${model}`,
+            make,
+            model,
+            color,
+          }),
+        });
+        const data = await res.json();
+        if (data.dataUrl) {
+          resultUrl = data.dataUrl;
+        }
+      } catch (aiErr) {
+        console.warn('Gemini endpoint fallback:', aiErr);
+      }
+
+      // 2. If Gemini unavailable or offline, use high-definition canvas cel-shading & inking
+      if (!resultUrl) {
+        resultUrl = await convertPhotoToCartoonSticker(normalized, {
+          edgeThickness: 2,
+          edgeThreshold: 26,
+          colorSteps: 6,
+          saturationBoost: 1.35,
+          stickerBorder: true,
+        });
+      }
+
+      setCartoonImageUrl(resultUrl);
+      setHasCartoon(true);
+      setStatusMsg({
+        type: 'success',
+        text: '✨ 2D Cartoon vector sticker successfully auto-generated from selected picture!',
+      });
+    } catch (err: any) {
+      console.error('Failed to auto-generate cartoon:', err);
+      setStatusMsg({
+        type: 'error',
+        text: 'Could not auto-generate cartoon from this photo.',
+      });
+    } finally {
+      setIsAutoGeneratingCartoon(false);
+    }
+  };
+
+  // Auto-generate cartoon for existing fleet car and save to database
+  const handleAutoGenerateForExistingCar = async (car: CarPhoto, photoUrl: string) => {
+    if (!photoUrl) return;
+    setStatusMsg({
+      type: 'success',
+      text: `Generating 2D cartoon sticker for [${car.plateNumber}]...`,
+    });
+
+    try {
+      const normalized = normalizeMediaForCanvas(photoUrl);
+      let resultUrl: string | null = null;
+
+      try {
+        const res = await fetch('/api/generate-cartoon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: normalized,
+            carName: car.carName,
+            make: car.make,
+            model: car.model,
+            color: car.color,
+          }),
+        });
+        const data = await res.json();
+        if (data.dataUrl) {
+          resultUrl = data.dataUrl;
+        }
+      } catch (e) {
+        console.warn('Fallback to algorithmic generator for existing car:', e);
+      }
+
+      if (!resultUrl) {
+        resultUrl = await convertPhotoToCartoonSticker(normalized, {
+          edgeThickness: 2,
+          edgeThreshold: 26,
+          colorSteps: 6,
+          saturationBoost: 1.35,
+          stickerBorder: true,
+        });
+      }
+
+      await onUpdateCar(car.id, {
+        cartoonImageUrl: resultUrl,
+        hasCartoon: true,
+      });
+
+      if (editingCarGallery && editingCarGallery.id === car.id) {
+        setEditingCarGallery({
+          ...editingCarGallery,
+          cartoonImageUrl: resultUrl,
+          hasCartoon: true,
+        });
+      }
+
+      setStatusMsg({
+        type: 'success',
+        text: `✨ Successfully updated [${car.plateNumber}] with a custom 2D Cartoon Sticker!`,
+      });
+    } catch (err: any) {
+      console.error('Error creating cartoon for existing car:', err);
+      setStatusMsg({
+        type: 'error',
+        text: 'Failed to update existing car cartoon sticker.',
+      });
+    }
+  };
 
   // Online Plate Auto-Lookup State
   const [isLookingUpPlate, setIsLookingUpPlate] = useState<boolean>(false);
@@ -686,10 +820,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                       {/* Cartoon Vector Preview */}
                       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-pink-500/40 bg-white flex items-center justify-center shadow-lg group">
-                        {cartoonImageUrl ? (
+                        {isAutoGeneratingCartoon ? (
+                          <div className="flex flex-col items-center gap-2 text-pink-600 p-4">
+                            <RefreshCw className="w-8 h-8 animate-spin" />
+                            <span className="text-xs font-bold text-gray-800">Auto-Generating 2D Cartoon...</span>
+                            <span className="text-[10px] text-gray-500">Applying comic inking & cel-shading</span>
+                          </div>
+                        ) : cartoonImageUrl ? (
                           <>
                             <img
-                              src={cartoonImageUrl}
+                              src={formatMediaUrl(cartoonImageUrl)}
                               alt="Cartoon Sticker"
                               className="w-full h-full object-contain p-3"
                             />
@@ -697,14 +837,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                               <Sparkles className="w-3 h-3" />
                               2D Cartoon Attached
                             </div>
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setIsCartoonStudioOpen(true)}
-                                className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-lg"
+                                onClick={() => {
+                                  setSelectedCartoonPhotoUrl(currentCoverPhoto?.url || stagedPhotos[0]?.url);
+                                  setIsCartoonStudioOpen(true);
+                                }}
+                                className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-lg cursor-pointer"
                               >
                                 <Sparkles className="w-3.5 h-3.5" />
-                                Edit Cartoon
+                                Studio / Fine-Tune
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCartoonImageUrl(null);
+                                  setHasCartoon(false);
+                                }}
+                                className="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-2.5 py-2 rounded-xl shadow-lg cursor-pointer"
+                                title="Remove cartoon sticker"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </>
@@ -715,15 +869,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             </div>
                             <p className="text-xs font-bold text-gray-800">2D Cartoon Vector Sticker</p>
                             <p className="text-[11px] text-gray-500 mb-3">
-                              Turn this vehicle into a stylized 2D decal sticker
+                              Turn selected picture into a stylized 2D decal sticker
                             </p>
-                            <button
-                              type="button"
-                              onClick={() => setIsCartoonStudioOpen(true)}
-                              className="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-colors cursor-pointer"
-                            >
-                              Generate Cartoon Art
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleAutoGenerateCartoonFromPhoto(currentCoverPhoto?.url || stagedPhotos[0]?.url)}
+                                className="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Auto-Apply Cartoon
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCartoonPhotoUrl(currentCoverPhoto?.url || stagedPhotos[0]?.url);
+                                  setIsCartoonStudioOpen(true);
+                                }}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-gray-300 transition-colors cursor-pointer"
+                              >
+                                Studio
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -787,7 +954,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                               </div>
 
                               {/* Action controls */}
-                              <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
+                              <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
                                 <div className="flex items-center justify-end gap-1">
                                   <button
                                     type="button"
@@ -802,28 +969,40 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                 <div className="space-y-1">
                                   <button
                                     type="button"
-                                    onClick={() => setCoverIndex(idx)}
-                                    className={`w-full py-1 text-[10px] font-bold rounded flex items-center justify-center gap-1 transition-colors ${
-                                      isCover
-                                        ? 'bg-[var(--ps-primary,#0A84FF)] text-white'
-                                        : 'bg-white/20 hover:bg-white/30 text-white'
-                                    }`}
+                                    onClick={() => handleAutoGenerateCartoonFromPhoto(photo.url)}
+                                    className="w-full py-1 text-[10px] font-bold rounded bg-pink-600/90 hover:bg-pink-600 text-white flex items-center justify-center gap-1 transition-colors shadow-sm"
+                                    title="Make Cartoon from this picture"
                                   >
-                                    <Star className="w-2.5 h-2.5" />
-                                    {isCover ? 'Cover' : 'Set as Cover'}
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    Make Cartoon
                                   </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveEditingPhotoIndex(idx);
-                                      setIsCropModalOpen(true);
-                                    }}
-                                    className="w-full py-1 text-[10px] font-bold rounded bg-blue-600/80 hover:bg-blue-600 text-white flex items-center justify-center gap-1 transition-colors"
-                                  >
-                                    <Crop className="w-2.5 h-2.5" />
-                                    Crop
-                                  </button>
+                                  <div className="grid grid-cols-2 gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCoverIndex(idx)}
+                                      className={`py-1 text-[9px] font-bold rounded flex items-center justify-center gap-0.5 transition-colors ${
+                                        isCover
+                                          ? 'bg-[var(--ps-primary,#0A84FF)] text-white'
+                                          : 'bg-white/20 hover:bg-white/30 text-white'
+                                      }`}
+                                    >
+                                      <Star className="w-2.5 h-2.5" />
+                                      {isCover ? 'Cover' : 'Cover'}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveEditingPhotoIndex(idx);
+                                        setIsCropModalOpen(true);
+                                      }}
+                                      className="py-1 text-[9px] font-bold rounded bg-blue-600/80 hover:bg-blue-600 text-white flex items-center justify-center gap-0.5 transition-colors"
+                                    >
+                                      <Crop className="w-2.5 h-2.5" />
+                                      Crop
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1391,13 +1570,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       #{idx + 1}
                     </div>
 
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhotoFromExistingCar(idx)}
+                          className="p-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg transition-transform hover:scale-110 cursor-pointer"
+                          title="Delete photo from gallery"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
                       <button
-                        onClick={() => handleRemovePhotoFromExistingCar(idx)}
-                        className="p-2 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg transition-transform hover:scale-110 cursor-pointer"
-                        title="Delete photo from gallery"
+                        type="button"
+                        onClick={() => handleAutoGenerateForExistingCar(editingCarGallery, imgUrl)}
+                        className="w-full py-1.5 px-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold flex items-center justify-center gap-1 shadow-md transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Sparkles className="w-3 h-3" />
+                        Make Cartoon
                       </button>
                     </div>
                   </div>
@@ -1435,20 +1626,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         />
       )}
 
-      {isCartoonStudioOpen && (currentCoverPhoto?.url || stagedPhotos[0]?.url) && (
+      {isCartoonStudioOpen && (selectedCartoonPhotoUrl || currentCoverPhoto?.url || stagedPhotos[0]?.url) && (
         <CartoonArtStudio
           isOpen={isCartoonStudioOpen}
           onClose={() => setIsCartoonStudioOpen(false)}
           carName={carName || `${make} ${model}`}
           make={make}
           model={model}
-          originalImageUrl={currentCoverPhoto?.url || stagedPhotos[0]?.url}
+          color={color}
+          originalImageUrl={selectedCartoonPhotoUrl || currentCoverPhoto?.url || stagedPhotos[0]?.url}
+          availableImages={stagedPhotos.map((p) => p.url)}
           onApplyCartoon={(cartoonUrl) => {
             setCartoonImageUrl(cartoonUrl);
             setHasCartoon(true);
             setStatusMsg({
               type: 'success',
-              text: '2D Cartoon Art vector sticker successfully attached to car gallery!',
+              text: '✨ 2D Cartoon Art vector sticker successfully attached to car gallery!',
             });
           }}
         />

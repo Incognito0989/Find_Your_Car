@@ -1,147 +1,241 @@
 /**
- * Cartoon Art Generator & Stylizer
- * Transforms vehicles into 2D minimalist vector cartoon stickers matching the iconic Miata cartoon art style
- * (Bold black outlines, clean cel-shading, pop-up / stylized headlights, cambered stance, sticker cutout aesthetics).
+ * Cartoon Art Generator & Image Processing Engine
+ * Transforms real vehicle photos into 2D cartoon sticker illustrations.
+ * 
+ * Works in tandem with:
+ * 1. Server-side Gemini AI Vision & Image Generation (via @google/genai)
+ * 2. High-performance client-side Canvas Cel-Shading & Edge-Extraction Algorithm
  */
 
-export interface CartoonStyleOptions {
-  primaryColor?: string;
-  outlineColor?: string;
-  outlineWidth?: number;
-  headlightStyle?: 'popup' | 'popup-taped-x' | 'laser' | 'round-classic' | 'sharp-aggressive';
-  carType?: 'miata' | 'coupe' | 'supercar' | 'muscle' | 'jdm-sedan';
-  wingStyle?: 'none' | 'ducktail' | 'gt-wing' | 'carbon-spoiler';
-  smileGrille?: boolean;
-}
-
-export function generateCarVectorSvg(options: CartoonStyleOptions = {}): string {
-  const {
-    primaryColor = '#FA7B8C', // Cute signature pink like the sample image
-    outlineColor = '#000000',
-    outlineWidth = 10,
-    headlightStyle = 'popup-taped-x',
-    carType = 'miata',
-    wingStyle = 'none',
-    smileGrille = true,
-  } = options;
-
-  const encodedColor = encodeURIComponent(primaryColor);
-  const encodedOutline = encodeURIComponent(outlineColor);
-
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-  <rect width="100%" height="100%" fill="white"/>
-  <g transform="translate(100, 90) scale(0.75)">
-    <!-- Optional GT Wing for Supercar / Track Cars -->
-    ${
-      wingStyle === 'gt-wing'
-        ? `<rect x="120" y="30" width="560" height="28" rx="6" fill="%2318181B" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>
-           <line x1="240" y1="58" x2="260" y2="150" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>
-           <line x1="560" y1="58" x2="540" y2="150" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>`
-        : ''
-    }
-
-    <!-- Wheels & Track Stance (Cambered) -->
-    <path d="M 80,330 L 50,350 L 65,440 L 120,440 L 110,380 Z" fill="%231C1C1E" stroke="${encodedOutline}" stroke-width="${outlineWidth}" stroke-linejoin="round"/>
-    <path d="M 720,330 L 750,350 L 735,440 L 680,440 L 690,380 Z" fill="%231C1C1E" stroke="${encodedOutline}" stroke-width="${outlineWidth}" stroke-linejoin="round"/>
-
-    <!-- Car Body Lower/Mid Base -->
-    <path d="M 120,430 C 100,430 80,420 80,390 L 80,330 C 80,280 120,230 180,210 C 240,190 320,180 400,180 C 480,180 560,190 620,210 C 680,230 720,280 720,330 L 720,390 C 720,420 700,430 680,430 Z" fill="${encodedColor}" stroke="${encodedOutline}" stroke-width="${outlineWidth}" stroke-linejoin="round"/>
-
-    <!-- Windshield & Roof Frame -->
-    <path d="M 230,200 L 260,100 C 270,75 320,65 400,65 C 480,65 530,75 540,100 L 570,200 Z" fill="${encodedColor}" stroke="${encodedOutline}" stroke-width="${outlineWidth}" stroke-linejoin="round"/>
-    <path d="M 270,190 L 290,110 C 300,95 340,85 400,85 C 460,85 500,95 510,110 L 530,190 Z" fill="%232D3136" stroke="${encodedOutline}" stroke-width="8"/>
-    <!-- Windshield Reflection -->
-    <polygon points="310,120 340,120 320,180 290,180" fill="rgba(255,255,255,0.15)"/>
-
-    <!-- Pop-up or Styled Headlights -->
-    ${
-      headlightStyle === 'popup-taped-x' || headlightStyle === 'popup'
-        ? `<!-- Left Pop-up -->
-           <rect x="165" y="140" width="115" height="115" rx="12" fill="%23111111" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>
-           <circle cx="222" cy="198" r="42" fill="%23F3F3F3" stroke="${encodedOutline}" stroke-width="8"/>
-           
-           <!-- Right Pop-up -->
-           <rect x="520" y="140" width="115" height="115" rx="12" fill="%23111111" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>
-           <circle cx="578" cy="198" r="42" fill="%23F3F3F3" stroke="${encodedOutline}" stroke-width="8"/>
-           ${
-             headlightStyle === 'popup-taped-x'
-               ? `<line x1="548" y1="168" x2="608" y2="228" stroke="${encodedOutline}" stroke-width="9"/>
-                  <line x1="608" y1="168" x2="548" y2="228" stroke="${encodedOutline}" stroke-width="9"/>`
-               : ''
-           }`
-        : headlightStyle === 'laser'
-        ? `<!-- Sharp Laser Lights -->
-           <polygon points="140,240 240,195 260,235 160,265" fill="%23FEF08A" stroke="${encodedOutline}" stroke-width="8"/>
-           <polygon points="660,240 560,195 540,235 640,265" fill="%23FEF08A" stroke="${encodedOutline}" stroke-width="8"/>`
-        : `<!-- Round Headlights -->
-           <circle cx="200" cy="240" r="40" fill="%23FFFFFF" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>
-           <circle cx="600" cy="240" r="40" fill="%23FFFFFF" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>`
-    }
-
-    <!-- Turn Signal Indicator Bars -->
-    <rect x="155" y="290" width="125" height="35" rx="10" fill="%23F5BC38" stroke="${encodedOutline}" stroke-width="8"/>
-    <rect x="520" y="290" width="125" height="35" rx="10" fill="%23F5BC38" stroke="${encodedOutline}" stroke-width="8"/>
-
-    <!-- Grille / Smile / Intake -->
-    ${
-      smileGrille
-        ? `<!-- Miata Smile / Happy Grille -->
-           <path d="M 270,390 C 270,440 530,440 530,390 C 530,370 270,370 270,390 Z" fill="%23382736" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>
-           <path d="M 300,410 C 350,430 450,430 500,410 Z" fill="%231D121B"/>`
-        : `<!-- Wide Sport Intake -->
-           <path d="M 220,350 L 580,350 L 550,420 L 250,420 Z" fill="%2318181B" stroke="${encodedOutline}" stroke-width="${outlineWidth}"/>`
-    }
-
-    <!-- Tow Hook / Aero Lip -->
-    <rect x="200" y="445" width="55" height="22" rx="6" fill="%23111111" stroke="${encodedOutline}" stroke-width="6"/>
-  </g>
-</svg>`;
+export interface CartoonFilterOptions {
+  edgeThreshold?: number; // 15 - 60 (lower = more lines, higher = cleaner)
+  edgeThickness?: number; // 1 - 4 px
+  colorSteps?: number; // 4 - 12 (color quantization levels)
+  saturationBoost?: number; // 1.0 - 1.6
+  contrastBoost?: number; // 1.0 - 1.4
+  stickerBorder?: boolean; // add white die-cut sticker outline
+  stickerBorderWidth?: number;
 }
 
 /**
- * Filter an uploaded photo onto an HTML Canvas with a Cel-Shaded Posterized Cartoon effect
+ * Converts a real car photo (URL or base64) into a 2D Cel-Shaded Cartoon Sticker
+ * using multi-pass canvas edge detection, color quantization, and inking.
  */
-export function applyCartoonCanvasFilter(
-  imageSource: HTMLImageElement,
-  outlineStrength: number = 3,
-  colorLevels: number = 5
-): string {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return imageSource.src;
+export async function convertPhotoToCartoonSticker(
+  imageSourceUrl: string,
+  options: CartoonFilterOptions = {}
+): Promise<string> {
+  const {
+    edgeThreshold = 28,
+    edgeThickness = 2,
+    colorSteps = 7,
+    saturationBoost = 1.35,
+    contrastBoost = 1.15,
+    stickerBorder = true,
+    stickerBorderWidth = 8,
+  } = options;
 
-  canvas.width = imageSource.naturalWidth || imageSource.width || 800;
-  canvas.height = imageSource.naturalHeight || imageSource.height || 600;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
 
-  // Step 1: Draw original image
-  ctx.drawImage(imageSource, 0, 0, canvas.width, canvas.height);
+    img.onload = () => {
+      try {
+        // Target high-definition sticker resolution (max 1000px on long edge)
+        const maxDimension = 1000;
+        let width = img.naturalWidth || img.width || 800;
+        let height = img.naturalHeight || img.height || 600;
 
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imgData.data;
-  const step = 255 / (colorLevels - 1);
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
 
-  // Posterize colors for flat comic style
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.round(data[i] / step) * step; // Red
-    data[i + 1] = Math.round(data[i + 1] / step) * step; // Green
-    data[i + 2] = Math.round(data[i + 2] / step) * step; // Blue
-    // Boost saturation slightly
-    const max = Math.max(data[i], data[i + 1], data[i + 2]);
-    const min = Math.min(data[i], data[i + 1], data[i + 2]);
-    const delta = max - min;
-    if (delta > 30) {
-      if (data[i] === max) data[i] = Math.min(255, data[i] * 1.15);
-      if (data[i + 1] === max) data[i + 1] = Math.min(255, data[i + 1] * 1.15);
-      if (data[i + 2] === max) data[i + 2] = Math.min(255, data[i + 2] * 1.15);
-    }
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          resolve(imageSourceUrl);
+          return;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Step 1: Draw image
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Step 2: Extract Pixel Buffer for Cel-Shading & Edge Detection
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        const totalPixels = width * height;
+
+        // Create Grayscale buffer for Sobel Edge Detection
+        const gray = new Float32Array(totalPixels);
+        for (let i = 0; i < totalPixels; i++) {
+          const idx = i * 4;
+          // Luminance formula
+          gray[i] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+        }
+
+        // Apply 3x3 Gaussian Blur to grayscale to reduce noise before edge detection
+        const blurred = new Float32Array(totalPixels);
+        const kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
+        const kSum = 16;
+
+        for (let y = 1; y < height - 1; y++) {
+          const rowOffset = y * width;
+          for (let x = 1; x < width - 1; x++) {
+            let sum = 0;
+            let kIdx = 0;
+            for (let ky = -1; ky <= 1; ky++) {
+              const kRow = (y + ky) * width;
+              for (let kx = -1; kx <= 1; kx++) {
+                sum += gray[kRow + x + kx] * kernel[kIdx++];
+              }
+            }
+            blurred[rowOffset + x] = sum / kSum;
+          }
+        }
+
+        // Sobel Operator for Edge Magnitude
+        const edges = new Uint8Array(totalPixels);
+        for (let y = 1; y < height - 1; y++) {
+          const rowOffset = y * width;
+          for (let x = 1; x < width - 1; x++) {
+            // Sobel X
+            const gx =
+              -1 * blurred[(y - 1) * width + (x - 1)] +
+              1 * blurred[(y - 1) * width + (x + 1)] +
+              -2 * blurred[y * width + (x - 1)] +
+              2 * blurred[y * width + (x + 1)] +
+              -1 * blurred[(y + 1) * width + (x - 1)] +
+              1 * blurred[(y + 1) * width + (x + 1)];
+
+            // Sobel Y
+            const gy =
+              -1 * blurred[(y - 1) * width + (x - 1)] +
+              -2 * blurred[(y - 1) * width + x] +
+              -1 * blurred[(y - 1) * width + (x + 1)] +
+              1 * blurred[(y + 1) * width + (x - 1)] +
+              2 * blurred[(y + 1) * width + x] +
+              1 * blurred[(y + 1) * width + (x + 1)];
+
+            const mag = Math.sqrt(gx * gx + gy * gy);
+            edges[rowOffset + x] = mag > edgeThreshold ? 255 : 0;
+          }
+        }
+
+        // Dilate edges if thickness > 1
+        let finalEdges = edges;
+        if (edgeThickness > 1) {
+          finalEdges = new Uint8Array(totalPixels);
+          const rad = Math.floor(edgeThickness);
+          for (let y = rad; y < height - rad; y++) {
+            for (let x = rad; x < width - rad; x++) {
+              if (edges[y * width + x] === 255) {
+                for (let dy = -rad; dy <= rad; dy++) {
+                  for (let dx = -rad; dx <= rad; dx++) {
+                    finalEdges[(y + dy) * width + (x + dx)] = 255;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Step 3: Color Quantization (Cel-Shading) + Saturation Boost
+        const step = 255 / Math.max(2, colorSteps - 1);
+
+        for (let i = 0; i < totalPixels; i++) {
+          const idx = i * 4;
+          let r = data[idx];
+          let g = data[idx + 1];
+          let b = data[idx + 2];
+
+          // Contrast Boost
+          r = Math.min(255, Math.max(0, (r - 128) * contrastBoost + 128));
+          g = Math.min(255, Math.max(0, (g - 128) * contrastBoost + 128));
+          b = Math.min(255, Math.max(0, (b - 128) * contrastBoost + 128));
+
+          // Saturation Boost (convert to HSL-like saturation adjustment)
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const delta = max - min;
+          if (delta > 10) {
+            const grayVal = (r + g + b) / 3;
+            r = Math.min(255, Math.max(0, grayVal + (r - grayVal) * saturationBoost));
+            g = Math.min(255, Math.max(0, grayVal + (g - grayVal) * saturationBoost));
+            b = Math.min(255, Math.max(0, grayVal + (b - grayVal) * saturationBoost));
+          }
+
+          // Cel-shade palette banding
+          r = Math.round(r / step) * step;
+          g = Math.round(g / step) * step;
+          b = Math.round(b / step) * step;
+
+          // Composite Ink Outline
+          if (finalEdges[i] === 255) {
+            // Rich Comic Book Inking Outline (#151518)
+            data[idx] = 22;
+            data[idx + 1] = 22;
+            data[idx + 2] = 26;
+          } else {
+            data[idx] = Math.min(255, Math.round(r));
+            data[idx + 1] = Math.min(255, Math.round(g));
+            data[idx + 2] = Math.min(255, Math.round(b));
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+
+        // Step 4: Add Crisp Die-Cut Sticker Border & Sticker Badge Aesthetic
+        if (stickerBorder) {
+          ctx.save();
+          // Inner sticker stroke
+          ctx.lineWidth = stickerBorderWidth;
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.strokeRect(
+            stickerBorderWidth / 2,
+            stickerBorderWidth / 2,
+            width - stickerBorderWidth,
+            height - stickerBorderWidth
+          );
+
+          // Outer thin contour line
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+          ctx.strokeRect(1, 1, width - 2, height - 2);
+          ctx.restore();
+        }
+
+        resolve(canvas.toDataURL('image/png', 0.95));
+      } catch (err) {
+        console.warn('Canvas cartoon conversion failed, falling back to original:', err);
+        resolve(imageSourceUrl);
+      }
+    };
+
+    img.onerror = () => {
+      console.warn('Failed to load image for cartoon conversion:', imageSourceUrl);
+      resolve(imageSourceUrl);
+    };
+
+    img.src = imageSourceUrl;
+  });
+}
+
+/**
+ * Formats a media URL safely for canvas loading or API transport
+ */
+export function normalizeMediaForCanvas(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http')) {
+    return url;
   }
-
-  ctx.putImageData(imgData, 0, 0);
-
-  // Step 2: Overlay subtle edge outline
-  ctx.lineWidth = outlineStrength;
-  ctx.strokeStyle = '#000000';
-  ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-
-  return canvas.toDataURL('image/png', 0.95);
+  return url.startsWith('/') ? url : `/${url}`;
 }
