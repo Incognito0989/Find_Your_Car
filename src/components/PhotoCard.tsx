@@ -47,7 +47,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         onClick={handleCardClick}
         className="photo-card group relative bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[20px] overflow-hidden transition-all duration-300 shadow-lg hover:shadow-2xl hover:border-[var(--ps-primary,#0A84FF)]/50 flex flex-col md:flex-row items-center p-4 gap-6 cursor-pointer"
       >
-        {/* Thumbnail with Plate Badge */}
+        {/* Thumbnail with Vehicle Name Badge */}
         <div className="relative w-full md:w-64 aspect-[4/3] rounded-xl overflow-hidden shrink-0 bg-black flex items-center justify-center">
           <img
             src={displayImage}
@@ -57,12 +57,9 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             }`}
           />
           <div className="absolute top-2.5 left-2.5">
-            <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.75))] backdrop-blur-md px-2.5 py-1 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-1.5 shadow-md">
-              <span className="text-[9px] text-[var(--ps-text-muted,#9ca3af)] font-bold uppercase tracking-wider">
-                Plate
-              </span>
-              <span className="text-xs font-mono font-bold text-[var(--ps-badge-text,#ffffff)]">
-                {car.plateNumber}
+            <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.85))] backdrop-blur-md px-2.5 py-1 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-1.5 shadow-md">
+              <span className="text-xs font-mono font-bold tracking-wider text-[var(--ps-badge-text,#ffffff)]">
+                {car.carName || `${car.make} ${car.model || ''}`}
               </span>
             </div>
           </div>
@@ -176,14 +173,11 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           }`}
         />
 
-        {/* License Plate Badge (Floating Top Left) */}
+        {/* Vehicle Badge (Floating Top Left) */}
         <div className="absolute top-3 left-3">
-          <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.75))] backdrop-blur-md px-3 py-1 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-1.5 shadow-md">
-            <span className="text-[9px] text-[var(--ps-text-muted,#9ca3af)] font-bold uppercase tracking-wider">
-              Plate
-            </span>
-            <span className="text-xs font-mono font-bold text-[var(--ps-badge-text,#ffffff)]">
-              {car.plateNumber}
+          <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.85))] backdrop-blur-md px-3 py-1 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-1.5 shadow-md">
+            <span className="text-xs font-mono font-bold tracking-wider text-[var(--ps-badge-text,#ffffff)]">
+              {car.carName || `${car.make} ${car.model || ''}`}
             </span>
           </div>
         </div>

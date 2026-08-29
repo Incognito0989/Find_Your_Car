@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Upload,
   Crop,
@@ -9,6 +9,7 @@ import {
   Trash2,
   Edit3,
   CheckCircle,
+  CheckCircle2,
   AlertCircle,
   ArrowLeft,
   RefreshCw,
@@ -45,6 +46,66 @@ import { convertPhotoToCartoonSticker, normalizeMediaForCanvas } from '../utils/
 import { DEFAULT_THEMES } from '../data/initialData';
 import { applyThemeToDocument } from '../utils/themeUtils';
 import { formatMediaUrl } from '../utils/apiConfig';
+
+export const US_STATES = [
+  { code: '', name: 'Auto-Detect / Any State' },
+  { code: 'AL', name: 'Alabama (AL)' },
+  { code: 'AK', name: 'Alaska (AK)' },
+  { code: 'AZ', name: 'Arizona (AZ)' },
+  { code: 'AR', name: 'Arkansas (AR)' },
+  { code: 'CA', name: 'California (CA)' },
+  { code: 'CO', name: 'Colorado (CO)' },
+  { code: 'CT', name: 'Connecticut (CT)' },
+  { code: 'DE', name: 'Delaware (DE)' },
+  { code: 'FL', name: 'Florida (FL)' },
+  { code: 'GA', name: 'Georgia (GA)' },
+  { code: 'HI', name: 'Hawaii (HI)' },
+  { code: 'ID', name: 'Idaho (ID)' },
+  { code: 'IL', name: 'Illinois (IL)' },
+  { code: 'IN', name: 'Indiana (IN)' },
+  { code: 'IA', name: 'Iowa (IA)' },
+  { code: 'KS', name: 'Kansas (KS)' },
+  { code: 'KY', name: 'Kentucky (KY)' },
+  { code: 'LA', name: 'Louisiana (LA)' },
+  { code: 'ME', name: 'Maine (ME)' },
+  { code: 'MD', name: 'Maryland (MD)' },
+  { code: 'MA', name: 'Massachusetts (MA)' },
+  { code: 'MI', name: 'Michigan (MI)' },
+  { code: 'MN', name: 'Minnesota (MN)' },
+  { code: 'MS', name: 'Mississippi (MS)' },
+  { code: 'MO', name: 'Missouri (MO)' },
+  { code: 'MT', name: 'Montana (MT)' },
+  { code: 'NE', name: 'Nebraska (NE)' },
+  { code: 'NV', name: 'Nevada (NV)' },
+  { code: 'NH', name: 'New Hampshire (NH)' },
+  { code: 'NJ', name: 'New Jersey (NJ)' },
+  { code: 'NM', name: 'New Mexico (NM)' },
+  { code: 'NY', name: 'New York (NY)' },
+  { code: 'NC', name: 'North Carolina (NC)' },
+  { code: 'ND', name: 'North Dakota (ND)' },
+  { code: 'OH', name: 'Ohio (OH)' },
+  { code: 'OK', name: 'Oklahoma (OK)' },
+  { code: 'OR', name: 'Oregon (OR)' },
+  { code: 'PA', name: 'Pennsylvania (PA)' },
+  { code: 'RI', name: 'Rhode Island (RI)' },
+  { code: 'SC', name: 'South Carolina (SC)' },
+  { code: 'SD', name: 'South Dakota (SD)' },
+  { code: 'TN', name: 'Tennessee (TN)' },
+  { code: 'TX', name: 'Texas (TX)' },
+  { code: 'UT', name: 'Utah (UT)' },
+  { code: 'VT', name: 'Vermont (VT)' },
+  { code: 'VA', name: 'Virginia (VA)' },
+  { code: 'WA', name: 'Washington (WA)' },
+  { code: 'WV', name: 'West Virginia (WV)' },
+  { code: 'WI', name: 'Wisconsin (WI)' },
+  { code: 'WY', name: 'Wyoming (WY)' },
+  { code: 'DC', name: 'District of Columbia (DC)' },
+  { code: 'ON', name: 'Ontario, Canada (ON)' },
+  { code: 'BC', name: 'British Columbia, Canada (BC)' },
+  { code: 'QC', name: 'Quebec, Canada (QC)' },
+  { code: 'AB', name: 'Alberta, Canada (AB)' },
+  { code: 'INTL', name: 'International / Other' },
+];
 
 interface AdminPortalProps {
   cars: CarPhoto[];
@@ -101,6 +162,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Upload Form State
   const [plateNumber, setPlateNumber] = useState<string>('');
+  const [selectedState, setSelectedState] = useState<string>('CA');
   const [carName, setCarName] = useState<string>('');
   const [make, setMake] = useState<string>('Porsche');
   const [model, setModel] = useState<string>('');
@@ -109,19 +171,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [event, setEvent] = useState<string>('Sunset Track Day Laguna');
   const [location, setLocation] = useState<string>('Monterey, CA');
 
-  // Photographer profile selection
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [photographerName, setPhotographerName] = useState<string>(adminName || 'Alex Rivera');
-  const [photographerTitle, setPhotographerTitle] = useState<string>('Lead Automotive Photographer');
-  const [photographerAvatar, setPhotographerAvatar] = useState<string>(
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
-  );
-  const [photographerBio, setPhotographerBio] = useState<string>(
-    'Motorsport & track day specialist capturing high-velocity supercars.'
-  );
-  const [photographerVenmo, setPhotographerVenmo] = useState<string>('alex-rivera-photo');
-  const [photographerPayPal, setPhotographerPayPal] = useState<string>('alexriveraphoto');
-  const [photographerInstagram, setPhotographerInstagram] = useState<string>('@alexrivera.raw');
+  // Automatically derive photographer attribution from logged-in user session
+  const currentPhotographer: Photographer = useMemo(() => {
+    if (adminUser) {
+      return {
+        id: adminUser.id,
+        name: adminUser.name || adminName || 'Alex Rivera',
+        title: adminUser.role === 'admin' ? 'Lead Automotive Photographer' : 'Automotive Photographer',
+        avatar:
+          adminUser.avatar ||
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        bio: adminUser.bio || 'Verified Plate Snap Cars high-resolution event photographer.',
+        venmoHandle: adminUser.venmoHandle || undefined,
+        payPalHandle: adminUser.payPalHandle || undefined,
+        instagram: adminUser.instagram || undefined,
+      };
+    }
+    return {
+      name: adminName || 'Alex Rivera',
+      title: 'Lead Automotive Photographer',
+      avatar:
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+      bio: 'Verified Plate Snap Cars high-resolution event photographer.',
+      venmoHandle: 'alex-rivera-photo',
+      payPalHandle: 'alexriveraphoto',
+      instagram: '@alexrivera.raw',
+    };
+  }, [adminUser, adminName]);
 
   const [tagsInput, setTagsInput] = useState<string>('TrackDay, Supercar, HighRes');
 
@@ -214,7 +290,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     if (!photoUrl) return;
     setStatusMsg({
       type: 'success',
-      text: `Generating 2D cartoon sticker for [${car.plateNumber}]...`,
+      text: `Generating 2D cartoon sticker for [${car.carName || car.make}]...`,
     });
 
     try {
@@ -267,7 +343,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       setStatusMsg({
         type: 'success',
-        text: `✨ Successfully updated [${car.plateNumber}] with a custom 2D Cartoon Sticker!`,
+        text: `✨ Successfully updated [${car.carName || car.make}] with a custom 2D Cartoon Sticker!`,
       });
     } catch (err: any) {
       console.error('Error creating cartoon for existing car:', err);
@@ -297,11 +373,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setLookupFeedback(null);
 
     try {
-      const response = await fetch(`/api/lookup-plate?plate=${encodeURIComponent(queryPlate)}`);
+      const stateParam = selectedState ? `&state=${encodeURIComponent(selectedState)}` : '';
+      const response = await fetch(`/api/lookup-plate?plate=${encodeURIComponent(queryPlate)}${stateParam}`);
       const data = await response.json();
 
-      if (data.success && data.vehicle) {
-        const v = data.vehicle;
+      if (data.success && (data.vehicle || data.data)) {
+        const v = data.vehicle || data.data;
         if (v.make) setMake(v.make);
         if (v.model) setModel(v.model);
         if (v.year) setYear(String(v.year));
@@ -309,18 +386,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         if (v.make && v.model) {
           setCarName(`${v.make} ${v.model}`);
         }
+        if (v.state && !selectedState) {
+          setSelectedState(v.state);
+        }
         if (Array.isArray(v.suggestedTags) && v.suggestedTags.length > 0) {
           setTagsInput(v.suggestedTags.join(', '));
         }
 
         setLookupFeedback({
-          source: data.source || 'Online Registry',
+          source: data.source || v.source || 'Online Registry',
           details: `${v.make} ${v.model} (${v.year || ''}) - ${v.engine || ''}`,
         });
 
         setStatusMsg({
           type: 'success',
-          text: `✨ Auto-filled vehicle specifications for [${queryPlate.toUpperCase()}] via ${data.source}!`,
+          text: `✨ Auto-filled vehicle specs for [${queryPlate.toUpperCase()}${selectedState ? ` (${selectedState})` : ''}] via ${data.source || v.source || 'NHTSA / Registry'}!`,
         });
       } else {
         setStatusMsg({
@@ -492,10 +572,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Submit new car to backend
   const handleSubmitCar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!plateNumber.trim()) {
-      setStatusMsg({ type: 'error', text: 'License plate number is required for all uploads.' });
-      return;
-    }
     if (stagedPhotos.length === 0) {
       setStatusMsg({ type: 'error', text: 'Please upload at least one photo or a folder of photos.' });
       return;
@@ -510,16 +586,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       const coverPhoto = stagedPhotos[coverIndex] || stagedPhotos[0];
       const allImagesUrls = stagedPhotos.map((p) => p.url);
+      const cleanPlate = (plateNumber || '').toUpperCase().trim();
+      const effectiveCarName = carName || (make ? `${make} ${model || 'Vehicle'}` : 'Custom Build');
 
-      const photogObject: Photographer = {
-        name: photographerName || 'Alex Rivera',
-        title: photographerTitle || 'Automotive Photographer',
-        avatar: photographerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-        bio: photographerBio || 'Verified Plate Snap Cars high-resolution event photographer.',
-        venmoHandle: photographerVenmo || undefined,
-        payPalHandle: photographerPayPal || undefined,
-        instagram: photographerInstagram || undefined,
-      };
+      // Use automatically resolved photographer attribution from authenticated session
+      const photogObject: Photographer = currentPhotographer;
 
       // Create photo authors mapping
       const photoAuthorsMap: Record<string, Photographer> = {};
@@ -528,10 +599,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       });
 
       await onAddCar({
-        plateNumber: plateNumber.toUpperCase().trim(),
-        carName: carName || `${make} ${model || 'Vehicle'}`,
-        make,
-        model: model || carName || 'Sport',
+        plateNumber: cleanPlate,
+        state: selectedState ? selectedState.toUpperCase().trim() : undefined,
+        carName: effectiveCarName,
+        make: make || 'Custom',
+        model: model || carName || 'Vehicle',
         year: parseInt(year, 10) || 2024,
         color: color || 'Custom Finish',
         event: event || 'Automotive Gathering',
@@ -542,14 +614,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         images: allImagesUrls,
         cartoonImageUrl: cartoonImageUrl || undefined,
         hasCartoon: Boolean(hasCartoon || cartoonImageUrl),
-        tags: tagsArray.length > 0 ? tagsArray : [make, 'CarMeet'],
+        tags: tagsArray.length > 0 ? tagsArray : [make || 'Automotive', 'CarMeet'],
         resolution,
         cameraInfo,
       });
 
       setStatusMsg({
         type: 'success',
-        text: `Successfully published ${allImagesUrls.length} photos for plate [${plateNumber.toUpperCase()}]. It is now searchable in the visitor dashboard!`,
+        text: `Successfully published ${allImagesUrls.length} photos for [${effectiveCarName}]${selectedState ? ` (${selectedState})` : ''}. It is now searchable in the visitor dashboard!`,
       });
 
       // Reset form
@@ -600,7 +672,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
     setStatusMsg({
       type: 'success',
-      text: `Added ${newUrls.length} photos to [${editingCarGallery.plateNumber}]. Total photos: ${updatedImages.length}`,
+      text: `Added ${newUrls.length} photos to [${editingCarGallery.carName}]. Total photos: ${updatedImages.length}`,
     });
   };
 
@@ -1098,7 +1170,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         />
                         <div className="min-w-0">
                           <p className="text-[11px] font-bold text-white truncate">{sample.make}</p>
-                          <p className="text-[9px] font-mono text-gray-400">{sample.plate}</p>
+                          <p className="text-[9px] font-mono text-gray-400 truncate">{sample.model}</p>
                         </div>
                       </button>
                     ))}
@@ -1107,7 +1179,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
             </div>
 
-            {/* Right Side: Metadata, Plate Input & Backend Publishing (5 cols) */}
+            {/* Right Side: Metadata, Vehicle Descriptor & Backend Publishing (5 cols) */}
             <div className="lg:col-span-5">
               <form
                 onSubmit={handleSubmitCar}
@@ -1117,64 +1189,88 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div>
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
                       <Tag className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
-                      Vehicle & License Tagging
+                      Vehicle Identification & Specifications
                     </h2>
                     <p className="text-xs text-gray-400">
-                      License plate is mandatory for visitor retrieval
+                      Configure vehicle name and specifications. Origin state refines regional search.
                     </p>
                   </div>
                 </div>
 
-                {/* License Plate Input - Prominent & Auto-formatted with Online Auto-Fill */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-blue-400">
-                      * License Plate Number (Mandatory)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => handleAutoFillPlate()}
-                      disabled={isLookingUpPlate || !plateNumber.trim()}
-                      className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {isLookingUpPlate ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                          <span>Looking up...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
-                          <span>Auto-Fill Online Data</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. 7XYZ999, GT3-992, MIATA-91, M4-PERF"
-                      value={plateNumber}
-                      onChange={(e) => {
-                        const val = e.target.value.toUpperCase();
-                        setPlateNumber(val);
-                      }}
-                      onBlur={() => {
-                        if (plateNumber.trim().length >= 3 && !model) {
-                          handleAutoFillPlate(plateNumber);
-                        }
-                      }}
-                      className="w-full bg-[#1C1C1E] border-2 border-blue-500/60 focus:border-blue-400 rounded-xl py-3 pl-4 pr-14 text-white font-mono font-bold text-lg tracking-wider uppercase outline-none shadow-inner transition-all placeholder:text-gray-600"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                      PLATE
+                {/* State Origin Selector & Model Spec Input */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    {/* Origin State / Province Selector */}
+                    <div className="sm:col-span-5">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-gray-300 mb-1.5 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Origin State / Region</span>
+                      </label>
+                      <select
+                        value={selectedState}
+                        onChange={(e) => setSelectedState(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#3A3A3C] focus:border-blue-400 rounded-xl py-3 px-3 text-white text-sm outline-none transition-all cursor-pointer font-medium"
+                      >
+                        {US_STATES.map((s) => (
+                          <option key={s.code} value={s.code} className="bg-[#1C1C1E] text-white">
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Internal Model Tag / VIN Input - Optional with Auto-Fill */}
+                    <div className="sm:col-span-7">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1">
+                          <span>Model Code / VIN</span>
+                          <span className="text-[10px] font-normal text-gray-400 lowercase">(optional)</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleAutoFillPlate()}
+                          disabled={isLookingUpPlate || !plateNumber.trim()}
+                          className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {isLookingUpPlate ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                              <span>Looking up...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
+                              <span>Auto-Fill</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="e.g. GT3-992, M4-COMP, or leave blank"
+                          value={plateNumber}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setPlateNumber(val);
+                          }}
+                          onBlur={() => {
+                            if (plateNumber.trim().length >= 3 && !model) {
+                              handleAutoFillPlate(plateNumber);
+                            }
+                          }}
+                          className="w-full bg-[#1C1C1E] border border-[#3A3A3C] focus:border-blue-400 rounded-xl py-2.5 pl-3.5 pr-14 text-white font-mono font-bold text-base tracking-wider uppercase outline-none shadow-inner transition-all placeholder:text-gray-600"
+                        />
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-white/10 text-gray-300 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded uppercase">
+                          OPTIONAL
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Auto-fill indicator badge */}
                   {lookupFeedback && (
-                    <div className="mt-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300 flex items-center gap-2">
+                    <div className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-300 flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                       <span>
                         <strong>Auto-Filled ({lookupFeedback.source}):</strong> {lookupFeedback.details}
@@ -1182,8 +1278,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   )}
 
-                  <p className="text-[10px] text-gray-500 mt-1">
-                    Visitors search by license plate to view this car's full photo gallery.
+                  <p className="text-[10px] text-gray-500">
+                    💡 Shoot location may differ from vehicle origin. The state selector helps identify out-of-state cars accurately.
                   </p>
                 </div>
 
@@ -1292,117 +1388,42 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Photographer Attribution & Payment Handles */}
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
-                      <label className="text-xs font-bold uppercase tracking-wider text-white">
-                        Photographer & Tipping Attribution
-                      </label>
+                {/* Automatic Photographer & Tipping Attribution Info */}
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={currentPhotographer.avatar}
+                      alt={currentPhotographer.name}
+                      className="w-9 h-9 rounded-full object-cover border border-white/15 shrink-0 shadow-sm"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white truncate">
+                          {currentPhotographer.name}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase bg-blue-500/20 text-blue-300 border border-blue-400/30 px-1.5 py-0.2 rounded font-bold">
+                          {adminUser?.role === 'admin' ? 'Lead Admin' : 'Photographer'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 truncate flex items-center gap-1.5 mt-0.5">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span>
+                          Photos & tips automatically attributed to your profile
+                          {currentPhotographer.venmoHandle ? ` (@${currentPhotographer.venmoHandle})` : ''}
+                        </span>
+                      </p>
                     </div>
-                    {adminUser?.role === 'admin' && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('users')}
-                        className="text-[11px] text-[var(--ps-primary,#0A84FF)] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Manage Team
-                      </button>
-                    )}
                   </div>
 
-                  {/* Quick Pick User Profile Dropdown */}
-                  <div>
-                    <label className="block text-[11px] text-gray-400 mb-1">
-                      Select Registered Photographer Profile
-                    </label>
-                    <select
-                      value={selectedUserId}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        setSelectedUserId(id);
-                        const user = usersList.find((u) => u.id === id);
-                        if (user) {
-                          setPhotographerName(user.name);
-                          setPhotographerTitle(user.title || 'Automotive Photographer');
-                          setPhotographerAvatar(user.avatar || photographerAvatar);
-                          setPhotographerBio(user.bio || photographerBio);
-                          setPhotographerVenmo(user.venmoHandle || '');
-                          setPhotographerPayPal(user.payPalHandle || '');
-                          setPhotographerInstagram(user.instagram || '');
-                        }
-                      }}
-                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
+                  {adminUser?.role === 'admin' && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('users')}
+                      className="text-[11px] font-medium text-[var(--ps-primary,#0A84FF)] hover:underline shrink-0 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <option value="">-- Choose Photographer Account or Custom --</option>
-                      {usersList.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.role.toUpperCase()}) {u.venmoHandle ? `• @${u.venmoHandle}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Photographer Name & Title */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] text-gray-400 mb-1">Photographer Name</label>
-                      <input
-                        type="text"
-                        value={photographerName}
-                        onChange={(e) => setPhotographerName(e.target.value)}
-                        placeholder="Alex Rivera"
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-gray-400 mb-1">Instagram (@handle)</label>
-                      <input
-                        type="text"
-                        value={photographerInstagram}
-                        onChange={(e) => setPhotographerInstagram(e.target.value)}
-                        placeholder="@alexrivera.raw"
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tipping Payment Handles */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="block text-[11px] text-gray-400 mb-1 flex items-center gap-1">
-                        <Smartphone className="w-3 h-3 text-blue-400" />
-                        <span>Venmo Username</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={photographerVenmo}
-                        onChange={(e) => setPhotographerVenmo(e.target.value)}
-                        placeholder="alex-rivera-photo"
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-gray-400 mb-1 flex items-center gap-1">
-                        <CreditCard className="w-3 h-3 text-sky-400" />
-                        <span>PayPal.me Handle</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={photographerPayPal}
-                        onChange={(e) => setPhotographerPayPal(e.target.value)}
-                        placeholder="alexriveraphoto"
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-xs outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                    <Heart className="w-3 h-3 text-amber-400" />
-                    <span>Tips from photo downloads will be sent directly to these Venmo and PayPal handles.</span>
-                  </p>
+                      Manage Team
+                    </button>
+                  )}
                 </div>
 
                 {/* Tags */}
@@ -1607,7 +1628,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   Live Gallery Fleet Management ({cars.length} vehicles)
                 </h2>
                 <p className="text-xs text-gray-400">
-                  Review plate tags, manage multi-photo collections, and add new captures to existing cars
+                  Review vehicle records, manage multi-photo collections, and add new captures to existing cars
                 </p>
               </div>
 
@@ -1636,8 +1657,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           alt={car.carName}
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute top-2.5 left-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/10 text-xs font-mono font-bold text-white">
-                          {car.plateNumber}
+                        <div className="absolute top-2.5 left-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/10 text-xs font-mono font-bold text-white flex items-center gap-1.5">
+                          <span className="truncate max-w-[150px]">{car.carName || `${car.make} ${car.model}`}</span>
                         </div>
                         <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-mono font-bold text-gray-200 flex items-center gap-1">
                           <Images className="w-3 h-3 text-[var(--ps-primary,#0A84FF)]" />
@@ -1697,9 +1718,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Images className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
-                  Manage Photos for [{editingCarGallery.plateNumber}]
+                  Manage Photos for [{editingCarGallery.carName}]
                 </h3>
-                <p className="text-xs text-gray-400">{editingCarGallery.carName}</p>
+                <p className="text-xs text-gray-400">{editingCarGallery.make} {editingCarGallery.model}</p>
               </div>
 
               <button

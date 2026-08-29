@@ -14,12 +14,16 @@ import {
   ChevronRight,
   Users,
   Heart,
+  MapPin,
+  AlertCircle,
+  Globe,
 } from 'lucide-react';
 import { CarPhoto, AppThemeConfig, Photographer } from '../types';
 import { PhotoCard } from './PhotoCard';
 import { DownloadModal } from './DownloadModal';
 import { CarGalleryPage } from './CarGalleryPage';
 import { TipModal } from './TipModal';
+import { US_STATES, getStateName, parsePlateAndStateQuery } from '../utils/stateUtils';
 
 interface VisitorPortalProps {
   cars: CarPhoto[];
@@ -35,6 +39,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   currentTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedStateFilter, setSelectedStateFilter] = useState<string>('All');
   const [selectedMake, setSelectedMake] = useState<string>('All');
   const [selectedAuthor, setSelectedAuthor] = useState<string>('All');
   const [artFilter, setArtFilter] = useState<'all' | 'photos' | 'cartoons'>('all');
@@ -51,8 +56,14 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   const [tippingCar, setTippingCar] = useState<CarPhoto | null>(null);
   const [isTipModalOpen, setIsTipModalOpen] = useState<boolean>(false);
 
-  // Quick sample plates for user click
-  const QUICK_PLATES = ['7XYZ999', 'M4-PERF', 'VETTE-8', 'MIATA-91', 'ABC1234', 'E55-AM-G'];
+  // Quick sample vehicles for user click
+  const QUICK_CARS = [
+    'Porsche 911 GT3 RS',
+    'BMW M4 Competition',
+    'Corvette Z06 C8',
+    'Mazda Miata NA',
+    'Mercedes-AMG E55',
+  ];
 
   // All distinct makes
   const distinctMakes = useMemo(() => {
@@ -61,6 +72,15 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
       if (c.make) set.add(c.make);
     });
     return ['All', ...Array.from(set)];
+  }, [cars]);
+
+  // All distinct states represented in current inventory
+  const distinctStates = useMemo(() => {
+    const set = new Set<string>();
+    cars.forEach((c) => {
+      if (c.state) set.add(c.state.toUpperCase().trim());
+    });
+    return ['All', ...Array.from(set).sort()];
   }, [cars]);
 
   // All distinct photographers
@@ -79,16 +99,72 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     return Array.from(map.values());
   }, [cars]);
 
+  // Smart Query Parsing (Checks if user typed a compound query like "7XYZ999 CA" or "Texas GT3")
+  const parsedSearch = useMemo(() => {
+    return parsePlateAndStateQuery(searchQuery);
+  }, [searchQuery]);
+
+  // Effective State Filter (Combines UI selector with typed state query)
+  const effectiveState = useMemo(() => {
+    if (selectedStateFilter !== 'All') return selectedStateFilter;
+    if (parsedSearch.hasStateMatch && parsedSearch.state) return parsedSearch.state;
+    return null;
+  }, [selectedStateFilter, parsedSearch]);
+
+  // Check for multi-state matching vehicles when searching a plate without a specific state selected
+  const multiStateNotice = useMemo(() => {
+    if (effectiveState !== null || !searchQuery.trim()) return null;
+
+    const cleanPlateSearch = searchQuery.toUpperCase().replace(/[\s\-_.]/g, '');
+    if (cleanPlateSearch.length < 2) return null;
+
+    // Check cars that match this plate
+    const matchingCars = cars.filter((c) => {
+      const p = (c.plateNumber || '').toUpperCase().replace(/[\s\-_.]/g, '');
+      return p.length > 0 && (p.includes(cleanPlateSearch) || cleanPlateSearch.includes(p));
+    });
+
+    if (matchingCars.length <= 1) return null;
+
+    const stateMap = new Map<string, number>();
+    matchingCars.forEach((c) => {
+      const st = c.state ? c.state.toUpperCase().trim() : 'UNSPECIFIED';
+      stateMap.set(st, (stateMap.get(st) || 0) + 1);
+    });
+
+    if (stateMap.size > 1) {
+      return {
+        plateQuery: searchQuery.trim().toUpperCase(),
+        totalMatches: matchingCars.length,
+        states: Array.from(stateMap.entries()).map(([code, count]) => ({
+          code,
+          label: code === 'UNSPECIFIED' ? 'No State Specified' : getStateName(code),
+          count,
+        })),
+      };
+    }
+    return null;
+  }, [cars, searchQuery, effectiveState]);
+
   // Filtered Cars
   const filteredCars = useMemo(() => {
     let result = [...cars];
 
+    // State filter (exact match if state specified)
+    if (effectiveState) {
+      result = result.filter((c) => (c.state || '').toUpperCase().trim() === effectiveState.toUpperCase().trim());
+    }
+
     // Search query filter (matches plate, name, make, model, event, author name, bio, tags)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().replace(/[\s\-_.]/g, '');
-      const rawQ = searchQuery.toLowerCase().trim();
+    const textQuery = parsedSearch.hasStateMatch ? parsedSearch.plate : searchQuery;
+
+    if (textQuery.trim()) {
+      const q = textQuery.toLowerCase().replace(/[\s\-_.]/g, '');
+      const rawQ = textQuery.toLowerCase().trim();
       result = result.filter((c) => {
-        const cleanPlate = c.plateNumber.toLowerCase().replace(/[\s\-_.]/g, '');
+        const cleanPlate = (c.plateNumber || '').toLowerCase().replace(/[\s\-_.]/g, '');
+        const plateRaw = (c.plateNumber || '').toLowerCase();
+        const carState = (c.state || '').toLowerCase();
         const photogName = (c.photographer?.name || '').toLowerCase();
         const photogBio = (c.photographer?.bio || '').toLowerCase();
         const photogInsta = (c.photographer?.instagram || '').toLowerCase();
@@ -99,18 +175,19 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           : false;
 
         return (
-          cleanPlate.includes(q) ||
-          c.plateNumber.toLowerCase().includes(rawQ) ||
-          c.carName.toLowerCase().includes(rawQ) ||
-          c.make.toLowerCase().includes(rawQ) ||
-          c.model.toLowerCase().includes(rawQ) ||
-          c.event.toLowerCase().includes(rawQ) ||
-          c.location.toLowerCase().includes(rawQ) ||
+          (cleanPlate && cleanPlate.includes(q)) ||
+          plateRaw.includes(rawQ) ||
+          (!effectiveState && carState === rawQ) ||
+          (c.carName || '').toLowerCase().includes(rawQ) ||
+          (c.make || '').toLowerCase().includes(rawQ) ||
+          (c.model || '').toLowerCase().includes(rawQ) ||
+          (c.event || '').toLowerCase().includes(rawQ) ||
+          (c.location || '').toLowerCase().includes(rawQ) ||
           photogName.includes(rawQ) ||
           photogBio.includes(rawQ) ||
           photogInsta.includes(rawQ) ||
           authorMatch ||
-          c.tags.some((t) => t.toLowerCase().includes(rawQ))
+          (Array.isArray(c.tags) && c.tags.some((t) => t.toLowerCase().includes(rawQ)))
         );
       });
     }
@@ -141,7 +218,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     }
 
     return result;
-  }, [cars, searchQuery, selectedMake, selectedAuthor, artFilter]);
+  }, [cars, searchQuery, parsedSearch, effectiveState, selectedMake, selectedAuthor, artFilter]);
 
   const handleOpenDownload = (car: CarPhoto, defaultToCartoon: boolean = false) => {
     setSelectedCarForDownload(car);
@@ -238,69 +315,133 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-[var(--ps-text-main,#ffffff)] leading-[1.1]">
-            Find Your Car by License Plate.
+            Find Your Car by Vehicle Name.
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--ps-text-muted,#9ca3af)] max-w-2xl mx-auto leading-relaxed">
-            Search our curated gallery from premier track days and meets by plate or photographer.
+            Search our curated gallery from premier track days and meets by vehicle name, make, or photographer.
             Download high-resolution photography and support shooters with direct tipping.
           </p>
         </section>
 
-        {/* Hero License Plate & Author Search Component */}
-        <section className="max-w-2xl mx-auto space-y-4">
+        {/* Hero Vehicle Name & Author Search Component */}
+        <section className="max-w-3xl mx-auto space-y-4">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-[var(--ps-primary,#0A84FF)] to-blue-600 rounded-[28px] blur-md opacity-25 group-hover:opacity-40 transition duration-500" />
-            <div className="relative flex items-center bg-[var(--ps-search-bg,#1C1C1E)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-2 shadow-2xl focus-within:border-[var(--ps-primary,#0A84FF)] transition-all">
-              <div className="pl-4 pr-2 text-gray-400">
-                <Search className="w-6 h-6 text-[var(--ps-primary,#0A84FF)]" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by license plate (7XYZ999), car name, or photographer..."
-                className="w-full bg-transparent border-none py-3.5 text-base sm:text-lg text-[var(--ps-text-main,#ffffff)] font-mono font-medium outline-none placeholder:text-gray-500 placeholder:font-sans"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="p-2 text-gray-400 hover:text-white transition-colors mr-1 cursor-pointer"
+            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-[var(--ps-search-bg,#1C1C1E)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-2 shadow-2xl focus-within:border-[var(--ps-primary,#0A84FF)] transition-all gap-2 sm:gap-0">
+              
+              {/* Origin State / Region Selector Dropdown Inside Search Bar */}
+              <div className="flex items-center pl-3 pr-2 sm:border-r border-[#3A3A3C]/60 shrink-0 py-1 sm:py-0">
+                <MapPin className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] mr-1.5 shrink-0" />
+                <select
+                  value={selectedStateFilter}
+                  onChange={(e) => setSelectedStateFilter(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-gray-200 outline-none cursor-pointer pr-2 hover:text-white transition-colors"
+                  title="Filter by Vehicle Origin State / Region"
                 >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
+                  <option value="All" className="bg-[#1C1C1E] text-white">All States / Regions</option>
+                  {US_STATES.map((s) => (
+                    <option key={s.code} value={s.code} className="bg-[#1C1C1E] text-white">
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Text Search Input */}
+              <div className="flex items-center flex-1 min-w-0">
+                <div className="pl-3 pr-2 text-gray-400">
+                  <Search className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by car name (e.g. Porsche 911 GT3 RS, Miata), make, author..."
+                  className="w-full bg-transparent border-none py-3 text-sm sm:text-base text-[var(--ps-text-main,#ffffff)] font-mono font-medium outline-none placeholder:text-gray-500 placeholder:font-sans"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="p-2 text-gray-400 hover:text-white transition-colors mr-1 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
               <button
                 type="button"
-                className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold px-6 py-3.5 rounded-2xl text-sm shadow-md active:scale-95 transition-all shrink-0 cursor-pointer"
+                className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold px-6 py-3 rounded-2xl text-xs sm:text-sm shadow-md active:scale-95 transition-all shrink-0 cursor-pointer text-center"
               >
                 Search
               </button>
             </div>
           </div>
 
-          {/* Quick Try Plate Tags */}
-          <div className="flex items-center justify-center gap-2 flex-wrap text-xs text-gray-400">
-            <span className="font-semibold text-gray-500">Quick Try:</span>
-            {QUICK_PLATES.map((plate) => (
-              <button
-                key={plate}
-                onClick={() => setSearchQuery(plate)}
-                className={`font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                  searchQuery.toUpperCase() === plate
-                    ? 'border-blue-500 bg-blue-500/20 text-blue-400 font-bold'
-                    : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
-                }`}
-              >
-                {plate}
-              </button>
-            ))}
+          {/* Search Helpers & Quick Vehicles */}
+          <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-gray-400 px-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-gray-500">Quick Try:</span>
+              {QUICK_CARS.map((carItem) => (
+                <button
+                  key={carItem}
+                  onClick={() => {
+                    setSearchQuery(carItem);
+                  }}
+                  className={`font-mono px-2 py-0.5 rounded-lg border transition-all cursor-pointer text-[11px] ${
+                    searchQuery.toLowerCase().includes(carItem.toLowerCase())
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-400 font-bold'
+                      : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
+                  }`}
+                >
+                  {carItem}
+                </button>
+              ))}
+            </div>
+
+            {selectedStateFilter !== 'All' && (
+              <div className="flex items-center gap-1.5 text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/30 text-[11px] font-mono">
+                <MapPin className="w-3 h-3 text-blue-400" />
+                <span>Filtered to <strong>{getStateName(selectedStateFilter)}</strong></span>
+                <button
+                  onClick={() => setSelectedStateFilter('All')}
+                  className="ml-1 hover:text-white cursor-pointer"
+                  title="Clear state filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* Filter Controls Bar (Makes + Photographers + Art Styles) */}
+        {/* Filter Controls Bar (States + Makes + Photographers + Art Styles) */}
         <section className="space-y-4 pt-6 border-t border-[var(--ps-card-border,#2C2C2E)]">
-          {/* Row 1: Make filter chips */}
+          {/* Row 1: State Origin Filter Chips (if inventory has distinct states) */}
+          {distinctStates.length > 2 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+              <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase font-mono mr-1 shrink-0">
+                <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                <span>State:</span>
+              </div>
+              {distinctStates.map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setSelectedStateFilter(st)}
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
+                    selectedStateFilter === st
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                      : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white hover:border-gray-600'
+                  }`}
+                >
+                  {st === 'All' ? 'All States' : getStateName(st)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Row 2: Make filter chips */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-2">
               <span className="text-xs font-bold text-gray-400 uppercase font-mono mr-1.5 shrink-0">
@@ -344,7 +485,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Photographer / Author Search Filter & Art Style Toggle */}
+          {/* Row 3: Photographer / Author Search Filter & Art Style Toggle */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-1">
             {/* Photographer chips */}
             <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
@@ -418,12 +559,49 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
         {/* Results Gallery Section */}
         <section className="space-y-6">
+          {/* Multi-State Disambiguation Alert Banner */}
+          {multiStateNotice && (
+            <div className="p-4 bg-gradient-to-r from-blue-950/60 to-purple-950/40 border border-blue-500/40 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg backdrop-blur-md animate-fadeIn">
+              <div className="flex items-center gap-3 text-blue-200">
+                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">
+                    Found {multiStateNotice.totalMatches} vehicles matching [{multiStateNotice.plateQuery}] across {multiStateNotice.states.length} different states.
+                  </p>
+                  <p className="text-[11px] text-blue-300">
+                    Filter by vehicle origin state to eliminate redundant results:
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {multiStateNotice.states.map((st) => (
+                  <button
+                    key={st.code}
+                    onClick={() => setSelectedStateFilter(st.code)}
+                    className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/40 text-white text-xs font-mono font-bold border border-blue-400/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <MapPin className="w-3 h-3 text-blue-400" />
+                    <span>{st.label} ({st.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-white">Automotive Showcase</h2>
               <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-white/10 text-gray-300">
                 {filteredCars.length} {filteredCars.length === 1 ? 'result' : 'results'}
               </span>
+              {selectedStateFilter !== 'All' && (
+                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {getStateName(selectedStateFilter)}
+                </span>
+              )}
               {selectedAuthor !== 'All' && (
                 <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   By {selectedAuthor}
@@ -431,10 +609,11 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               )}
             </div>
 
-            {(searchQuery || selectedAuthor !== 'All' || selectedMake !== 'All') && (
+            {(searchQuery || selectedStateFilter !== 'All' || selectedAuthor !== 'All' || selectedMake !== 'All') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
+                  setSelectedStateFilter('All');
                   setSelectedAuthor('All');
                   setSelectedMake('All');
                   setArtFilter('all');
@@ -473,11 +652,12 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               </div>
               <h3 className="text-lg font-bold text-white">No cars found</h3>
               <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                Try searching by different license plate characters, car make, or select another photographer.
+                Try searching by different vehicle name, car make, model, or select another photographer.
               </p>
               <button
                 onClick={() => {
                   setSearchQuery('');
+                  setSelectedStateFilter('All');
                   setSelectedMake('All');
                   setSelectedAuthor('All');
                   setArtFilter('all');

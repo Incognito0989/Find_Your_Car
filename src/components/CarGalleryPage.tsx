@@ -118,9 +118,10 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
   // Download individual photo directly
   const handleDownloadSinglePhoto = (url: string, index: number) => {
+    const safePrefix = `${car.make || 'Car'}_${car.model || 'Photo'}`.replace(/[\s\-_]+/g, '_');
     const link = document.createElement('a');
     link.href = formatMediaUrl(url);
-    link.download = `${car.plateNumber}_Photo_${index + 1}_PlateSnap.jpg`;
+    link.download = `${safePrefix}_Photo_${index + 1}_HighRes.jpg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -145,6 +146,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
   const handleDownloadAllPhotos = async () => {
     setIsDownloadingAll(true);
     setDownloadAllProgress('Preparing photo archive...');
+    const safePrefix = `${car.make || 'Car'}_${car.model || 'Photo'}`.replace(/[\s\-_]+/g, '_');
 
     try {
       for (let i = 0; i < allImages.length; i++) {
@@ -152,7 +154,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
         const imgUrl = formatMediaUrl(allImages[i]);
         const link = document.createElement('a');
         link.href = imgUrl;
-        link.download = `${car.plateNumber}_Photo_${i + 1}_HighRes.jpg`;
+        link.download = `${safePrefix}_Photo_${i + 1}_HighRes.jpg`;
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
@@ -187,14 +189,11 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             <span className="sm:hidden">Back</span>
           </button>
 
-          {/* Center Plate Badge */}
+          {/* Center Vehicle Descriptor Badge */}
           <div className="flex items-center gap-3">
             <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.85))] px-3.5 py-1.5 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-2 shadow-inner">
-              <span className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] font-bold uppercase tracking-wider">
-                Plate
-              </span>
               <span className="text-sm font-mono font-black text-[var(--ps-badge-text,#ffffff)] tracking-wider">
-                {car.plateNumber}
+                {car.carName || `${car.make} ${car.model || ''}`}
               </span>
             </div>
             <span className="hidden md:inline-block text-xs font-mono text-gray-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
@@ -273,7 +272,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                 </span>
                 {car.year && (
                   <span className="px-2.5 py-1 rounded-full bg-white/10 text-gray-300 text-xs font-mono">
-                    {car.year} Model
+                    {car.year}
                   </span>
                 )}
                 {car.color && (
@@ -281,9 +280,11 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                     🎨 {car.color}
                   </span>
                 )}
-                <span className="px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-xs flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" />
-                  Verified Plate Record
+                <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-xs font-mono flex items-center gap-1.5">
+                  <ShieldCheck className="w-3 h-3 text-blue-400" />
+                  <span>
+                    <strong>{car.carName || `${car.make} ${car.model || ''}`}</strong>
+                  </span>
                 </span>
               </div>
 
@@ -487,7 +488,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             <div>
               <h2 className="text-xl font-bold text-white">Vehicle Photo Gallery</h2>
               <p className="text-xs text-gray-400">
-                All {allImages.length} high-resolution captures for plate [{car.plateNumber}]
+                All {allImages.length} high-resolution captures for {car.carName}
               </p>
             </div>
 
@@ -638,7 +639,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                   <span>2D Cartoon Sticker Edition</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white">
-                  Get the Cartoon Vector Sticker for [{car.plateNumber}]
+                  Get the Cartoon Vector Sticker for {car.carName}
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-300 leading-relaxed max-w-2xl">
                   Hand-crafted or AI-stylized vector art based on this vehicle. Perfect for custom vinyl decals,
@@ -696,7 +697,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           <div className="flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
               <span className="text-xs font-mono font-bold bg-white/10 px-3 py-1 rounded-full border border-white/10">
-                [ {car.plateNumber} ] • Photo {activeIndex + 1} of {allImages.length}
+                {car.model} • Photo {activeIndex + 1} of {allImages.length}
               </span>
               <span className="hidden sm:inline text-xs text-gray-400">{car.carName}</span>
               <span className="text-xs text-blue-400 font-medium">By {activeAuthor.name}</span>

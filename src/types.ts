@@ -22,11 +22,13 @@ export interface UserAccount {
   payPalHandle?: string;
   createdAt: string;
   isActive: boolean;
+  status?: 'pending' | 'active' | 'suspended';
 }
 
 export interface CarPhoto {
   id: string;
   plateNumber: string;
+  state?: string;
   carName: string;
   make: string;
   model: string;
@@ -58,6 +60,7 @@ export interface VehicleLookupResult {
   engine?: string;
   transmission?: string;
   bodyStyle?: string;
+  state?: string;
   suggestedTags?: string[];
   source?: string;
 }

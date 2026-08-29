@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
 import {
   Heart,
-  DollarSign,
   ExternalLink,
   Copy,
   Check,
-  Sparkles,
   X,
   Users,
   ShieldCheck,
-  QrCode,
   Smartphone,
   CreditCard,
-  Camera,
 } from 'lucide-react';
 import { Photographer, CarPhoto } from '../types';
 
@@ -41,11 +37,7 @@ export const TipModal: React.FC<TipModalProps> = ({
   defaultAmount = 10,
   onTipCompleted,
 }) => {
-  const [selectedAmount, setSelectedAmount] = useState<number>(defaultAmount);
-  const [customAmount, setCustomAmount] = useState<string>('');
-  const [isCustom, setIsCustom] = useState<boolean>(false);
   const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
-  const [activePlatformTab, setActivePlatformTab] = useState<'all' | 'venmo' | 'paypal'>('all');
 
   if (!isOpen) return null;
 
@@ -78,7 +70,7 @@ export const TipModal: React.FC<TipModalProps> = ({
     });
   }
 
-  const effectiveTotalAmount = isCustom ? (parseFloat(customAmount) || 0) : selectedAmount;
+  const effectiveTotalAmount = defaultAmount;
   const isSplit = uniqueAuthors.length > 1;
   const perAuthorAmount = isSplit && effectiveTotalAmount > 0
     ? (effectiveTotalAmount / uniqueAuthors.length)
@@ -97,8 +89,7 @@ export const TipModal: React.FC<TipModalProps> = ({
 
   const getVenmoUrl = (handle: string, amount: number, authorName: string) => {
     const cleanHandle = handle.replace(/^@/, '').trim();
-    const plate = car?.plateNumber || 'Car';
-    const note = `PlateSnap tip for [${plate}] automotive photos by ${authorName}`;
+    const note = `Automotive photos tip for [${car?.carName || car?.make || 'Car'}] by ${authorName}`;
     const amountParam = amount > 0 ? `&amount=${amount.toFixed(2)}` : '';
     return `https://venmo.com/${encodeURIComponent(cleanHandle)}?txn=pay&note=${encodeURIComponent(note)}${amountParam}`;
   };
@@ -141,7 +132,7 @@ export const TipModal: React.FC<TipModalProps> = ({
               </div>
               <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-0.5">
                 {car
-                  ? `Tipping for photos of [${car.plateNumber}] • ${car.carName}`
+                  ? `Tipping for photos of ${car.carName}`
                   : 'Send a tip directly via Venmo or PayPal without platform cuts'}
               </p>
             </div>
@@ -157,64 +148,6 @@ export const TipModal: React.FC<TipModalProps> = ({
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto py-5 space-y-6 pr-1">
-          {/* Tip Amount Selector */}
-          <div>
-            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-2.5">
-              Select Tip Amount
-            </label>
-            <div className="grid grid-cols-4 gap-2.5">
-              {[5, 10, 20].map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAmount(amt);
-                    setIsCustom(false);
-                  }}
-                  className={`py-3 rounded-2xl font-bold text-sm transition-all duration-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                    !isCustom && selectedAmount === amt
-                      ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-lg shadow-[var(--ps-primary,#0A84FF)]/30 border border-white/20 scale-[1.02]'
-                      : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10'
-                  }`}
-                >
-                  <span>${amt}</span>
-                  <span className="text-[10px] font-normal opacity-80">
-                    {amt === 5 ? 'Coffee' : amt === 10 ? 'Standard' : 'Hero Tip'}
-                  </span>
-                </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => setIsCustom(true)}
-                className={`py-3 rounded-2xl font-bold text-sm transition-all duration-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  isCustom
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-lg shadow-[var(--ps-primary,#0A84FF)]/30 border border-white/20 scale-[1.02]'
-                    : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10'
-                }`}
-              >
-                <span>Custom</span>
-                <span className="text-[10px] font-normal opacity-80">Any $</span>
-              </button>
-            </div>
-
-            {isCustom && (
-              <div className="mt-3 relative flex items-center">
-                <span className="absolute left-4 text-gray-400 font-bold text-base">$</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="Enter custom tip amount (e.g. 15)"
-                  value={customAmount}
-                  onChange={(e) => setCustomAmount(e.target.value)}
-                  autoFocus
-                  className="w-full bg-white/5 border border-[var(--ps-primary,#0A84FF)] rounded-xl py-2.5 pl-8 pr-4 text-white font-bold text-base focus:outline-none focus:ring-2 focus:ring-[var(--ps-primary,#0A84FF)]"
-                />
-              </div>
-            )}
-          </div>
-
           {/* Split Notice Banner */}
           {isSplit && (
             <div className="bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-2xl p-3.5 flex items-center gap-3">

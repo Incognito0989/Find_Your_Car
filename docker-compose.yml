@@ -20,6 +20,24 @@ services:
       retries: 5
       start_period: 5s
 
+  # ComfyUI AI Cartoon & Style Generator Service (Automated)
+  comfyui:
+    image: yanwk/comfyui-boot:latest
+    container_name: platesnap-comfyui
+    restart: unless-stopped
+    ports:
+      - "${COMFYUI_PORT:-8188}:8188"
+    environment:
+      - CLI_ARGS=--listen 0.0.0.0 --port 8188 ${COMFYUI_CLI_EXTRA_ARGS:---cpu}
+    volumes:
+      - comfyui_storage:/root
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8188/system_stats || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
   # Plate Snap Node.js API Backend
   plate-snap-server:
     build:
@@ -47,6 +65,8 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@platesnapcars.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-platesnap2026}
       - ADMIN_NAME=${ADMIN_NAME:-Lead Automotive Photographer}
+      - CARTOON_ENGINE=${CARTOON_ENGINE:-comfyui}
+      - COMFYUI_API_URL=${COMFYUI_API_URL:-http://comfyui:8188}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
       # Mount host ./data directory into container for permanent photo uploads & assets
@@ -77,4 +97,6 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  comfyui_storage:
     driver: local

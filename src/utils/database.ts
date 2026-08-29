@@ -62,7 +62,7 @@ export function getLocalCars(): CarPhoto[] {
     }
     const data = fs.readFileSync(CARS_JSON_PATH, 'utf-8');
     const parsed = JSON.parse(data);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed;
     }
     return INITIAL_CAR_PHOTOS;
@@ -181,7 +181,8 @@ export async function initializePostgresDatabase(): Promise<void> {
 
       CREATE TABLE IF NOT EXISTS cars (
         id VARCHAR(128) PRIMARY KEY,
-        plate_number VARCHAR(64) NOT NULL,
+        plate_number VARCHAR(64),
+        state VARCHAR(64),
         car_name VARCHAR(255) NOT NULL,
         make VARCHAR(128) NOT NULL,
         model VARCHAR(128) NOT NULL,
@@ -210,12 +211,18 @@ export async function initializePostgresDatabase(): Promise<void> {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
+      ALTER TABLE cars ADD COLUMN IF NOT EXISTS state VARCHAR(64);
       ALTER TABLE cars ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb;
       ALTER TABLE cars ADD COLUMN IF NOT EXISTS photo_authors JSONB DEFAULT '{}'::jsonb;
       ALTER TABLE cars ADD COLUMN IF NOT EXISTS photographer_venmo VARCHAR(128);
       ALTER TABLE cars ADD COLUMN IF NOT EXISTS photographer_paypal VARCHAR(128);
+      DO $$ BEGIN
+        ALTER TABLE cars ALTER COLUMN plate_number DROP NOT NULL;
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END $$;
 
       CREATE INDEX IF NOT EXISTS idx_cars_plate_number ON cars(plate_number);
+      CREATE INDEX IF NOT EXISTS idx_cars_state ON cars(state);
       CREATE INDEX IF NOT EXISTS idx_cars_make ON cars(make);
       CREATE INDEX IF NOT EXISTS idx_cars_event ON cars(event);
       CREATE INDEX IF NOT EXISTS idx_cars_photographer ON cars(photographer_name);
@@ -285,15 +292,16 @@ async function seedDefaultCars(pool: Pool) {
   for (const car of initialCars) {
     await pool.query(
       `INSERT INTO cars (
-        id, plate_number, car_name, make, model, year, color, event, location, date,
+        id, plate_number, state, car_name, make, model, year, color, event, location, date,
         photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
         photographer_venmo, photographer_paypal,
         image_url, images, photo_authors, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23::jsonb, $24, $25, $26, $27, $28)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21::jsonb, $22, $23, $24::jsonb, $25, $26, $27, $28, $29)
       ON CONFLICT (id) DO NOTHING`,
       [
         car.id,
-        car.plateNumber,
+        car.plateNumber || '',
+        car.state || '',
         car.carName,
         car.make,
         car.model,
@@ -357,7 +365,8 @@ export function mapRowToCar(row: any): CarPhoto | null {
 
   return {
     id: row.id,
-    plateNumber: row.plate_number,
+    plateNumber: row.plate_number || '',
+    state: row.state || undefined,
     carName: row.car_name,
     make: row.make,
     model: row.model,
@@ -402,6 +411,7 @@ export function mapRowToUser(row: any): UserAccount & { password?: string } {
     venmoHandle: row.venmo_handle || '',
     payPalHandle: row.paypal_handle || '',
     isActive: row.is_active ?? true,
+    status: row.status || (row.is_active ? 'active' : 'pending'),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
     password: row.password,
   };
@@ -414,7 +424,7 @@ export async function getAllUsersFromDb(): Promise<UserAccount[]> {
   if (isPostgresAvailable) {
     try {
       const pool = getPgPool();
-      const result = await pool.query('SELECT id, username, name, email, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, created_at FROM users ORDER BY created_at ASC');
+      const result = await pool.query('SELECT id, username, name, email, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, status, created_at FROM users ORDER BY created_at ASC');
       return result.rows.map((row) => {
         const u = mapRowToUser(row);
         delete (u as any).password;
@@ -429,7 +439,10 @@ export async function getAllUsersFromDb(): Promise<UserAccount[]> {
   const local = getLocalUsers();
   return local.map((u) => {
     const { password, ...safeUser } = u;
-    return safeUser;
+    return {
+      ...safeUser,
+      status: safeUser.status || (safeUser.isActive ? 'active' : 'pending'),
+    };
   });
 }
 
@@ -475,6 +488,11 @@ export async function getUserByUsernameOrEmailFromDb(identifier: string): Promis
   );
 }
 
+export async function getUserByIdWithPassword(id: string): Promise<(UserAccount & { password?: string }) | null> {
+  const local = getLocalUsers();
+  return local.find((u) => u.id === id) || null;
+}
+
 export async function createUserInDb(
   userData: Partial<UserAccount>,
   password = 'shooter2026'
@@ -490,7 +508,8 @@ export async function createUserInDb(
     instagram: userData.instagram || '',
     venmoHandle: userData.venmoHandle || '',
     payPalHandle: userData.payPalHandle || '',
-    isActive: userData.isActive ?? true,
+    isActive: userData.isActive ?? (userData.status === 'pending' ? false : true),
+    status: userData.status || (userData.isActive === false ? 'pending' : 'active'),
     createdAt: new Date().toISOString(),
     password,
   };
@@ -510,8 +529,8 @@ export async function createUserInDb(
       const pool = getPgPool();
       await pool.query(
         `INSERT INTO users (
-          id, username, name, email, password, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          id, username, name, email, password, role, avatar, bio, instagram, venmo_handle, paypal_handle, is_active, status, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (id) DO UPDATE SET
           username = EXCLUDED.username,
           name = EXCLUDED.name,
@@ -523,7 +542,8 @@ export async function createUserInDb(
           instagram = EXCLUDED.instagram,
           venmo_handle = EXCLUDED.venmo_handle,
           paypal_handle = EXCLUDED.paypal_handle,
-          is_active = EXCLUDED.is_active`,
+          is_active = EXCLUDED.is_active,
+          status = EXCLUDED.status`,
         [
           newUser.id,
           newUser.username,
@@ -537,6 +557,7 @@ export async function createUserInDb(
           newUser.venmoHandle,
           newUser.payPalHandle,
           newUser.isActive,
+          newUser.status,
           newUser.createdAt,
         ]
       );
@@ -562,6 +583,8 @@ export async function updateUserInDb(
   const updatedUser: UserAccount & { password?: string } = {
     ...existing,
     ...updates,
+    username: updates.username ? updates.username.toLowerCase().trim() : existing.username,
+    status: updates.status || (updates.isActive !== undefined ? (updates.isActive ? 'active' : 'suspended') : existing.status),
     password: updates.password ? updates.password : existing.password,
   };
   local[idx] = updatedUser;
@@ -572,18 +595,21 @@ export async function updateUserInDb(
       const pool = getPgPool();
       await pool.query(
         `UPDATE users SET
-          name = COALESCE($1, name),
-          email = COALESCE($2, email),
-          role = COALESCE($3, role),
-          avatar = COALESCE($4, avatar),
-          bio = COALESCE($5, bio),
-          instagram = COALESCE($6, instagram),
-          venmo_handle = COALESCE($7, venmo_handle),
-          paypal_handle = COALESCE($8, paypal_handle),
-          is_active = COALESCE($9, is_active),
-          password = COALESCE($10, password)
-        WHERE id = $11`,
+          username = COALESCE($1, username),
+          name = COALESCE($2, name),
+          email = COALESCE($3, email),
+          role = COALESCE($4, role),
+          avatar = COALESCE($5, avatar),
+          bio = COALESCE($6, bio),
+          instagram = COALESCE($7, instagram),
+          venmo_handle = COALESCE($8, venmo_handle),
+          paypal_handle = COALESCE($9, paypal_handle),
+          is_active = COALESCE($10, is_active),
+          status = COALESCE($11, status),
+          password = COALESCE($12, password)
+        WHERE id = $13`,
         [
+          updates.username ? updates.username.toLowerCase().trim() : null,
           updates.name || null,
           updates.email !== undefined ? updates.email : null,
           updates.role || null,
@@ -593,6 +619,7 @@ export async function updateUserInDb(
           updates.venmoHandle !== undefined ? updates.venmoHandle : null,
           updates.payPalHandle !== undefined ? updates.payPalHandle : null,
           updates.isActive !== undefined ? updates.isActive : null,
+          updates.status || null,
           updates.password || null,
           id,
         ]
@@ -660,6 +687,7 @@ export async function searchCarsInPostgres(
         sql += ` AND (
           REGEXP_REPLACE(UPPER(plate_number), '[\\s\\-_.]', '', 'g') ILIKE $${paramIdx}
           OR plate_number ILIKE $${paramIdx + 1}
+          OR state ILIKE $${paramIdx + 1}
           OR car_name ILIKE $${paramIdx + 1}
           OR make ILIKE $${paramIdx + 1}
           OR model ILIKE $${paramIdx + 1}
@@ -734,6 +762,7 @@ export async function searchCarsInPostgres(
     if (q) {
       const cleanCarPlate = (car.plateNumber || '').replace(/[\s\-_.]/g, '').toLowerCase();
       const rawPlate = (car.plateNumber || '').toLowerCase();
+      const carState = (car.state || '').toLowerCase();
       const carName = (car.carName || '').toLowerCase();
       const make = (car.make || '').toLowerCase();
       const model = (car.model || '').toLowerCase();
@@ -748,6 +777,7 @@ export async function searchCarsInPostgres(
       const matches =
         cleanCarPlate.includes(cleanQ) ||
         rawPlate.includes(q) ||
+        carState.includes(q) ||
         carName.includes(q) ||
         make.includes(q) ||
         model.includes(q) ||
@@ -805,13 +835,14 @@ export async function insertCarIntoDb(car: CarPhoto): Promise<CarPhoto> {
       const pool = getPgPool();
       await pool.query(
         `INSERT INTO cars (
-          id, plate_number, car_name, make, model, year, color, event, location, date,
+          id, plate_number, state, car_name, make, model, year, color, event, location, date,
           photographer_name, photographer_title, photographer_avatar, photographer_bio, photographer_instagram,
           photographer_venmo, photographer_paypal,
           image_url, images, photo_authors, cartoon_image_url, has_cartoon, tags, views, downloads, resolution, camera_info, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20::jsonb, $21, $22, $23::jsonb, $24, $25, $26, $27, $28)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21::jsonb, $22, $23, $24::jsonb, $25, $26, $27, $28, $29)
         ON CONFLICT (id) DO UPDATE SET
           plate_number = EXCLUDED.plate_number,
+          state = EXCLUDED.state,
           car_name = EXCLUDED.car_name,
           make = EXCLUDED.make,
           model = EXCLUDED.model,
@@ -837,7 +868,8 @@ export async function insertCarIntoDb(car: CarPhoto): Promise<CarPhoto> {
           camera_info = EXCLUDED.camera_info`,
         [
           car.id,
-          car.plateNumber,
+          car.plateNumber || '',
+          car.state || '',
           car.carName,
           car.make,
           car.model,
@@ -902,29 +934,31 @@ export async function updateCarInDb(id: string, updates: Partial<CarPhoto>): Pro
       await pool.query(
         `UPDATE cars SET
           plate_number = COALESCE($1, plate_number),
-          car_name = COALESCE($2, car_name),
-          make = COALESCE($3, make),
-          model = COALESCE($4, model),
-          year = COALESCE($5, year),
-          color = COALESCE($6, color),
-          event = COALESCE($7, event),
-          location = COALESCE($8, location),
-          image_url = COALESCE($9, image_url),
-          images = COALESCE($10::jsonb, images),
-          photo_authors = COALESCE($11::jsonb, photo_authors),
-          cartoon_image_url = $12,
-          has_cartoon = COALESCE($13, has_cartoon),
-          tags = COALESCE($14::jsonb, tags),
-          photographer_name = COALESCE($15, photographer_name),
-          photographer_title = COALESCE($16, photographer_title),
-          photographer_avatar = COALESCE($17, photographer_avatar),
-          photographer_bio = COALESCE($18, photographer_bio),
-          photographer_instagram = COALESCE($19, photographer_instagram),
-          photographer_venmo = COALESCE($20, photographer_venmo),
-          photographer_paypal = COALESCE($21, photographer_paypal)
-        WHERE id = $22`,
+          state = COALESCE($2, state),
+          car_name = COALESCE($3, car_name),
+          make = COALESCE($4, make),
+          model = COALESCE($5, model),
+          year = COALESCE($6, year),
+          color = COALESCE($7, color),
+          event = COALESCE($8, event),
+          location = COALESCE($9, location),
+          image_url = COALESCE($10, image_url),
+          images = COALESCE($11::jsonb, images),
+          photo_authors = COALESCE($12::jsonb, photo_authors),
+          cartoon_image_url = $13,
+          has_cartoon = COALESCE($14, has_cartoon),
+          tags = COALESCE($15::jsonb, tags),
+          photographer_name = COALESCE($16, photographer_name),
+          photographer_title = COALESCE($17, photographer_title),
+          photographer_avatar = COALESCE($18, photographer_avatar),
+          photographer_bio = COALESCE($19, photographer_bio),
+          photographer_instagram = COALESCE($20, photographer_instagram),
+          photographer_venmo = COALESCE($21, photographer_venmo),
+          photographer_paypal = COALESCE($22, photographer_paypal)
+        WHERE id = $23`,
         [
-          updates.plateNumber || null,
+          updates.plateNumber !== undefined ? updates.plateNumber : null,
+          updates.state !== undefined ? updates.state : null,
           updates.carName || null,
           updates.make || null,
           updates.model || null,
