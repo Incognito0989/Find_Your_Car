@@ -48,8 +48,8 @@ app.use(
 );
 
 // Increase JSON payload limit for high-res automotive photos & profiles
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "200mb" }));
+app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
 // Ensure upload directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -480,8 +480,8 @@ app.post("/api/register", async (req: Request, res: Response) => {
         name: name.trim(),
         email: (email || "").trim(),
         role: "photographer",
-        avatar: processedAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-        bio: bio ? bio.trim() : "Motorsport photographer applicant.",
+        avatar: processedAvatar || "",
+        bio: bio ? bio.trim() : "",
         instagram: (instagram || "").trim(),
         venmoHandle: (venmoHandle || "").replace(/^@/, "").trim(),
         payPalHandle: (payPalHandle || "").replace(/^@/, "").trim(),
@@ -541,7 +541,7 @@ app.post("/api/lookup-plate", async (req: Request, res: Response) => {
   }
 });
 
-// Admin & Photographer Unified Login
+// Admin & Photographer Unified Login (PostgreSQL Database-backed)
 app.post("/api/admin/login", async (req: Request, res: Response) => {
   try {
     const { password, email, username, identifier } = req.body;
@@ -551,87 +551,39 @@ app.post("/api/admin/login", async (req: Request, res: Response) => {
 
     const inputIdentifier = (identifier || username || email || "").toLowerCase().trim();
     const inputPassword = String(password).trim();
-    const creds = getAdminCredentials();
 
-    let authenticatedUser: UserAccount | null = null;
-
-    // 1. Check if matching specific database user
-    if (inputIdentifier) {
-      const user = await getUserByUsernameOrEmailFromDb(inputIdentifier);
-      if (user && user.password && user.password === inputPassword) {
-        // Check approval status
-        if (user.status === "pending" || user.isActive === false) {
-          if (user.status === "pending") {
-            return res.status(403).json({
-              error: "Your photographer registration is currently pending admin review. The studio administrator will approve your account soon.",
-              isPending: true,
-            });
-          } else {
-            return res.status(403).json({
-              error: "Your account is currently inactive or suspended. Please contact the studio administrator.",
-            });
-          }
-        }
-        const { password: _, ...safeUser } = user;
-        authenticatedUser = safeUser;
-      }
+    if (!inputIdentifier) {
+      return res.status(400).json({ error: "Username or email is required." });
     }
 
-    // 2. Check environment admin credentials fallback
-    if (!authenticatedUser) {
-      const validAdminIdentifiers = new Set([
-        creds.email.toLowerCase().trim(),
-        creds.name.toLowerCase().trim(),
-        "admin",
-        "administrator",
-        "admin@platesnapcars.local",
-      ]);
-      if (process.env.ADMIN_EMAIL) {
-        validAdminIdentifiers.add(process.env.ADMIN_EMAIL.toLowerCase().trim());
-      }
+    // Query database for the user account
+    const user = await getUserByUsernameOrEmailFromDb(inputIdentifier);
 
-      const isPasswordAdmin =
-        inputPassword === creds.password ||
-        inputPassword === (process.env.ADMIN_PASSWORD || "platesnap2026");
-
-      const isIdentifierAdmin = !inputIdentifier || validAdminIdentifiers.has(inputIdentifier);
-
-      if (isPasswordAdmin && isIdentifierAdmin) {
-        // Fetch or create master admin profile
-        const existingAdmin = await getUserByUsernameOrEmailFromDb("admin");
-        if (existingAdmin) {
-          const { password: _, ...safeAdmin } = existingAdmin;
-          authenticatedUser = safeAdmin;
-        } else {
-          authenticatedUser = {
-            id: "user-admin-master",
-            username: "admin",
-            name: creds.name,
-            email: creds.email,
-            role: "admin",
-            avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-            bio: "Lead Automotive Photographer & Studio Administrator.",
-            instagram: "@rivera_motorsport",
-            venmoHandle: "alex-rivera-photo",
-            payPalHandle: "alexriveraphoto",
-            createdAt: new Date().toISOString(),
-            isActive: true,
-            status: "active",
-          };
-        }
-      }
-    }
-
-    if (!authenticatedUser) {
+    if (!user || !user.password || user.password !== inputPassword) {
       return res.status(401).json({
         error: "Invalid credentials. Please verify your username/email and password.",
       });
     }
 
+    // Check approval status and active flag
+    if (user.status === "pending" || user.isActive === false) {
+      if (user.status === "pending") {
+        return res.status(403).json({
+          error: "Your photographer registration is currently pending admin review. The studio administrator will approve your account soon.",
+          isPending: true,
+        });
+      } else {
+        return res.status(403).json({
+          error: "Your account is currently inactive or suspended. Please contact the studio administrator.",
+        });
+      }
+    }
+
+    const { password: _, ...safeUser } = user;
     const token = `adm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     sessionUserMap.set(token, {
       token,
-      user: authenticatedUser,
+      user: safeUser,
       createdAt: Date.now(),
     });
 
@@ -639,17 +591,17 @@ app.post("/api/admin/login", async (req: Request, res: Response) => {
       success: true,
       token,
       admin: {
-        id: authenticatedUser.id,
-        name: authenticatedUser.name,
-        username: authenticatedUser.username,
-        email: authenticatedUser.email,
-        role: authenticatedUser.role,
-        avatar: authenticatedUser.avatar,
-        bio: authenticatedUser.bio,
-        instagram: authenticatedUser.instagram,
-        venmoHandle: authenticatedUser.venmoHandle,
-        payPalHandle: authenticatedUser.payPalHandle,
-        status: authenticatedUser.status || "active",
+        id: safeUser.id,
+        name: safeUser.name,
+        username: safeUser.username,
+        email: safeUser.email,
+        role: safeUser.role,
+        avatar: safeUser.avatar,
+        bio: safeUser.bio,
+        instagram: safeUser.instagram,
+        venmoHandle: safeUser.venmoHandle,
+        payPalHandle: safeUser.payPalHandle,
+        status: safeUser.status || "active",
       },
     });
   } catch (err: any) {
@@ -781,10 +733,20 @@ app.post("/api/admin/logout", (req: Request, res: Response) => {
   res.json({ success: true, message: "Logged out successfully" });
 });
 
-// Get Current User Profile (Authenticated)
-app.get("/api/user/me", authenticateSession, (req: Request, res: Response) => {
-  const user = (req as any).user as UserAccount;
-  res.json({ user });
+// Get Current User Profile (Authenticated from PostgreSQL Database)
+app.get("/api/user/me", authenticateSession, async (req: Request, res: Response) => {
+  try {
+    const sessionUser = (req as any).user as UserAccount;
+    const dbUser = await getUserByIdFromDb(sessionUser.id);
+    if (dbUser) {
+      const { password: _, ...safeUser } = dbUser;
+      return res.json({ user: safeUser });
+    }
+    res.json({ user: sessionUser });
+  } catch (err: any) {
+    const sessionUser = (req as any).user as UserAccount;
+    res.json({ user: sessionUser });
+  }
 });
 
 // ==========================================
@@ -837,8 +799,8 @@ app.post("/api/users", requireAdmin, async (req: Request, res: Response) => {
         name: name.trim(),
         email: (email || "").trim(),
         role: role === "admin" ? "admin" : "photographer",
-        avatar: processedAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-        bio: bio || "Automotive photographer and content creator.",
+        avatar: processedAvatar || "",
+        bio: bio || "",
         instagram: (instagram || "").trim(),
         venmoHandle: (venmoHandle || "").replace(/^@/, "").trim(),
         payPalHandle: (payPalHandle || "").replace(/^@/, "").trim(),
@@ -1158,30 +1120,30 @@ app.post("/api/cars", authenticateSession, async (req: Request, res: Response) =
       new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
       ` • ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 
-    const tagsArray = Array.isArray(tags) ? tags : ["CarMeet", make || "Automotive"];
+    const tagsArray = Array.isArray(tags) ? tags : [];
     const currentUser = (req as any).user as UserAccount;
 
     const assignedPhotog = {
-      name: photographer?.name || currentUser.name || "Alex Rivera",
-      title: photographer?.title || "Automotive Photographer",
-      avatar: photographer?.avatar || currentUser.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
-      bio: photographer?.bio || currentUser.bio || "Official Plate Snap Cars verified shooter.",
-      instagram: photographer?.instagram || currentUser.instagram || "",
-      venmoHandle: photographer?.venmoHandle || currentUser.venmoHandle || "",
-      payPalHandle: photographer?.payPalHandle || currentUser.payPalHandle || "",
+      name: photographer?.name || currentUser?.name || "Photographer",
+      title: photographer?.title || (currentUser?.role === "admin" ? "Lead Photographer" : "Photographer"),
+      avatar: photographer?.avatar || currentUser?.avatar || "",
+      bio: photographer?.bio || currentUser?.bio || "",
+      instagram: photographer?.instagram || currentUser?.instagram || "",
+      venmoHandle: photographer?.venmoHandle || currentUser?.venmoHandle || "",
+      payPalHandle: photographer?.payPalHandle || currentUser?.payPalHandle || "",
     };
 
     const newCar = {
       id: carId,
       plateNumber: cleanPlate,
       state: cleanState || undefined,
-      carName: carName || `${make || "Custom"} ${model || "Vehicle"}`,
-      make: make || "Custom",
-      model: model || "Vehicle",
-      year: year ? parseInt(year, 10) : new Date().getFullYear(),
-      color: color || "Custom Color",
-      event: event || "Automotive Gathering",
-      location: location || "Metropolitan Car Meet",
+      carName: carName || (make ? `${make} ${model || ""}`.trim() : "Custom Vehicle"),
+      make: make || "",
+      model: model || "",
+      year: year ? parseInt(year, 10) : undefined,
+      color: color || "",
+      event: event || "",
+      location: location || "",
       date: formattedDate,
       photographer: assignedPhotog,
       imageUrl: primaryImageUrl,
@@ -1192,8 +1154,8 @@ app.post("/api/cars", authenticateSession, async (req: Request, res: Response) =
       tags: tagsArray,
       views: 1,
       downloads: 0,
-      resolution: resolution || "High Resolution • 300 DPI",
-      cameraInfo: cameraInfo || "Sony Alpha • 50mm f/1.8 • 1/1000s • ISO 100",
+      resolution: resolution || "",
+      cameraInfo: cameraInfo || "",
       createdAt: new Date().toISOString(),
     };
 
@@ -1226,6 +1188,8 @@ app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response
       hasCartoon,
       tags,
       photographer,
+      resolution,
+      cameraInfo,
     } = req.body;
 
     const existingCar = await getCarByIdFromDb(id);
@@ -1253,21 +1217,23 @@ app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response
 
     const updates: any = {
       ...(plateNumber !== undefined ? { plateNumber: plateNumber.toUpperCase().trim() } : {}),
-      ...(state !== undefined ? { state: state.toUpperCase().trim() } : {}),
-      ...(carName ? { carName } : {}),
-      ...(make ? { make } : {}),
-      ...(model ? { model } : {}),
-      ...(year ? { year: parseInt(year, 10) } : {}),
-      ...(color ? { color } : {}),
-      ...(event ? { event } : {}),
-      ...(location ? { location } : {}),
-      ...(imageUrl ? { imageUrl } : {}),
+      ...(state !== undefined ? { state: state ? state.toUpperCase().trim() : undefined } : {}),
+      ...(carName !== undefined ? { carName } : {}),
+      ...(make !== undefined ? { make } : {}),
+      ...(model !== undefined ? { model } : {}),
+      ...(year !== undefined ? { year: year ? parseInt(year, 10) : undefined } : {}),
+      ...(color !== undefined ? { color } : {}),
+      ...(event !== undefined ? { event } : {}),
+      ...(location !== undefined ? { location } : {}),
+      ...(imageUrl !== undefined ? { imageUrl } : {}),
       ...(savedImages.length > 0 ? { images: savedImages } : {}),
-      ...(photoAuthors ? { photoAuthors } : {}),
+      ...(photoAuthors !== undefined ? { photoAuthors } : {}),
       ...(cartoonImageUrl !== undefined ? { cartoonImageUrl } : {}),
       ...(hasCartoon !== undefined ? { hasCartoon: Boolean(hasCartoon) } : {}),
-      ...(tags ? { tags: Array.isArray(tags) ? tags : [tags] } : {}),
-      ...(photographer ? { photographer } : {}),
+      ...(tags !== undefined ? { tags: Array.isArray(tags) ? tags : [tags] } : {}),
+      ...(photographer !== undefined ? { photographer } : {}),
+      ...(resolution !== undefined ? { resolution } : {}),
+      ...(cameraInfo !== undefined ? { cameraInfo } : {}),
     };
 
     const updated = await updateCarInDb(id, updates);

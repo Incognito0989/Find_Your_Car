@@ -162,44 +162,41 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Upload Form State
   const [plateNumber, setPlateNumber] = useState<string>('');
-  const [selectedState, setSelectedState] = useState<string>('CA');
+  const [selectedState, setSelectedState] = useState<string>('');
   const [carName, setCarName] = useState<string>('');
-  const [make, setMake] = useState<string>('Porsche');
+  const [make, setMake] = useState<string>('');
   const [model, setModel] = useState<string>('');
-  const [year, setYear] = useState<string>('2024');
+  const [year, setYear] = useState<string>('');
   const [color, setColor] = useState<string>('');
-  const [event, setEvent] = useState<string>('Sunset Track Day Laguna');
-  const [location, setLocation] = useState<string>('Monterey, CA');
+  const [event, setEvent] = useState<string>('');
+  const [location, setLocation] = useState<string>('');
 
   // Automatically derive photographer attribution from logged-in user session
   const currentPhotographer: Photographer = useMemo(() => {
     if (adminUser) {
       return {
         id: adminUser.id,
-        name: adminUser.name || adminName || 'Alex Rivera',
+        name: adminUser.name || adminName || 'Photographer',
         title: adminUser.role === 'admin' ? 'Lead Automotive Photographer' : 'Automotive Photographer',
-        avatar:
-          adminUser.avatar ||
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-        bio: adminUser.bio || 'Verified Plate Snap Cars high-resolution event photographer.',
+        avatar: adminUser.avatar || '',
+        bio: adminUser.bio || '',
         venmoHandle: adminUser.venmoHandle || undefined,
         payPalHandle: adminUser.payPalHandle || undefined,
         instagram: adminUser.instagram || undefined,
       };
     }
     return {
-      name: adminName || 'Alex Rivera',
-      title: 'Lead Automotive Photographer',
-      avatar:
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-      bio: 'Verified Plate Snap Cars high-resolution event photographer.',
-      venmoHandle: 'alex-rivera-photo',
-      payPalHandle: 'alexriveraphoto',
-      instagram: '@alexrivera.raw',
+      name: adminName || 'Photographer',
+      title: 'Automotive Photographer',
+      avatar: '',
+      bio: '',
+      venmoHandle: undefined,
+      payPalHandle: undefined,
+      instagram: undefined,
     };
   }, [adminUser, adminName]);
 
-  const [tagsInput, setTagsInput] = useState<string>('TrackDay, Supercar, HighRes');
+  const [tagsInput, setTagsInput] = useState<string>('');
 
   // Multi-image Staging State
   const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
@@ -210,11 +207,64 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [hasCartoon, setHasCartoon] = useState<boolean>(false);
   const [selectedCartoonPhotoUrl, setSelectedCartoonPhotoUrl] = useState<string | null>(null);
   const [isAutoGeneratingCartoon, setIsAutoGeneratingCartoon] = useState<boolean>(false);
-  const [resolution, setResolution] = useState<string>('High Resolution • 300 DPI');
-  const [cameraInfo, setCameraInfo] = useState<string>('Sony Alpha • 70-200mm f/2.8 GM • ISO 100');
+  const [resolution, setResolution] = useState<string>('');
+  const [cameraInfo, setCameraInfo] = useState<string>('');
 
-  // Fleet Existing Car Photo Management Modal
+  // Fleet Existing Car Comprehensive Edit Modal State
   const [editingCarGallery, setEditingCarGallery] = useState<CarPhoto | null>(null);
+  const [editModalTab, setEditModalTab] = useState<'info' | 'photos'>('info');
+  const [editCarName, setEditCarName] = useState<string>('');
+  const [editMake, setEditMake] = useState<string>('');
+  const [editModel, setEditModel] = useState<string>('');
+  const [editYear, setEditYear] = useState<string>('');
+  const [editColor, setEditColor] = useState<string>('');
+  const [editState, setEditState] = useState<string>('');
+  const [editPlateNumber, setEditPlateNumber] = useState<string>('');
+  const [editEvent, setEditEvent] = useState<string>('');
+  const [editLocation, setEditLocation] = useState<string>('');
+  const [editDate, setEditDate] = useState<string>('');
+  const [editCameraInfo, setEditCameraInfo] = useState<string>('');
+  const [editResolution, setEditResolution] = useState<string>('');
+  const [editTags, setEditTags] = useState<string>('');
+  const [editPhotographerName, setEditPhotographerName] = useState<string>('');
+  const [editPhotographerTitle, setEditPhotographerTitle] = useState<string>('');
+  const [editPhotographerInstagram, setEditPhotographerInstagram] = useState<string>('');
+  const [editPhotographerVenmo, setEditPhotographerVenmo] = useState<string>('');
+  const [editPhotographerPayPal, setEditPhotographerPayPal] = useState<string>('');
+  const [editCoverImageUrl, setEditCoverImageUrl] = useState<string>('');
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+
+  // Sync edit states whenever a car is selected for editing
+  useEffect(() => {
+    if (editingCarGallery) {
+      setEditCarName(editingCarGallery.carName || '');
+      setEditMake(editingCarGallery.make || '');
+      setEditModel(editingCarGallery.model || '');
+      setEditYear(editingCarGallery.year ? String(editingCarGallery.year) : '');
+      setEditColor(editingCarGallery.color || '');
+      setEditState(editingCarGallery.state || '');
+      setEditPlateNumber(editingCarGallery.plateNumber || '');
+      setEditEvent(editingCarGallery.event || '');
+      setEditLocation(editingCarGallery.location || '');
+      setEditDate(editingCarGallery.date || '');
+      setEditCameraInfo(editingCarGallery.cameraInfo || '');
+      setEditResolution(editingCarGallery.resolution || '');
+      setEditTags(Array.isArray(editingCarGallery.tags) ? editingCarGallery.tags.join(', ') : '');
+      setEditPhotographerName(editingCarGallery.photographer?.name || '');
+      setEditPhotographerTitle(editingCarGallery.photographer?.title || '');
+      setEditPhotographerInstagram(editingCarGallery.photographer?.instagram || '');
+      setEditPhotographerVenmo(editingCarGallery.photographer?.venmoHandle || '');
+      setEditPhotographerPayPal(editingCarGallery.photographer?.payPalHandle || '');
+      setEditCoverImageUrl(editingCarGallery.imageUrl || '');
+      const imgs =
+        Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
+          ? editingCarGallery.images
+          : [editingCarGallery.imageUrl];
+      setEditImages(imgs);
+      setEditModalTab('info');
+    }
+  }, [editingCarGallery]);
 
   // Hidden File Input References
   const multiFileInputRef = useRef<HTMLInputElement>(null);
@@ -431,68 +481,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [themeForm, setThemeForm] = useState<AppThemeConfig>({ ...currentTheme });
   const [themeSavedToast, setThemeSavedToast] = useState<boolean>(false);
 
-  // Quick sample photo library for easy testing with multi-photo arrays
-  const SAMPLE_PHOTOS = [
-    {
-      label: 'Porsche 911 GT3 RS (6 Photos)',
-      plate: 'GT3-992',
-      make: 'Porsche',
-      model: '911 GT3 RS',
-      color: 'Python Green',
-      url: 'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1200',
-      images: [
-        'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200',
-      ],
-    },
-    {
-      label: 'Mazda Miata Pop-Up NA (4 Photos)',
-      plate: 'MIATA-91',
-      make: 'Mazda',
-      model: 'MX-5 Miata',
-      color: 'Classic Pink',
-      url: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200',
-      images: [
-        'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
-      ],
-    },
-    {
-      label: 'BMW M4 Competition (4 Photos)',
-      plate: 'M4-PERF',
-      make: 'BMW',
-      model: 'M4 Competition G82',
-      color: 'Yas Marina Blue',
-      url: 'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1200',
-      images: [
-        'https://images.unsplash.com/photo-1614200179396-2bdb77ee4a31?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1555353540-64580b51c258?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&q=80&w=1200',
-      ],
-    },
-    {
-      label: 'Corvette C8 Stingray (4 Photos)',
-      plate: 'VETTE-8',
-      make: 'Chevrolet',
-      model: 'Corvette C8',
-      color: 'Sebring Orange',
-      url: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200',
-      images: [
-        'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
-        'https://images.unsplash.com/photo-1603584173870-7f3d5128759b?auto=format&fit=crop&q=80&w=1200',
-      ],
-    },
-  ];
-
   // Process a list of File objects (from multi-select, folder input, or drag-and-drop)
   const handleFilesAdded = async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(
@@ -552,23 +540,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
-  // Select sample template
-  const handleSelectSample = (sample: (typeof SAMPLE_PHOTOS)[0]) => {
-    const photos: StagedPhoto[] = sample.images.map((imgUrl, i) => ({
-      id: `sample-${i}-${Date.now()}`,
-      url: imgUrl,
-      name: `${sample.make}_Angle_${i + 1}.jpg`,
-    }));
-    setStagedPhotos(photos);
-    setCoverIndex(0);
-    setPlateNumber(sample.plate);
-    setMake(sample.make);
-    setModel(sample.model);
-    setCarName(`${sample.make} ${sample.model}`);
-    setColor(sample.color);
-    setStatusMsg({ type: 'success', text: `Loaded ${photos.length} multi-angle photos for ${sample.label}.` });
-  };
-
   // Submit new car to backend
   const handleSubmitCar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -587,7 +558,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       const coverPhoto = stagedPhotos[coverIndex] || stagedPhotos[0];
       const allImagesUrls = stagedPhotos.map((p) => p.url);
       const cleanPlate = (plateNumber || '').toUpperCase().trim();
-      const effectiveCarName = carName || (make ? `${make} ${model || 'Vehicle'}` : 'Custom Build');
+      const effectiveCarName = carName.trim() || (make.trim() ? `${make.trim()} ${model.trim()}`.trim() : '');
 
       // Use automatically resolved photographer attribution from authenticated session
       const photogObject: Photographer = currentPhotographer;
@@ -599,35 +570,44 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       });
 
       await onAddCar({
-        plateNumber: cleanPlate,
+        plateNumber: cleanPlate || undefined,
         state: selectedState ? selectedState.toUpperCase().trim() : undefined,
-        carName: effectiveCarName,
-        make: make || 'Custom',
-        model: model || carName || 'Vehicle',
-        year: parseInt(year, 10) || 2024,
-        color: color || 'Custom Finish',
-        event: event || 'Automotive Gathering',
-        location: location || 'Laguna Seca, CA',
+        carName: effectiveCarName || 'Vehicle',
+        make: make.trim() || undefined,
+        model: model.trim() || undefined,
+        year: year.trim() ? parseInt(year.trim(), 10) || undefined : undefined,
+        color: color.trim() || undefined,
+        event: event.trim() || undefined,
+        location: location.trim() || undefined,
         photographer: photogObject,
         photoAuthors: photoAuthorsMap,
         imageUrl: coverPhoto.url,
         images: allImagesUrls,
         cartoonImageUrl: cartoonImageUrl || undefined,
         hasCartoon: Boolean(hasCartoon || cartoonImageUrl),
-        tags: tagsArray.length > 0 ? tagsArray : [make || 'Automotive', 'CarMeet'],
-        resolution,
-        cameraInfo,
+        tags: tagsArray,
+        resolution: resolution.trim() || undefined,
+        cameraInfo: cameraInfo.trim() || undefined,
       });
 
       setStatusMsg({
         type: 'success',
-        text: `Successfully published ${allImagesUrls.length} photos for [${effectiveCarName}]${selectedState ? ` (${selectedState})` : ''}. It is now searchable in the visitor dashboard!`,
+        text: `Successfully published ${allImagesUrls.length} photos for [${effectiveCarName || 'Vehicle'}]! It is now searchable in the visitor dashboard!`,
       });
 
       // Reset form
       setPlateNumber('');
+      setSelectedState('');
+      setMake('');
       setModel('');
       setCarName('');
+      setYear('');
+      setColor('');
+      setEvent('');
+      setLocation('');
+      setTagsInput('');
+      setResolution('');
+      setCameraInfo('');
       setStagedPhotos([]);
       setCoverIndex(0);
       setCartoonImageUrl(null);
@@ -636,6 +616,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setStatusMsg({ type: 'error', text: err.message || 'Failed to upload car photos' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Save all vehicle, shot, and photographer details for existing car
+  const handleSaveCarDetails = async () => {
+    if (!editingCarGallery) return;
+    setIsSavingEdit(true);
+    try {
+      const tagsArray = editTags
+        .split(',')
+        .map((t) => t.trim().replace(/^#/, ''))
+        .filter(Boolean);
+
+      const effectiveCover = editCoverImageUrl || editImages[0] || editingCarGallery.imageUrl;
+
+      const updatedPayload: Partial<CarPhoto> = {
+        carName: editCarName.trim() || undefined,
+        make: editMake.trim() || undefined,
+        model: editModel.trim() || undefined,
+        year: editYear.trim() ? parseInt(editYear.trim(), 10) || undefined : undefined,
+        color: editColor.trim() || undefined,
+        state: editState ? editState.toUpperCase().trim() : undefined,
+        plateNumber: editPlateNumber ? editPlateNumber.toUpperCase().trim() : undefined,
+        event: editEvent.trim() || undefined,
+        location: editLocation.trim() || undefined,
+        date: editDate.trim() || undefined,
+        cameraInfo: editCameraInfo.trim() || undefined,
+        resolution: editResolution.trim() || undefined,
+        imageUrl: effectiveCover,
+        images: editImages,
+        tags: tagsArray,
+        photographer: {
+          ...editingCarGallery.photographer,
+          name: editPhotographerName.trim() || editingCarGallery.photographer?.name || 'Photographer',
+          title: editPhotographerTitle.trim() || undefined,
+          instagram: editPhotographerInstagram.trim() || undefined,
+          venmoHandle: editPhotographerVenmo.trim() || undefined,
+          payPalHandle: editPhotographerPayPal.trim() || undefined,
+        },
+      };
+
+      await onUpdateCar(editingCarGallery.id, updatedPayload);
+
+      setEditingCarGallery((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updatedPayload,
+            } as CarPhoto
+          : null
+      );
+
+      setStatusMsg({
+        type: 'success',
+        text: `Vehicle & shot details updated successfully for [${editCarName || editMake || 'Vehicle'}]!`,
+      });
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to update vehicle details.' });
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -658,11 +698,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     });
 
     const newUrls = await Promise.all(readers);
-    const existingImages = Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
-      ? editingCarGallery.images
-      : [editingCarGallery.imageUrl];
+    const existingImages = Array.isArray(editImages) && editImages.length > 0
+      ? editImages
+      : (Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
+          ? editingCarGallery.images
+          : [editingCarGallery.imageUrl]);
 
     const updatedImages = [...existingImages, ...newUrls];
+    setEditImages(updatedImages);
+    if (!editCoverImageUrl && updatedImages.length > 0) {
+      setEditCoverImageUrl(updatedImages[0]);
+    }
+
     await onUpdateCar(editingCarGallery.id, { images: updatedImages });
 
     setEditingCarGallery({
@@ -672,24 +719,43 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
     setStatusMsg({
       type: 'success',
-      text: `Added ${newUrls.length} photos to [${editingCarGallery.carName}]. Total photos: ${updatedImages.length}`,
+      text: `Added ${newUrls.length} photos to [${editingCarGallery.carName || 'Vehicle'}]. Total photos: ${updatedImages.length}`,
+    });
+  };
+
+  // Set cover photo for existing car
+  const handleSetCoverPhoto = async (imgUrl: string) => {
+    if (!editingCarGallery) return;
+    setEditCoverImageUrl(imgUrl);
+    await onUpdateCar(editingCarGallery.id, { imageUrl: imgUrl });
+    setEditingCarGallery({
+      ...editingCarGallery,
+      imageUrl: imgUrl,
+    });
+    setStatusMsg({
+      type: 'success',
+      text: `Updated primary cover photo for [${editingCarGallery.carName || 'Vehicle'}]!`,
     });
   };
 
   // Remove photo from existing car
   const handleRemovePhotoFromExistingCar = async (photoIndex: number) => {
     if (!editingCarGallery) return;
-    const existingImages = Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
-      ? [...editingCarGallery.images]
-      : [editingCarGallery.imageUrl];
+    const existingImages = Array.isArray(editImages) && editImages.length > 0
+      ? [...editImages]
+      : (Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
+          ? [...editingCarGallery.images]
+          : [editingCarGallery.imageUrl]);
 
     if (existingImages.length <= 1) {
       setStatusMsg({ type: 'error', text: 'A car must have at least one photo.' });
       return;
     }
 
-    existingImages.splice(photoIndex, 1);
-    const newCover = existingImages[0];
+    const removedUrl = existingImages.splice(photoIndex, 1)[0];
+    const newCover = editCoverImageUrl === removedUrl ? existingImages[0] : editCoverImageUrl;
+    setEditImages(existingImages);
+    setEditCoverImageUrl(newCover);
 
     await onUpdateCar(editingCarGallery.id, {
       images: existingImages,
@@ -1149,33 +1215,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </div>
                 )}
-
-                {/* Quick Templates / Sample fleet for rapid testing */}
-                <div className="border-t border-[#2C2C2E] pt-4">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5 block">
-                    Quick Sample Fleet with Multi-Angle Galleries (Click to test):
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {SAMPLE_PHOTOS.map((sample) => (
-                      <button
-                        key={sample.plate}
-                        type="button"
-                        onClick={() => handleSelectSample(sample)}
-                        className="p-2 rounded-xl bg-[#161618] hover:bg-[#222226] border border-[#2C2C2E] text-left transition-colors flex items-center gap-2 cursor-pointer"
-                      >
-                        <img
-                          src={sample.url}
-                          alt={sample.label}
-                          className="w-8 h-8 rounded-lg object-cover"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-bold text-white truncate">{sample.make}</p>
-                          <p className="text-[9px] font-mono text-gray-400 truncate">{sample.model}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -1682,7 +1721,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         className="flex-1 py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-                        <span>Manage Photos ({photoCount})</span>
+                        <span>Edit Details & Photos ({photoCount})</span>
                       </button>
 
                       <button
@@ -1710,24 +1749,77 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         )}
       </main>
 
-      {/* Editing Car Gallery Modal */}
+      {/* Editing Car Gallery & Details Modal */}
       {editingCarGallery && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in">
-          <div className="bg-[#161618] border border-[#2C2C2E] rounded-3xl max-w-3xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#161618] border border-[#2C2C2E] rounded-3xl max-w-4xl w-full p-6 space-y-6 max-h-[92vh] overflow-y-auto shadow-2xl">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Images className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
-                  Manage Photos for [{editingCarGallery.carName}]
+                  <Edit3 className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
+                  Update Vehicle, Shot & Gallery Details
                 </h3>
-                <p className="text-xs text-gray-400">{editingCarGallery.make} {editingCarGallery.model}</p>
+                <p className="text-xs text-gray-400">
+                  {editingCarGallery.carName || `${editingCarGallery.make || ''} ${editingCarGallery.model || ''}`.trim() || 'Vehicle Details'}
+                </p>
               </div>
 
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveCarDetails}
+                  disabled={isSavingEdit}
+                  className="px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setEditingCarGallery(null)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Sub Tabs */}
+            <div className="flex border-b border-[#2C2C2E] gap-2 pb-1">
               <button
-                onClick={() => setEditingCarGallery(null)}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                type="button"
+                onClick={() => setEditModalTab('info')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                  editModalTab === 'info'
+                    ? 'bg-white/15 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
               >
-                <X className="w-4 h-4" />
+                <Tag className="w-4 h-4 text-blue-400" />
+                <span>Vehicle & Shot Metadata</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditModalTab('photos')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                  editModalTab === 'photos'
+                    ? 'bg-white/15 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Images className="w-4 h-4 text-purple-400" />
+                <span>Manage Photos ({editImages.length})</span>
               </button>
             </div>
 
@@ -1741,75 +1833,407 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               className="hidden"
             />
 
-            {/* Add Extra Photos Trigger */}
-            <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
-              <div>
-                <p className="text-xs font-bold text-white">Add Extra Angles & Shots</p>
-                <p className="text-[11px] text-gray-400">Append high-res photos to this car's gallery</p>
-              </div>
+            {/* TAB: METADATA & SPECS */}
+            {editModalTab === 'info' && (
+              <div className="space-y-5">
+                {/* Vehicle Identification */}
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300 block">
+                    Vehicle Specifications & Display
+                  </span>
 
-              <button
-                onClick={() => manageCarFileInputRef.current?.click()}
-                className="px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                Upload More Photos
-              </button>
-            </div>
-
-            {/* Photos Grid */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Current Photos in Gallery ({(editingCarGallery.images || [editingCarGallery.imageUrl]).length})
-              </span>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {(editingCarGallery.images || [editingCarGallery.imageUrl]).map((imgUrl, idx) => (
-                  <div
-                    key={idx}
-                    className="relative aspect-[4/3] rounded-xl overflow-hidden border border-[#2C2C2E] bg-black group"
-                  >
-                    <img
-                      src={formatMediaUrl(imgUrl)}
-                      alt=""
-                      className="w-full h-full object-cover"
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 mb-1">
+                      Car Title (Full Display Name)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2024 Porsche 911 GT3 RS"
+                      value={editCarName}
+                      onChange={(e) => setEditCarName(e.target.value)}
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
-                    <div className="absolute top-1.5 left-1.5 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white">
-                      #{idx + 1}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Manufacturer
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Porsche, BMW, Mazda"
+                        value={editMake}
+                        onChange={(e) => setEditMake(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
                     </div>
 
-                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePhotoFromExistingCar(idx)}
-                          className="p-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg transition-transform hover:scale-110 cursor-pointer"
-                          title="Delete photo from gallery"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Model / Trim
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="911 GT3 RS, M4, C8"
+                        value={editModel}
+                        onChange={(e) => setEditModel(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleAutoGenerateForExistingCar(editingCarGallery, imgUrl)}
-                        className="w-full py-1.5 px-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold flex items-center justify-center gap-1 shadow-md transition-colors cursor-pointer"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Make Cartoon
-                      </button>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Model Year
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 2024 (or blank)"
+                        value={editYear}
+                        onChange={(e) => setEditYear(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="pt-4 border-t border-[#2C2C2E] flex justify-end">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Color / Finish
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Python Green, Alpine White"
+                        value={editColor}
+                        onChange={(e) => setEditColor(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Origin State / Region
+                      </label>
+                      <select
+                        value={editState}
+                        onChange={(e) => setEditState(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      >
+                        <option value="">None / Unspecified</option>
+                        {US_STATES.map((s) => (
+                          <option key={s.code} value={s.code}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Model Tag / VIN
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Optional internal code"
+                        value={editPlateNumber}
+                        onChange={(e) => setEditPlateNumber(e.target.value.toUpperCase())}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white font-mono text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event & Shoot Info */}
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300 block">
+                    Event, Location & Camera Rig
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Event / Meet Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sunset Track Day (or blank)"
+                        value={editEvent}
+                        onChange={(e) => setEditEvent(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Location / Venue
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Laguna Seca, CA (or blank)"
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Shoot Date
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Oct 2024"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Camera & Lens Rig
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sony A7IV • 70-200mm"
+                        value={editCameraInfo}
+                        onChange={(e) => setEditCameraInfo(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Resolution & Output
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 6000x4000 • 300 DPI"
+                        value={editResolution}
+                        onChange={(e) => setEditResolution(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 mb-1">
+                      Search Tags (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. TrackDay, Supercar, RollingShot"
+                      value={editTags}
+                      onChange={(e) => setEditTags(e.target.value)}
+                      className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Photographer Attribution & Tipping */}
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300 block">
+                    Photographer Attribution & Tipping
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Photographer Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Photographer Name"
+                        value={editPhotographerName}
+                        onChange={(e) => setEditPhotographerName(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Title / Role
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Automotive Photographer"
+                        value={editPhotographerTitle}
+                        onChange={(e) => setEditPhotographerTitle(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Instagram Handle
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="@username"
+                        value={editPhotographerInstagram}
+                        onChange={(e) => setEditPhotographerInstagram(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Venmo Username
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="venmo-handle"
+                        value={editPhotographerVenmo}
+                        onChange={(e) => setEditPhotographerVenmo(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        PayPal Username
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="paypal-handle"
+                        value={editPhotographerPayPal}
+                        onChange={(e) => setEditPhotographerPayPal(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: PHOTOS & GALLERY */}
+            {editModalTab === 'photos' && (
+              <div className="space-y-5">
+                {/* Add Extra Photos Trigger */}
+                <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
+                  <div>
+                    <p className="text-xs font-bold text-white">Add Extra Angles & Shots</p>
+                    <p className="text-[11px] text-gray-400">Append high-res photos to this car's gallery</p>
+                  </div>
+
+                  <button
+                    onClick={() => manageCarFileInputRef.current?.click()}
+                    className="px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Upload More Photos
+                  </button>
+                </div>
+
+                {/* Photos Grid */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Photos in Gallery ({editImages.length})
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      Click "Set Cover" on any shot to make it the primary thumbnail
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {editImages.map((imgUrl, idx) => {
+                      const isCover = (editCoverImageUrl || editImages[0]) === imgUrl;
+                      return (
+                        <div
+                          key={idx}
+                          className={`relative aspect-[4/3] rounded-xl overflow-hidden border bg-black group transition-all ${
+                            isCover ? 'border-[var(--ps-primary,#0A84FF)] ring-2 ring-blue-500/40' : 'border-[#2C2C2E]'
+                          }`}
+                        >
+                          <img
+                            src={formatMediaUrl(imgUrl)}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-1.5 left-1.5 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white flex items-center gap-1">
+                            <span>#{idx + 1}</span>
+                            {isCover && (
+                              <span className="bg-blue-600 text-white px-1 rounded text-[8px] font-bold uppercase">
+                                Cover
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                            <div className="flex justify-between items-center">
+                              {!isCover ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetCoverPhoto(imgUrl)}
+                                  className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shadow-md cursor-pointer"
+                                >
+                                  Set Cover
+                                </button>
+                              ) : (
+                                <span className="text-[10px] font-bold text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded">
+                                  ★ Primary
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhotoFromExistingCar(idx)}
+                                className="p-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-lg transition-transform hover:scale-110 cursor-pointer"
+                                title="Delete photo from gallery"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAutoGenerateForExistingCar(editingCarGallery, imgUrl)}
+                              className="w-full py-1.5 px-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold flex items-center justify-center gap-1 shadow-md transition-colors cursor-pointer"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              Make 2D Cartoon Sticker
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer Actions */}
+            <div className="pt-4 border-t border-[#2C2C2E] flex items-center justify-between">
               <button
+                type="button"
                 onClick={() => setEditingCarGallery(null)}
                 className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
               >
-                Close & Done
+                Cancel / Close
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveCarDetails}
+                disabled={isSavingEdit}
+                className="px-6 py-2.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Saving Updates...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Save All Vehicle & Shot Updates</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

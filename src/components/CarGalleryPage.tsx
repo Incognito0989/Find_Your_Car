@@ -267,9 +267,11 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {/* Left: Car Title, Make, Model & Specs */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-primary,#0A84FF)] text-xs font-mono font-bold tracking-wide border border-[var(--ps-primary,#0A84FF)]/30">
-                  {car.make}
-                </span>
+                {car.make && (
+                  <span className="px-3 py-1 rounded-full bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-primary,#0A84FF)] text-xs font-mono font-bold tracking-wide border border-[var(--ps-primary,#0A84FF)]/30">
+                    {car.make}
+                  </span>
+                )}
                 {car.year && (
                   <span className="px-2.5 py-1 rounded-full bg-white/10 text-gray-300 text-xs font-mono">
                     {car.year}
@@ -280,48 +282,62 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                     🎨 {car.color}
                   </span>
                 )}
-                <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-xs font-mono flex items-center gap-1.5">
-                  <ShieldCheck className="w-3 h-3 text-blue-400" />
-                  <span>
-                    <strong>{car.carName || `${car.make} ${car.model || ''}`}</strong>
+                {car.carName && (
+                  <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-xs font-mono flex items-center gap-1.5">
+                    <ShieldCheck className="w-3 h-3 text-blue-400" />
+                    <span>
+                      <strong>{car.carName}</strong>
+                    </span>
                   </span>
-                </span>
+                )}
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
-                {car.carName}
+                {car.carName || 'Vehicle'}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-gray-400">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
-                  <span>{car.event}</span>
+              {(car.event || car.location || car.date) && (
+                <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-gray-400">
+                  {car.event && (
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
+                      <span>{car.event}</span>
+                    </div>
+                  )}
+                  {car.event && car.location && <span>•</span>}
+                  {car.location && (
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
+                      <span>{car.location}</span>
+                    </div>
+                  )}
+                  {(car.event || car.location) && car.date && <span>•</span>}
+                  {car.date && <span>{car.date}</span>}
                 </div>
-                <span>•</span>
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
-                  <span>{car.location || 'Metropolitan Car Meet'}</span>
-                </div>
-                <span>•</span>
-                <span>{car.date}</span>
-              </div>
+              )}
             </div>
 
             {/* Right: Photographer Details & Tipping */}
             <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-4 shrink-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-[#2C2C2E]">
               {/* Primary Photographer / Set Authors */}
               <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2.5 rounded-2xl">
-                <img
-                  src={car.photographer.avatar}
-                  alt={car.photographer.name}
-                  className="w-10 h-10 rounded-full object-cover border border-white/20 shadow-md"
-                />
+                {car.photographer?.avatar ? (
+                  <img
+                    src={car.photographer.avatar}
+                    alt={car.photographer.name}
+                    className="w-10 h-10 rounded-full object-cover border border-white/20 shadow-md"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                    {(car.photographer?.name || 'P').charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase font-mono tracking-wider">
                     {allSetAuthors.length > 1 ? `Lead Shooter (${allSetAuthors.length} in set)` : 'Photographer'}
                   </p>
-                  <p className="text-sm font-bold text-white">{car.photographer.name}</p>
-                  {car.photographer.instagram && (
+                  <p className="text-sm font-bold text-white">{car.photographer?.name || 'Photographer'}</p>
+                  {car.photographer?.instagram && (
                     <p className="text-[11px] text-[var(--ps-primary,#0A84FF)] font-mono">
                       {car.photographer.instagram}
                     </p>
@@ -426,27 +442,39 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             )}
 
             {/* Author Attribution Tag in Top Right */}
-            <div className="absolute top-4 right-4 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-lg">
-              <img
-                src={activeAuthor.avatar}
-                alt={activeAuthor.name}
-                className="w-5 h-5 rounded-full object-cover border border-white/20"
-              />
-              <div className="text-[11px]">
-                <span className="text-gray-400 block text-[9px] leading-tight">Shot by</span>
-                <span className="text-white font-bold">{activeAuthor.name}</span>
+            {activeAuthor && (
+              <div className="absolute top-4 right-4 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-lg">
+                {activeAuthor.avatar ? (
+                  <img
+                    src={activeAuthor.avatar}
+                    alt={activeAuthor.name}
+                    className="w-5 h-5 rounded-full object-cover border border-white/20"
+                  />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-[10px] text-white font-bold">
+                    {(activeAuthor.name || 'P').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="text-[11px]">
+                  <span className="text-gray-400 block text-[9px] leading-tight">Shot by</span>
+                  <span className="text-white font-bold">{activeAuthor.name}</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Bottom Metadata Bar */}
             <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pointer-events-none">
               <div className="space-y-0.5">
-                <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)] font-bold">
-                  {car.resolution || 'Ultra High Definition • 300 DPI'}
-                </p>
-                <p className="text-[11px] text-gray-300 font-mono">
-                  {car.cameraInfo || 'Professional Automotive Camera Rig'}
-                </p>
+                {car.resolution && (
+                  <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)] font-bold">
+                    {car.resolution}
+                  </p>
+                )}
+                {car.cameraInfo && (
+                  <p className="text-[11px] text-gray-300 font-mono">
+                    {car.cameraInfo}
+                  </p>
+                )}
               </div>
 
               <div className="text-xs text-gray-400 font-mono bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 w-fit">

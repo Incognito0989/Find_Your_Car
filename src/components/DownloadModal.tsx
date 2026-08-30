@@ -149,29 +149,39 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             <div className="space-y-5">
               {/* Header & Car Title */}
               <div>
-                <div className="flex items-center justify-between text-xs text-[var(--ps-text-muted,#9ca3af)] mb-1">
-                  <span>{car.year} • {car.make}</span>
-                  <span className="font-mono">{car.model}</span>
-                </div>
+                {([car.year, car.make].filter(Boolean).length > 0 || car.model) && (
+                  <div className="flex items-center justify-between text-xs text-[var(--ps-text-muted,#9ca3af)] mb-1">
+                    <span>{[car.year, car.make].filter(Boolean).join(' • ')}</span>
+                    {car.model && <span className="font-mono">{car.model}</span>}
+                  </div>
+                )}
                 <h2 className="text-2xl font-black text-[var(--ps-text-main,#ffffff)] tracking-tight">
-                  {car.carName}
+                  {car.carName || 'Vehicle'}
                 </h2>
-                <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-1">
-                  {car.event} • {car.location}
-                </p>
+                {[car.event, car.location].filter(Boolean).length > 0 && (
+                  <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-1">
+                    {[car.event, car.location].filter(Boolean).join(' • ')}
+                  </p>
+                )}
               </div>
 
               {/* Photographer Card & Direct Tip Menu Trigger */}
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <img
-                    src={car.photographer.avatar}
-                    alt={car.photographer.name}
-                    className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
-                  />
+                  {car.photographer?.avatar ? (
+                    <img
+                      src={car.photographer.avatar}
+                      alt={car.photographer.name}
+                      className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                      {(car.photographer?.name || 'P').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{car.photographer.name}</p>
-                    <p className="text-[10px] text-gray-400 truncate">{car.photographer.title}</p>
+                    <p className="text-xs font-bold text-white truncate">{car.photographer?.name || 'Photographer'}</p>
+                    {car.photographer?.title && <p className="text-[10px] text-gray-400 truncate">{car.photographer.title}</p>}
                   </div>
                 </div>
 
