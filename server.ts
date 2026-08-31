@@ -146,11 +146,14 @@ function deleteOldLocalPhotoFile(oldUrl?: string | null) {
   }
 }
 
-// Save base64 image data directly as files to disk with automatic compression (< 2MB)
+// Save base64 image data directly as files to disk
+// If compress=false: preserves 100% original file size, bytes, and resolution (all gallery photos)
+// If compress=true: creates a compressed copy (< 2MB) specifically for the designated cover photo
 async function saveBase64ImageToDisk(
   dataUrl: string,
-  prefix = "car",
-  plateNumber?: string
+  prefix = "photo",
+  plateNumber?: string,
+  compress = false
 ): Promise<string> {
   if (!dataUrl || !dataUrl.startsWith("data:image/")) {
     return dataUrl;
@@ -171,48 +174,46 @@ async function saveBase64ImageToDisk(
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    const TWO_MB = 2 * 1024 * 1024; // 2MB target limit
+    const TWO_MB = 2 * 1024 * 1024; // 2MB target limit for cover photo
     let finalBuffer = rawBuffer;
     let finalExt = rawExt;
 
-    // Apply smart sharp compression if not vector and if buffer > 2MB or if it is a cover photo
-    if (rawExt !== "svg") {
+    // ONLY compress/scale down if designated as cover photo (compress === true)
+    if (compress && rawExt !== "svg") {
       try {
-        if (prefix.includes("cover") || rawBuffer.length > TWO_MB) {
-          const imageInstance = sharp(rawBuffer);
-          const metadata = await imageInstance.metadata();
+        const imageInstance = sharp(rawBuffer);
+        const metadata = await imageInstance.metadata();
 
-          let width = metadata.width || 2560;
-          let height = metadata.height || 1440;
+        let width = metadata.width || 2560;
+        let height = metadata.height || 1440;
 
-          // Resize down to max 2560px (4K/2K high clarity)
-          if (width > 2560 || height > 2560) {
-            imageInstance.resize({
-              width: width > height ? 2560 : undefined,
-              height: height >= width ? 2560 : undefined,
-              fit: "inside",
-              withoutEnlargement: true,
-            });
+        // Resize cover photo down to max 2560px for fast header/thumbnail loading
+        if (width > 2560 || height > 2560) {
+          imageInstance.resize({
+            width: width > height ? 2560 : undefined,
+            height: height >= width ? 2560 : undefined,
+            fit: "inside",
+            withoutEnlargement: true,
+          });
+        }
+
+        if (rawExt === "png" && metadata.hasAlpha) {
+          finalBuffer = await imageInstance.png({ quality: 85, compressionLevel: 8 }).toBuffer();
+        } else {
+          // Compress to high quality JPEG guaranteed under 2MB
+          let quality = 88;
+          finalBuffer = await imageInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
+          while (finalBuffer.length > TWO_MB && quality > 40) {
+            quality -= 10;
+            finalBuffer = await sharp(rawBuffer)
+              .resize({ width: Math.min(width, 2048), fit: "inside", withoutEnlargement: true })
+              .jpeg({ quality, mozjpeg: true })
+              .toBuffer();
           }
-
-          if (rawExt === "png" && metadata.hasAlpha) {
-            finalBuffer = await imageInstance.png({ quality: 85, compressionLevel: 8 }).toBuffer();
-          } else {
-            // Compress to high quality JPEG/WebP guaranteed under 2MB
-            let quality = 88;
-            finalBuffer = await imageInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
-            while (finalBuffer.length > TWO_MB && quality > 40) {
-              quality -= 10;
-              finalBuffer = await sharp(rawBuffer)
-                .resize({ width: Math.min(width, 2048), fit: "inside", withoutEnlargement: true })
-                .jpeg({ quality, mozjpeg: true })
-                .toBuffer();
-            }
-            finalExt = "jpg";
-          }
+          finalExt = "jpg";
         }
       } catch (compErr: any) {
-        console.warn(`[Compression Warning] Falling back to direct buffer save: ${compErr.message}`);
+        console.warn(`[Compression Warning] Falling back to direct buffer save for cover: ${compErr.message}`);
         finalBuffer = rawBuffer;
       }
     }
@@ -222,7 +223,7 @@ async function saveBase64ImageToDisk(
 
     fs.writeFileSync(filePath, finalBuffer);
     console.log(
-      `[Storage] Saved image file to plate folder [${plateFolder}]: ${filename} (${(
+      `[Storage] Saved ${compress ? "compressed cover" : "original photo"} [${plateFolder}]: ${filename} (${(
         finalBuffer.length /
         1024 /
         1024
@@ -233,6 +234,79 @@ async function saveBase64ImageToDisk(
     console.error("Failed to save image to disk:", err);
     return dataUrl;
   }
+}
+
+// Generate a compressed cover photo copy (< 2MB) from an existing file path or image source
+async function createCompressedCoverFromExisting(
+  source: string,
+  plateNumber?: string
+): Promise<string> {
+  if (!source) return source;
+
+  // If already a base64 string
+  if (source.startsWith("data:image/")) {
+    return saveBase64ImageToDisk(source, "cover", plateNumber, true);
+  }
+
+  // If it is an existing local file /uploads/...
+  if (source.startsWith("/uploads/") || source.startsWith("uploads/")) {
+    try {
+      const cleanRelativePath = source.replace(/^\/?uploads\//, "");
+      const fullPath = path.join(UPLOADS_DIR, path.normalize(cleanRelativePath).replace(/^(\.\.[\/\\])+/, ""));
+
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        const rawBuffer = fs.readFileSync(fullPath);
+        const TWO_MB = 2 * 1024 * 1024;
+        const plateFolder = getPlateFolderSlug(plateNumber);
+        const targetDir = path.join(UPLOADS_DIR, plateFolder);
+
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const imageInstance = sharp(rawBuffer);
+        const metadata = await imageInstance.metadata();
+        let width = metadata.width || 2560;
+        let height = metadata.height || 1440;
+
+        if (width > 2560 || height > 2560) {
+          imageInstance.resize({
+            width: width > height ? 2560 : undefined,
+            height: height >= width ? 2560 : undefined,
+            fit: "inside",
+            withoutEnlargement: true,
+          });
+        }
+
+        let quality = 88;
+        let finalBuffer = await imageInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
+        while (finalBuffer.length > TWO_MB && quality > 40) {
+          quality -= 10;
+          finalBuffer = await sharp(rawBuffer)
+            .resize({ width: Math.min(width, 2048), fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality, mozjpeg: true })
+            .toBuffer();
+        }
+
+        const filename = `cover_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;
+        const filePath = path.join(targetDir, filename);
+        fs.writeFileSync(filePath, finalBuffer);
+
+        console.log(
+          `[Storage] Generated compressed cover copy from original [${plateFolder}]: ${filename} (${(
+            finalBuffer.length /
+            1024 /
+            1024
+          ).toFixed(2)} MB)`
+        );
+        return `/uploads/${plateFolder}/${filename}`;
+      }
+    } catch (err: any) {
+      console.warn(`[Storage] Could not create compressed cover copy from existing file:`, err.message);
+    }
+  }
+
+  return source;
 }
 
 // Save avatar images to /uploads/avatars/
@@ -1292,12 +1366,12 @@ app.get("/api/cars", async (req: Request, res: Response) => {
       results.map(async (c) => {
         let cleanImageUrl = c.imageUrl;
         if (cleanImageUrl && cleanImageUrl.startsWith("data:image/")) {
-          cleanImageUrl = await saveBase64ImageToDisk(cleanImageUrl, "cover", c.plateNumber);
+          cleanImageUrl = await saveBase64ImageToDisk(cleanImageUrl, "cover", c.plateNumber, true);
         }
 
         let cleanCartoonUrl = c.cartoonImageUrl;
         if (cleanCartoonUrl && cleanCartoonUrl.startsWith("data:image/")) {
-          cleanCartoonUrl = await saveBase64ImageToDisk(cleanCartoonUrl, "cartoon", c.plateNumber);
+          cleanCartoonUrl = await saveBase64ImageToDisk(cleanCartoonUrl, "cartoon", c.plateNumber, false);
         }
 
         if (full) {
@@ -1391,23 +1465,31 @@ app.post("/api/cars", authenticateSession, async (req: Request, res: Response) =
     const cleanState = (state || "").toUpperCase().trim();
     const folderIdentifier = cleanPlate || `car_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    // Process all images into the vehicle's folder
+    // 1. Process and save all gallery photos at 100% original size (compress = false)
     const savedImages: string[] = await Promise.all(
       rawImagesList.map(async (img: string, idx: number) => {
         if (img && img.startsWith("data:image/")) {
-          return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, folderIdentifier);
+          return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, folderIdentifier, false);
         }
         return img;
       })
     );
 
-    const primaryImageUrl = imageUrl && imageUrl.startsWith("data:image/")
-      ? await saveBase64ImageToDisk(imageUrl, "cover", folderIdentifier)
-      : (imageUrl || savedImages[0]);
+    // 2. Create the designated compressed cover photo (< 2MB)
+    let primaryImageUrl = "";
+    if (imageUrl && imageUrl.startsWith("data:image/")) {
+      primaryImageUrl = await saveBase64ImageToDisk(imageUrl, "cover", folderIdentifier, true);
+    } else if (rawImagesList[0] && rawImagesList[0].startsWith("data:image/")) {
+      primaryImageUrl = await saveBase64ImageToDisk(rawImagesList[0], "cover", folderIdentifier, true);
+    } else if (savedImages[0]) {
+      primaryImageUrl = await createCompressedCoverFromExisting(savedImages[0], folderIdentifier);
+    } else {
+      primaryImageUrl = imageUrl || "";
+    }
 
     const savedCartoonUrl = cartoonImageUrl
       ? (cartoonImageUrl.startsWith("data:image/")
-          ? await saveBase64ImageToDisk(cartoonImageUrl, "cartoon", folderIdentifier)
+          ? await saveBase64ImageToDisk(cartoonImageUrl, "cartoon", folderIdentifier, false)
           : cartoonImageUrl)
       : null;
 
@@ -1497,7 +1579,7 @@ app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response
       savedImages = await Promise.all(
         images.map(async (img: string, idx: number) => {
           if (img && img.startsWith("data:image/")) {
-            return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder);
+            return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder, false);
           }
           return img;
         })
@@ -1508,24 +1590,25 @@ app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response
     let previousCoverUrl: string | undefined = undefined;
     if (imageUrl && imageUrl.startsWith("data:image/")) {
       previousCoverUrl = existingCar?.imageUrl;
-      imageUrl = await saveBase64ImageToDisk(imageUrl, `cover`, targetFolder);
+      imageUrl = await saveBase64ImageToDisk(imageUrl, `cover`, targetFolder, true);
 
       // If previous cover photo was a local file and is replaced, delete old file to save space
       if (previousCoverUrl && previousCoverUrl !== imageUrl) {
         deleteOldLocalPhotoFile(previousCoverUrl);
       }
     } else if (imageUrl && existingCar?.imageUrl && existingCar.imageUrl !== imageUrl) {
-      // Replaced with another URL
+      // Replaced with another URL or photo
       deleteOldLocalPhotoFile(existingCar.imageUrl);
+      imageUrl = await createCompressedCoverFromExisting(imageUrl, targetFolder);
     } else if (!imageUrl && savedImages.length > 0) {
-      imageUrl = savedImages[0];
+      imageUrl = await createCompressedCoverFromExisting(savedImages[0], targetFolder);
     }
 
     if (cartoonImageUrl && cartoonImageUrl.startsWith("data:image/")) {
       if (existingCar?.cartoonImageUrl) {
         deleteOldLocalPhotoFile(existingCar.cartoonImageUrl);
       }
-      cartoonImageUrl = await saveBase64ImageToDisk(cartoonImageUrl, `cartoon`, targetFolder);
+      cartoonImageUrl = await saveBase64ImageToDisk(cartoonImageUrl, `cartoon`, targetFolder, false);
     }
 
     const updates: any = {
@@ -1618,13 +1701,13 @@ async function migrateBase64CarsToFiles() {
 
       let newImageUrl = car.imageUrl;
       if (newImageUrl && newImageUrl.startsWith("data:image/")) {
-        newImageUrl = await saveBase64ImageToDisk(newImageUrl, "cover", targetFolder);
+        newImageUrl = await saveBase64ImageToDisk(newImageUrl, "cover", targetFolder, true);
         changed = true;
       }
 
       let newCartoonUrl = car.cartoonImageUrl;
       if (newCartoonUrl && newCartoonUrl.startsWith("data:image/")) {
-        newCartoonUrl = await saveBase64ImageToDisk(newCartoonUrl, "cartoon", targetFolder);
+        newCartoonUrl = await saveBase64ImageToDisk(newCartoonUrl, "cartoon", targetFolder, false);
         changed = true;
       }
 
@@ -1633,7 +1716,7 @@ async function migrateBase64CarsToFiles() {
         newImages = await Promise.all(
           newImages.map(async (img, idx) => {
             if (img && img.startsWith("data:image/")) {
-              return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder);
+              return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder, false);
             }
             return img;
           })
