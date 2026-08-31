@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -12,6 +12,7 @@ import {
   X,
   Lock,
   ChevronRight,
+  ChevronDown,
   Users,
   Heart,
   MapPin,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { CarPhoto, AppThemeConfig, Photographer } from '../types';
 import { PhotoCard } from './PhotoCard';
+import { PhotoCardSkeleton, PhotoCardSkeletonGrid } from './PhotoCardSkeleton';
 import { DownloadModal } from './DownloadModal';
 import { CarGalleryPage } from './CarGalleryPage';
 import { TipModal } from './TipModal';
@@ -27,6 +29,7 @@ import { US_STATES, getStateName, parsePlateAndStateQuery } from '../utils/state
 
 interface VisitorPortalProps {
   cars: CarPhoto[];
+  isLoading?: boolean;
   onOpenAdmin: () => void;
   onOpenServerConfig?: () => void;
   currentTheme: AppThemeConfig;
@@ -35,6 +38,7 @@ interface VisitorPortalProps {
 
 export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   cars,
+  isLoading = false,
   onOpenAdmin,
   currentTheme,
 }) => {
@@ -44,6 +48,11 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   const [selectedAuthor, setSelectedAuthor] = useState<string>('All');
   const [artFilter, setArtFilter] = useState<'all' | 'photos' | 'cartoons'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Infinite Scroll / Row Pagination State
+  const [visibleCount, setVisibleCount] = useState<number>(8);
+  const [isLoadingMoreRows, setIsLoadingMoreRows] = useState<boolean>(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Active Car Detail / Full Gallery View State
   const [selectedCarForGallery, setSelectedCarForGallery] = useState<CarPhoto | null>(null);
@@ -219,6 +228,40 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
     return result;
   }, [cars, searchQuery, parsedSearch, effectiveState, selectedMake, selectedAuthor, artFilter]);
+
+  // Reset pagination on filter or search changes
+  useEffect(() => {
+    setVisibleCount(8);
+  }, [searchQuery, selectedStateFilter, selectedMake, selectedAuthor, artFilter]);
+
+  // Infinite Scroll Intersection Observer to load more rows on scroll
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && visibleCount < filteredCars.length && !isLoadingMoreRows) {
+          setIsLoadingMoreRows(true);
+          setTimeout(() => {
+            setVisibleCount((prev) => Math.min(prev + 4, filteredCars.length));
+            setIsLoadingMoreRows(false);
+          }, 350);
+        }
+      },
+      { threshold: 0.1, rootMargin: '250px' }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [visibleCount, filteredCars.length, isLoadingMoreRows]);
+
+  const handleLoadMore = () => {
+    setIsLoadingMoreRows(true);
+    setTimeout(() => {
+      setVisibleCount((prev) => Math.min(prev + 4, filteredCars.length));
+      setIsLoadingMoreRows(false);
+    }, 250);
+  };
 
   const handleOpenDownload = (car: CarPhoto, defaultToCartoon: boolean = false) => {
     setSelectedCarForDownload(car);
@@ -626,24 +669,59 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             )}
           </div>
 
-          {filteredCars.length > 0 ? (
-            <div
-              className={
-                viewMode === 'grid'
-                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-                  : 'flex flex-col gap-4'
-              }
-            >
-              {filteredCars.map((car) => (
-                <PhotoCard
-                  key={car.id}
-                  car={car}
-                  onOpenDownloadModal={handleOpenDownload}
-                  onSelectCar={(car) => setSelectedCarForGallery(car)}
-                  onSelectAuthor={(authorName) => setSelectedAuthor(authorName)}
-                  viewMode={viewMode}
-                />
-              ))}
+          {/* Gallery Content Area */}
+          {isLoading && cars.length === 0 ? (
+            <PhotoCardSkeletonGrid count={8} viewMode={viewMode} />
+          ) : filteredCars.length > 0 ? (
+            <div className="space-y-6">
+              <div
+                className={
+                  viewMode === 'grid'
+                    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+                    : 'flex flex-col gap-4'
+                }
+              >
+                {filteredCars.slice(0, visibleCount).map((car, index) => (
+                  <PhotoCard
+                    key={car.id}
+                    car={car}
+                    priority={index < (viewMode === 'grid' ? 4 : 2)}
+                    onOpenDownloadModal={handleOpenDownload}
+                    onSelectCar={(car) => setSelectedCarForGallery(car)}
+                    onSelectAuthor={(authorName) => setSelectedAuthor(authorName)}
+                    viewMode={viewMode}
+                  />
+                ))}
+              </div>
+
+              {/* Shimmer row skeleton when loading additional rows */}
+              {isLoadingMoreRows && (
+                <div className="pt-2 animate-fadeIn">
+                  <PhotoCardSkeletonGrid
+                    count={viewMode === 'grid' ? 4 : 2}
+                    viewMode={viewMode}
+                  />
+                </div>
+              )}
+
+              {/* Infinite scroll sentinel observer & fallback load more */}
+              {visibleCount < filteredCars.length && (
+                <div className="flex flex-col items-center justify-center pt-8 pb-4 space-y-3">
+                  <div ref={sentinelRef} className="h-6 w-full pointer-events-none" />
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMoreRows}
+                    className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 shadow-md hover:border-[var(--ps-primary,#0A84FF)]/40 cursor-pointer disabled:opacity-50"
+                  >
+                    <ChevronDown className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] animate-bounce" />
+                    <span>
+                      {isLoadingMoreRows
+                        ? 'Loading next row...'
+                        : `Load More Vehicles (${filteredCars.length - visibleCount} more)`}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-16 text-center bg-[#141416]/60 border border-[#2C2C2E] rounded-3xl space-y-4 max-w-xl mx-auto">

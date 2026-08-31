@@ -10,7 +10,20 @@ import { getApiBaseUrl } from './utils/apiConfig';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'visitor' | 'admin'>('visitor');
-  const [cars, setCars] = useState<CarPhoto[]>(INITIAL_CAR_PHOTOS);
+  const [cars, setCars] = useState<CarPhoto[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('platesnap_cars_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [currentTheme, setCurrentTheme] = useState<AppThemeConfig>(DEFAULT_THEMES[0]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -28,15 +41,18 @@ export function App() {
     return fetch(url, options);
   }, []);
 
-  // Fetch cars and theme from backend API
+  // Fetch cars and theme from backend API with client caching
   const refreshAppData = useCallback(async () => {
     try {
       setIsLoading(true);
       const carsRes = await apiFetch('/api/cars');
       if (carsRes.ok) {
         const carsData = await carsRes.json();
-        if (carsData && Array.isArray(carsData.cars) && carsData.cars.length > 0) {
+        if (carsData && Array.isArray(carsData.cars)) {
           setCars(carsData.cars);
+          try {
+            localStorage.setItem('platesnap_cars_cache', JSON.stringify(carsData.cars));
+          } catch (e) {}
         }
       }
 
@@ -226,6 +242,7 @@ export function App() {
       {currentView === 'visitor' ? (
         <VisitorPortal
           cars={cars}
+          isLoading={isLoading}
           onOpenAdmin={handleOpenAdmin}
           onOpenServerConfig={() => setIsServerModalOpen(true)}
           currentTheme={currentTheme}

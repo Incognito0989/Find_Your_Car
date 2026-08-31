@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
+import sharp from "sharp";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import {
@@ -34,6 +35,37 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const AVATARS_DIR = path.join(UPLOADS_DIR, "avatars");
+const THUMBNAILS_DIR = path.join(UPLOADS_DIR, "thumbnails");
+
+// Ensure upload & thumbnail directories exist
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+if (!fs.existsSync(AVATARS_DIR)) {
+  fs.mkdirSync(AVATARS_DIR, { recursive: true });
+}
+if (!fs.existsSync(THUMBNAILS_DIR)) {
+  fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
+}
+
+// In-Memory Thumbnail Buffer Cache & Cars Query Cache
+interface CachedThumbnail {
+  buffer: Buffer;
+  contentType: string;
+  etag: string;
+}
+const thumbnailMemoryCache = new Map<string, CachedThumbnail>();
+
+interface CachedCarsResponse {
+  data: any;
+  timestamp: number;
+  etag: string;
+}
+const carsQueryCache = new Map<string, CachedCarsResponse>();
+
+function invalidateCarsCache() {
+  carsQueryCache.clear();
+}
 
 // Enable CORS so the Vercel-hosted frontend can connect directly to this backend
 app.use(
@@ -1028,10 +1060,130 @@ Style Requirements:
 });
 
 // ==========================================
+// HIGH-SPEED THUMBNAIL RESIZING & CACHING ENGINE
+// ==========================================
+app.get("/api/thumbnail", async (req: Request, res: Response) => {
+  try {
+    const src = (req.query.src as string) || (req.query.url as string);
+    if (!src) {
+      return res.status(400).json({ error: "Source image URL or path required" });
+    }
+
+    const width = Math.min(Math.max(parseInt(req.query.w as string, 10) || 640, 50), 1920);
+    const quality = Math.min(Math.max(parseInt(req.query.q as string, 10) || 80, 20), 100);
+    const format = ((req.query.format as string) || "webp").toLowerCase();
+
+    // Cache key based on source, width, quality, format
+    const cacheKey = `${src}_w${width}_q${quality}_${format}`;
+
+    // 1. Check in-memory buffer cache (sub-millisecond return)
+    const memCached = thumbnailMemoryCache.get(cacheKey);
+    if (memCached) {
+      const ifNoneMatch = req.headers["if-none-match"];
+      if (ifNoneMatch && ifNoneMatch === memCached.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader("Content-Type", memCached.contentType);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.setHeader("ETag", memCached.etag);
+      return res.send(memCached.buffer);
+    }
+
+    // 2. Resolve input buffer
+    let inputBuffer: Buffer | null = null;
+    let inputFilePath: string | null = null;
+
+    if (src.startsWith("/uploads/")) {
+      // Local uploaded file
+      const relative = src.replace(/^\/uploads\//, "");
+      const fullPath = path.join(UPLOADS_DIR, relative);
+      if (fs.existsSync(fullPath)) {
+        inputFilePath = fullPath;
+      }
+    } else if (src.startsWith("data:image/")) {
+      // Base64 data URL
+      const match = src.match(/^data:image\/[a-zA-Z0-9+]+;base64,(.+)$/);
+      if (match) {
+        inputBuffer = Buffer.from(match[1], "base64");
+      }
+    } else if (src.startsWith("http://") || src.startsWith("https://")) {
+      // Remote image - fetch
+      try {
+        const fetchRes = await fetch(src, { headers: { "User-Agent": "PlateSnap-Thumbnailer/1.0" } });
+        if (fetchRes.ok) {
+          const arrayBuf = await fetchRes.arrayBuffer();
+          inputBuffer = Buffer.from(arrayBuf);
+        }
+      } catch (err) {
+        console.warn("[Thumbnail] Remote fetch error:", err);
+      }
+    }
+
+    if (!inputFilePath && !inputBuffer) {
+      if (src.startsWith("http://") || src.startsWith("https://")) {
+        return res.redirect(src);
+      }
+      return res.status(404).json({ error: "Source image not found" });
+    }
+
+    // 3. Process with sharp
+    let sharpInstance = inputFilePath ? sharp(inputFilePath) : sharp(inputBuffer!);
+
+    // Resize maintaining aspect ratio
+    sharpInstance = sharpInstance.resize({
+      width,
+      withoutEnlargement: true,
+      fit: "inside",
+    });
+
+    let outputBuffer: Buffer;
+    let contentType = "image/webp";
+
+    if (format === "jpeg" || format === "jpg") {
+      outputBuffer = await sharpInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
+      contentType = "image/jpeg";
+    } else if (format === "png") {
+      outputBuffer = await sharpInstance.png({ compressionLevel: 8 }).toBuffer();
+      contentType = "image/png";
+    } else {
+      outputBuffer = await sharpInstance.webp({ quality, effort: 4 }).toBuffer();
+      contentType = "image/webp";
+    }
+
+    const etag = `W/"thumb_${Buffer.from(cacheKey).toString("base64").substring(0, 20)}_${outputBuffer.length}"`;
+
+    if (thumbnailMemoryCache.size > 150) {
+      const firstKey = thumbnailMemoryCache.keys().next().value;
+      if (firstKey) thumbnailMemoryCache.delete(firstKey);
+    }
+    thumbnailMemoryCache.set(cacheKey, {
+      buffer: outputBuffer,
+      contentType,
+      etag,
+    });
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("ETag", etag);
+    return res.send(outputBuffer);
+  } catch (err: any) {
+    console.error("[Thumbnail Generation Error]:", err);
+    const src = (req.query.src as string) || (req.query.url as string);
+    if (src && src.startsWith("/uploads/")) {
+      const fullPath = path.join(UPLOADS_DIR, src.replace(/^\/uploads\//, ""));
+      if (fs.existsSync(fullPath)) {
+        return res.sendFile(fullPath);
+      }
+    }
+    res.status(500).json({ error: "Failed to generate thumbnail: " + err.message });
+  }
+});
+
+// ==========================================
 // POSTGRESQL & SEARCH CARS ENDPOINTS
 // ==========================================
 
-// GET all cars / Search with dynamic SQL queries & indexes
+// GET all cars / Search with dynamic SQL queries & in-memory caching
 app.get("/api/cars", async (req: Request, res: Response) => {
   try {
     const q = (req.query.q as string) || "";
@@ -1039,8 +1191,36 @@ app.get("/api/cars", async (req: Request, res: Response) => {
     const tag = (req.query.tag as string) || "";
     const author = (req.query.author as string) || "";
 
+    const cacheKey = `cars_${q}_${event}_${tag}_${author}`;
+    const cached = carsQueryCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < 30000) {
+      const ifNoneMatch = req.headers["if-none-match"];
+      if (ifNoneMatch && ifNoneMatch === cached.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=60");
+      res.setHeader("ETag", cached.etag);
+      return res.json(cached.data);
+    }
+
     const results = await searchCarsInPostgres(q, event, tag, author);
-    res.json({ cars: results, total: results.length });
+    const responseData = { cars: results, total: results.length };
+    const etag = `W/"cars_${results.length}_${now}"`;
+
+    if (carsQueryCache.size > 50) {
+      carsQueryCache.clear();
+    }
+    carsQueryCache.set(cacheKey, {
+      data: responseData,
+      timestamp: now,
+      etag,
+    });
+
+    res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=60");
+    res.setHeader("ETag", etag);
+    res.json(responseData);
   } catch (err: any) {
     console.error("Search error:", err);
     res.status(500).json({ error: "Search query failed on database engine." });
@@ -1160,6 +1340,7 @@ app.post("/api/cars", authenticateSession, async (req: Request, res: Response) =
     };
 
     const inserted = await insertCarIntoDb(newCar);
+    invalidateCarsCache();
     res.status(201).json({ success: true, car: inserted });
   } catch (err: any) {
     console.error("Error creating car:", err);
@@ -1241,6 +1422,7 @@ app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response
       return res.status(404).json({ error: "Car record not found." });
     }
 
+    invalidateCarsCache();
     res.json({ success: true, car: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1263,6 +1445,7 @@ app.delete("/api/cars/:id", requireAdmin, async (req: Request, res: Response) =>
   try {
     const { id } = req.params;
     await deleteCarFromDb(id);
+    invalidateCarsCache();
     res.json({ success: true, message: "Car record deleted successfully." });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

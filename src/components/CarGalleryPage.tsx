@@ -26,7 +26,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { CarPhoto, AppThemeConfig, Photographer } from '../types';
-import { formatMediaUrl } from '../utils/apiConfig';
+import { formatMediaUrl, getThumbnailUrl } from '../utils/apiConfig';
 import { DownloadModal } from './DownloadModal';
 import { TipModal } from './TipModal';
 
@@ -497,9 +497,10 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                   }`}
                 >
                   <img
-                    src={formatMediaUrl(imgUrl)}
+                    src={getThumbnailUrl(imgUrl, 320, 75)}
                     alt={`Thumbnail ${idx + 1}`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                   <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white">
                     #{idx + 1}
@@ -562,9 +563,11 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                     className="relative aspect-[4/3] bg-black overflow-hidden cursor-pointer"
                   >
                     <img
-                      src={formattedUrl}
+                      src={getThumbnailUrl(imgUrl, 640, 80)}
                       alt={`${car.carName} - Shot ${idx + 1}`}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
                     />
 
                     {/* Badge */}
