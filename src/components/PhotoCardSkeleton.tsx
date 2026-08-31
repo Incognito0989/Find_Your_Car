@@ -92,6 +92,52 @@ export const PhotoCardSkeleton: React.FC<PhotoCardSkeletonProps> = ({
 };
 
 
+export const GalleryThumbnailSkeleton: React.FC = () => {
+  return (
+    <div className="relative w-24 sm:w-32 aspect-[4/3] rounded-2xl overflow-hidden border border-[#2C2C2E] bg-white/5 shrink-0 flex items-center justify-center">
+      <div className="skeleton-rainbow-shimmer" />
+      <div className="absolute bottom-1.5 right-1.5 w-6 h-3 rounded skeleton-rainbow-badge border border-white/10" />
+    </div>
+  );
+};
+
+export const GalleryPhotoSkeletonCard: React.FC<{ index?: number }> = ({ index = 1 }) => {
+  return (
+    <div className="group relative bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-2xl overflow-hidden shadow-md flex flex-col">
+      {/* 4:3 Image Rainbow Shimmer Container */}
+      <div className="relative aspect-[4/3] bg-white/5 overflow-hidden flex items-center justify-center border-b border-white/5">
+        <div className="skeleton-rainbow-shimmer" />
+        {/* Photo Index Badge */}
+        <div className="absolute top-3 left-3 w-16 h-5 rounded-full skeleton-rainbow-badge border border-white/10 shadow-sm" />
+        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10" />
+      </div>
+
+      {/* Card Info Footer */}
+      <div className="p-3.5 bg-black/40 border-t border-white/5 flex items-center justify-between relative overflow-hidden">
+        <div className="skeleton-rainbow-shimmer opacity-30" />
+        <div className="flex items-center gap-2 relative z-10">
+          <div className="w-5 h-5 rounded-full skeleton-rainbow-badge" />
+          <div className="h-3.5 w-24 rounded-md bg-white/15" />
+        </div>
+        <div className="flex items-center gap-1.5 relative z-10">
+          <div className="w-7 h-7 rounded-lg bg-white/10" />
+          <div className="w-7 h-7 rounded-lg bg-white/10" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const GalleryPhotoSkeletonGrid: React.FC<{ count?: number }> = ({ count = 6 }) => {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: count }).map((_, idx) => (
+        <GalleryPhotoSkeletonCard key={`gallery-skeleton-${idx}`} index={idx + 1} />
+      ))}
+    </div>
+  );
+};
+
 export const PhotoCardSkeletonGrid: React.FC<{
   count?: number;
   viewMode?: 'grid' | 'list';

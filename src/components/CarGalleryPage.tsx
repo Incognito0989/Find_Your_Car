@@ -30,6 +30,7 @@ import { CarPhoto, AppThemeConfig, Photographer } from '../types';
 import { formatMediaUrl, getThumbnailUrl, getApiBaseUrl } from '../utils/apiConfig';
 import { DownloadModal } from './DownloadModal';
 import { TipModal } from './TipModal';
+import { GalleryPhotoSkeletonGrid, GalleryThumbnailSkeleton } from './PhotoCardSkeleton';
 
 interface CarGalleryPageProps {
   car: CarPhoto;
@@ -100,6 +101,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
     }
     return [car.imageUrl];
   }, [car.images, car.imageUrl]);
+
+  const expectedPhotoCount = React.useMemo(() => {
+    return Math.max(
+      car.photoCount || 0,
+      initialCar.photoCount || 0,
+      Array.isArray(car.images) && car.images.length > 0 ? car.images.length : 0,
+      Array.isArray(initialCar.images) && initialCar.images.length > 0 ? initialCar.images.length : 0,
+      1
+    );
+  }, [car.photoCount, initialCar.photoCount, car.images, initialCar.images]);
 
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState<boolean>(false);
@@ -533,30 +544,40 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           </div>
 
           {/* Thumbnail Carousel Strip */}
-          {allImages.length > 1 && (
-            <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
-              {allImages.map((imgUrl, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveIndex(idx)}
-                  className={`relative w-24 sm:w-32 aspect-[4/3] rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
-                    activeIndex === idx
-                      ? 'border-[var(--ps-primary,#0A84FF)] scale-105 shadow-lg shadow-[var(--ps-primary,#0A84FF)]/20 ring-2 ring-[var(--ps-primary,#0A84FF)]/40'
-                      : 'border-[#2C2C2E] opacity-60 hover:opacity-100 hover:border-white/40'
-                  }`}
-                >
-                  <img
-                    src={getThumbnailUrl(imgUrl, 320, 75)}
-                    alt={`Thumbnail ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white">
-                    #{idx + 1}
-                  </div>
-                </button>
-              ))}
-            </div>
+          {isLoadingDetails ? (
+            expectedPhotoCount > 1 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+                {Array.from({ length: expectedPhotoCount }).map((_, idx) => (
+                  <GalleryThumbnailSkeleton key={`thumb-skel-${idx}`} />
+                ))}
+              </div>
+            )
+          ) : (
+            allImages.length > 1 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+                {allImages.map((imgUrl, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveIndex(idx)}
+                    className={`relative w-24 sm:w-32 aspect-[4/3] rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                      activeIndex === idx
+                        ? 'border-[var(--ps-primary,#0A84FF)] scale-105 shadow-lg shadow-[var(--ps-primary,#0A84FF)]/20 ring-2 ring-[var(--ps-primary,#0A84FF)]/40'
+                        : 'border-[#2C2C2E] opacity-60 hover:opacity-100 hover:border-white/40'
+                    }`}
+                  >
+                    <img
+                      src={getThumbnailUrl(imgUrl, 320, 75)}
+                      alt={`Thumbnail ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    <div className="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[9px] font-mono text-white">
+                      #{idx + 1}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )
           )}
         </section>
 
@@ -566,7 +587,9 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             <div>
               <h2 className="text-xl font-bold text-white">Vehicle Photo Gallery</h2>
               <p className="text-xs text-gray-400">
-                All {allImages.length} high-resolution captures for {car.carName}
+                {isLoadingDetails
+                  ? `Loading ${expectedPhotoCount} high-resolution captures for ${car.carName}...`
+                  : `All ${allImages.length} high-resolution captures for ${car.carName}`}
               </p>
             </div>
 
@@ -581,8 +604,8 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
               <button
                 onClick={handleDownloadAllPhotos}
-                disabled={isDownloadingAll}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
+                disabled={isDownloadingAll || isLoadingDetails}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
                 <FileArchive className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
                 <span>Batch Download Set</span>
@@ -590,123 +613,128 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             </div>
           </div>
 
-          {/* Responsive Gallery Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allImages.map((imgUrl, idx) => {
-              const formattedUrl = formatMediaUrl(imgUrl);
-              const isSelected = activeIndex === idx;
-              const author = getAuthorForPhoto(imgUrl);
+          {/* Responsive Gallery Grid or Skeletons */}
+          {isLoadingDetails ? (
+            <GalleryPhotoSkeletonGrid count={expectedPhotoCount} />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {allImages.map((imgUrl, idx) => {
+                const formattedUrl = formatMediaUrl(imgUrl);
+                const isSelected = activeIndex === idx;
+                const author = getAuthorForPhoto(imgUrl);
 
-              return (
-                <div
-                  key={idx}
-                  className={`group relative bg-[var(--ps-card-bg,#111111)] border rounded-2xl overflow-hidden transition-all duration-300 shadow-md hover:shadow-2xl flex flex-col ${
-                    isSelected
-                      ? 'border-[var(--ps-primary,#0A84FF)]'
-                      : 'border-[var(--ps-card-border,#2C2C2E)] hover:border-white/30'
-                  }`}
-                >
-                  {/* Photo Container */}
+                return (
                   <div
-                    onClick={() => setActiveIndex(idx)}
-                    className="relative aspect-[4/3] bg-black overflow-hidden cursor-pointer"
+                    key={idx}
+                    className={`group relative bg-[var(--ps-card-bg,#111111)] border rounded-2xl overflow-hidden transition-all duration-300 shadow-md hover:shadow-2xl flex flex-col ${
+                      isSelected
+                        ? 'border-[var(--ps-primary,#0A84FF)]'
+                        : 'border-[var(--ps-card-border,#2C2C2E)] hover:border-white/30'
+                    }`}
                   >
-                    <img
-                      src={getThumbnailUrl(imgUrl, 640, 80)}
-                      alt={`${car.carName} - Shot ${idx + 1}`}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      decoding="async"
-                    />
+                    {/* Photo Container */}
+                    <div
+                      onClick={() => setActiveIndex(idx)}
+                      className="relative aspect-[4/3] bg-black/80 overflow-hidden cursor-pointer"
+                    >
+                      <div className="skeleton-rainbow-shimmer opacity-20" />
+                      <img
+                        src={getThumbnailUrl(imgUrl, 640, 80)}
+                        alt={`${car.carName} - Shot ${idx + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
+                        loading="lazy"
+                        decoding="async"
+                      />
 
-                    {/* Badge */}
-                    <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono font-bold text-white border border-white/10">
-                      Photo {idx + 1}
-                    </div>
-
-                    {/* Active Indicator */}
-                    {isSelected && (
-                      <div className="absolute top-3 right-3 bg-[var(--ps-primary,#0A84FF)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
-                        Spotlight Active
+                      {/* Badge */}
+                      <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono font-bold text-white border border-white/10 z-20">
+                        Photo {idx + 1}
                       </div>
-                    )}
 
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveIndex(idx);
-                          setIsFullscreenOpen(true);
-                        }}
-                        className="p-2.5 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                        title="View Fullscreen"
-                      >
-                        <ZoomIn className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTipSingleAuthor(author);
-                        }}
-                        className="p-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                        title={`Tip ${author.name}`}
-                      >
-                        <Heart className="w-4 h-4 fill-black" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDownloadSinglePhoto(imgUrl, idx);
-                        }}
-                        className="p-2.5 rounded-full bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                        title="Download Photo"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                      {/* Active Indicator */}
+                      {isSelected && (
+                        <div className="absolute top-3 right-3 bg-[var(--ps-primary,#0A84FF)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-20">
+                          Spotlight Active
+                        </div>
+                      )}
 
-                  {/* Card Info Footer with Author Info */}
-                  <div className="p-4 flex items-center justify-between border-t border-[var(--ps-card-border,#2C2C2E)] bg-white/2">
-                    <div className="space-y-1 min-w-0 pr-2">
-                      <p className="text-xs font-bold text-white truncate">
-                        {idx === 0 ? 'Primary Front Shot' : `Angle Capture #${idx + 1}`}
-                      </p>
-                      <div className="flex items-center gap-1.5">
-                        <img
-                          src={author.avatar}
-                          alt={author.name}
-                          className="w-4 h-4 rounded-full object-cover border border-white/20"
-                        />
-                        <span className="text-[11px] text-gray-300 font-medium truncate">
-                          {author.name}
-                        </span>
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-30">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveIndex(idx);
+                            setIsFullscreenOpen(true);
+                          }}
+                          className="p-2.5 rounded-full bg-black/80 hover:bg-black text-white border border-white/20 shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                          title="View Fullscreen"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTipSingleAuthor(author);
+                          }}
+                          className="p-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                          title={`Tip ${author.name}`}
+                        >
+                          <Heart className="w-4 h-4 fill-black" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadSinglePhoto(imgUrl, idx);
+                          }}
+                          className="p-2.5 rounded-full bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                          title="Download Photo"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleTipSingleAuthor(author)}
-                        className="p-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
-                        title={`Tip ${author.name}`}
-                      >
-                        <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
-                      </button>
+                    {/* Card Info Footer with Author Info */}
+                    <div className="p-4 flex items-center justify-between border-t border-[var(--ps-card-border,#2C2C2E)] bg-white/2">
+                      <div className="space-y-1 min-w-0 pr-2">
+                        <p className="text-xs font-bold text-white truncate">
+                          {idx === 0 ? 'Primary Front Shot' : `Angle Capture #${idx + 1}`}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <img
+                            src={author.avatar}
+                            alt={author.name}
+                            className="w-4 h-4 rounded-full object-cover border border-white/20"
+                          />
+                          <span className="text-[11px] text-gray-300 font-medium truncate">
+                            {author.name}
+                          </span>
+                        </div>
+                      </div>
 
-                      <button
-                        onClick={() => handleDownloadSinglePhoto(imgUrl, idx)}
-                        className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-                        <span>Download</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleTipSingleAuthor(author)}
+                          className="p-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer"
+                          title={`Tip ${author.name}`}
+                        >
+                          <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDownloadSinglePhoto(imgUrl, idx)}
+                          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
+                          <span>Download</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* 2D Cartoon Sticker Section */}

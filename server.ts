@@ -10,6 +10,7 @@ import {
   initializePostgresDatabase,
   getIsPostgresAvailable,
   searchCarsInPostgres,
+  getAllCarsFromDb,
   getCarByIdFromDb,
   insertCarIntoDb,
   updateCarInDb,
@@ -1287,16 +1288,37 @@ app.get("/api/cars", async (req: Request, res: Response) => {
     const results = await searchCarsInPostgres(q, event, tag, author);
 
     // If 'full' is not requested, strip the heavy images array from gallery list response to reduce 30MB payload
-    const finalCars = full
-      ? results
-      : results.map((c) => {
-          const { images, ...lightCar } = c;
+    const finalCars = await Promise.all(
+      results.map(async (c) => {
+        let cleanImageUrl = c.imageUrl;
+        if (cleanImageUrl && cleanImageUrl.startsWith("data:image/")) {
+          cleanImageUrl = await saveBase64ImageToDisk(cleanImageUrl, "cover", c.plateNumber);
+        }
+
+        let cleanCartoonUrl = c.cartoonImageUrl;
+        if (cleanCartoonUrl && cleanCartoonUrl.startsWith("data:image/")) {
+          cleanCartoonUrl = await saveBase64ImageToDisk(cleanCartoonUrl, "cartoon", c.plateNumber);
+        }
+
+        if (full) {
           return {
-            ...lightCar,
-            images: [], // Exclude heavy image list for visitor gallery overview
-            photoCount: c.photoCount || (images && images.length) || 1,
+            ...c,
+            imageUrl: cleanImageUrl,
+            cartoonImageUrl: cleanCartoonUrl,
+            photoCount: (c.images && c.images.length) || c.photoCount || 1,
           };
-        });
+        }
+
+        const { images, ...lightCar } = c;
+        return {
+          ...lightCar,
+          imageUrl: cleanImageUrl,
+          cartoonImageUrl: cleanCartoonUrl,
+          images: [], // Exclude heavy image list for visitor gallery overview
+          photoCount: c.photoCount || (images && images.length) || 1,
+        };
+      })
+    );
 
     const responseData = { cars: finalCars, total: finalCars.length };
     const etag = `W/"cars_${finalCars.length}_${now}"`;
@@ -1585,14 +1607,71 @@ app.post("/api/theme", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+// Background migrator to convert any legacy base64 car records to disk files
+async function migrateBase64CarsToFiles() {
+  try {
+    const allCars = await getAllCarsFromDb();
+    let migratedCount = 0;
+    for (const car of allCars) {
+      let changed = false;
+      const targetFolder = getPlateFolderSlug(car.plateNumber || car.id);
+
+      let newImageUrl = car.imageUrl;
+      if (newImageUrl && newImageUrl.startsWith("data:image/")) {
+        newImageUrl = await saveBase64ImageToDisk(newImageUrl, "cover", targetFolder);
+        changed = true;
+      }
+
+      let newCartoonUrl = car.cartoonImageUrl;
+      if (newCartoonUrl && newCartoonUrl.startsWith("data:image/")) {
+        newCartoonUrl = await saveBase64ImageToDisk(newCartoonUrl, "cartoon", targetFolder);
+        changed = true;
+      }
+
+      let newImages = car.images;
+      if (Array.isArray(newImages) && newImages.some((img) => img && img.startsWith("data:image/"))) {
+        newImages = await Promise.all(
+          newImages.map(async (img, idx) => {
+            if (img && img.startsWith("data:image/")) {
+              return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder);
+            }
+            return img;
+          })
+        );
+        changed = true;
+      }
+
+      if (changed) {
+        await updateCarInDb(car.id, {
+          imageUrl: newImageUrl,
+          cartoonImageUrl: newCartoonUrl,
+          images: newImages,
+        });
+        migratedCount++;
+      }
+    }
+    if (migratedCount > 0) {
+      console.log(`[Storage Migration] Successfully migrated ${migratedCount} vehicles with base64 data to compressed disk files.`);
+      invalidateCarsCache();
+    }
+  } catch (err: any) {
+    console.warn("[Storage Migration Warning] Could not migrate base64 records:", err.message);
+  }
+}
+
 // ==========================================
 // SERVER INITIALIZATION
 // ==========================================
 async function startServer() {
   // Initialize and connect to PostgreSQL (or seamlessly use file storage)
-  initializePostgresDatabase().catch((err) => {
-    console.log("[Database] Local store ready, background PostgreSQL probe noticed:", err.message);
-  });
+  initializePostgresDatabase()
+    .then(() => {
+      migrateBase64CarsToFiles();
+    })
+    .catch((err) => {
+      console.log("[Database] Local store ready, background PostgreSQL probe noticed:", err.message);
+      migrateBase64CarsToFiles();
+    });
 
   const isExplicitlyBackendOnly = process.env.BACKEND_ONLY === "true";
   const distPath = path.join(process.cwd(), "dist");

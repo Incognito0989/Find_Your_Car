@@ -799,6 +799,10 @@ export async function searchCarsInPostgres(
 // ----------------------------------------------------
 // Unified CRUD Operations
 // ----------------------------------------------------
+export async function getAllCarsFromDb(): Promise<CarPhoto[]> {
+  return searchCarsInPostgres('');
+}
+
 export async function getCarByIdFromDb(id: string): Promise<CarPhoto | null> {
   if (isPostgresAvailable) {
     try {
