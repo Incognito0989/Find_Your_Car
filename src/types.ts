@@ -40,6 +40,7 @@ export interface CarPhoto {
   photographer: Photographer;
   imageUrl: string; // Primary thumbnail / cover photo
   images?: string[]; // All photos belonging to this car's set/gallery
+  photoCount?: number; // Total number of photos in the car's gallery
   photoAuthors?: Record<string, Photographer>; // Optional mapping of image index/URL to specific photographer
   cartoonImageUrl?: string;
   hasCartoon: boolean;

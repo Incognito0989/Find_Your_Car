@@ -24,9 +24,10 @@ import {
   Smartphone,
   Users,
   Lock,
+  Loader2,
 } from 'lucide-react';
 import { CarPhoto, AppThemeConfig, Photographer } from '../types';
-import { formatMediaUrl, getThumbnailUrl } from '../utils/apiConfig';
+import { formatMediaUrl, getThumbnailUrl, getApiBaseUrl } from '../utils/apiConfig';
 import { DownloadModal } from './DownloadModal';
 import { TipModal } from './TipModal';
 
@@ -39,11 +40,59 @@ interface CarGalleryPageProps {
 }
 
 export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
-  car,
+  car: initialCar,
   onBack,
   currentTheme,
   onOpenAdmin,
 }) => {
+  // Current car state which gets enriched when full details are fetched
+  const [car, setCar] = useState<CarPhoto>(initialCar);
+  const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(
+    !initialCar.images || initialCar.images.length <= 1
+  );
+
+  // Sync state if initialCar prop changes
+  useEffect(() => {
+    setCar(initialCar);
+  }, [initialCar]);
+
+  // Fetch full details (all gallery photos) on mount if only cover photo was loaded initially
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFullCarDetails = async () => {
+      // If car already has multiple loaded images, skip
+      if (initialCar.images && initialCar.images.length > 1) {
+        setIsLoadingDetails(false);
+        return;
+      }
+
+      try {
+        setIsLoadingDetails(true);
+        const base = getApiBaseUrl();
+        const url = base ? `${base}/api/cars/${initialCar.id}` : `/api/cars/${initialCar.id}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.car && isMounted) {
+            setCar(data.car);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch full vehicle details:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingDetails(false);
+        }
+      }
+    };
+
+    fetchFullCarDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialCar.id]);
+
   // Normalize images list (fallback to imageUrl if images array is empty or undefined)
   const allImages = React.useMemo(() => {
     if (Array.isArray(car.images) && car.images.length > 0) {

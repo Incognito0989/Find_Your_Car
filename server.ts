@@ -79,9 +79,10 @@ app.use(
   })
 );
 
-// Increase JSON payload limit for high-res automotive photos & profiles
-app.use(express.json({ limit: "200mb" }));
-app.use(express.urlencoded({ limit: "200mb", extended: true }));
+// Configure flexible payload/file limit from environment variable (defaults to 100mb)
+const uploadLimit = process.env.FILE_UPLOAD_LIMIT || "100mb";
+app.use(express.json({ limit: uploadLimit }));
+app.use(express.urlencoded({ limit: uploadLimit, extended: true }));
 
 // Ensure upload directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -124,8 +125,32 @@ function getPlateFolderSlug(plateNumber?: string): string {
   return sanitized || "unassigned";
 }
 
-// Save base64 image data directly as files to disk inside the plate folder
-function saveBase64ImageToDisk(dataUrl: string, prefix = "car", plateNumber?: string): string {
+// Helper to safely delete an old local photo file if it was replaced or removed
+function deleteOldLocalPhotoFile(oldUrl?: string | null) {
+  if (!oldUrl || typeof oldUrl !== "string") return;
+  if (!oldUrl.startsWith("/uploads/") && !oldUrl.startsWith("uploads/")) return;
+
+  try {
+    const cleanRelativePath = oldUrl.replace(/^\/?uploads\//, "");
+    // Prevent directory traversal
+    const safePath = path.normalize(cleanRelativePath).replace(/^(\.\.[\/\\])+/, "");
+    const fullPath = path.join(UPLOADS_DIR, safePath);
+
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+      fs.unlinkSync(fullPath);
+      console.log(`[Storage Cleanup] Deleted replaced old image file: ${cleanRelativePath}`);
+    }
+  } catch (err: any) {
+    console.warn(`[Storage Cleanup] Could not delete old file (${oldUrl}):`, err.message);
+  }
+}
+
+// Save base64 image data directly as files to disk with automatic compression (< 2MB)
+async function saveBase64ImageToDisk(
+  dataUrl: string,
+  prefix = "car",
+  plateNumber?: string
+): Promise<string> {
   if (!dataUrl || !dataUrl.startsWith("data:image/")) {
     return dataUrl;
   }
@@ -134,8 +159,9 @@ function saveBase64ImageToDisk(dataUrl: string, prefix = "car", plateNumber?: st
     const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
     if (!matches) return dataUrl;
 
-    const ext = matches[1] === "svg+xml" ? "svg" : matches[1] === "jpeg" ? "jpg" : matches[1];
+    const rawExt = matches[1] === "svg+xml" ? "svg" : matches[1] === "jpeg" ? "jpg" : matches[1];
     const base64Data = matches[2];
+    const rawBuffer = Buffer.from(base64Data, "base64");
 
     const plateFolder = getPlateFolderSlug(plateNumber);
     const targetDir = path.join(UPLOADS_DIR, plateFolder);
@@ -144,11 +170,63 @@ function saveBase64ImageToDisk(dataUrl: string, prefix = "car", plateNumber?: st
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const TWO_MB = 2 * 1024 * 1024; // 2MB target limit
+    let finalBuffer = rawBuffer;
+    let finalExt = rawExt;
+
+    // Apply smart sharp compression if not vector and if buffer > 2MB or if it is a cover photo
+    if (rawExt !== "svg") {
+      try {
+        if (prefix.includes("cover") || rawBuffer.length > TWO_MB) {
+          const imageInstance = sharp(rawBuffer);
+          const metadata = await imageInstance.metadata();
+
+          let width = metadata.width || 2560;
+          let height = metadata.height || 1440;
+
+          // Resize down to max 2560px (4K/2K high clarity)
+          if (width > 2560 || height > 2560) {
+            imageInstance.resize({
+              width: width > height ? 2560 : undefined,
+              height: height >= width ? 2560 : undefined,
+              fit: "inside",
+              withoutEnlargement: true,
+            });
+          }
+
+          if (rawExt === "png" && metadata.hasAlpha) {
+            finalBuffer = await imageInstance.png({ quality: 85, compressionLevel: 8 }).toBuffer();
+          } else {
+            // Compress to high quality JPEG/WebP guaranteed under 2MB
+            let quality = 88;
+            finalBuffer = await imageInstance.jpeg({ quality, mozjpeg: true }).toBuffer();
+            while (finalBuffer.length > TWO_MB && quality > 40) {
+              quality -= 10;
+              finalBuffer = await sharp(rawBuffer)
+                .resize({ width: Math.min(width, 2048), fit: "inside", withoutEnlargement: true })
+                .jpeg({ quality, mozjpeg: true })
+                .toBuffer();
+            }
+            finalExt = "jpg";
+          }
+        }
+      } catch (compErr: any) {
+        console.warn(`[Compression Warning] Falling back to direct buffer save: ${compErr.message}`);
+        finalBuffer = rawBuffer;
+      }
+    }
+
+    const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${finalExt}`;
     const filePath = path.join(targetDir, filename);
 
-    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
-    console.log(`[Storage] Saved image file to plate folder [${plateFolder}]: ${filename}`);
+    fs.writeFileSync(filePath, finalBuffer);
+    console.log(
+      `[Storage] Saved image file to plate folder [${plateFolder}]: ${filename} (${(
+        finalBuffer.length /
+        1024 /
+        1024
+      ).toFixed(2)} MB)`
+    );
     return `/uploads/${plateFolder}/${filename}`;
   } catch (err) {
     console.error("Failed to save image to disk:", err);
@@ -1190,8 +1268,9 @@ app.get("/api/cars", async (req: Request, res: Response) => {
     const event = (req.query.event as string) || "";
     const tag = (req.query.tag as string) || "";
     const author = (req.query.author as string) || "";
+    const full = req.query.full === "true";
 
-    const cacheKey = `cars_${q}_${event}_${tag}_${author}`;
+    const cacheKey = `cars_${q}_${event}_${tag}_${author}_${full}`;
     const cached = carsQueryCache.get(cacheKey);
     const now = Date.now();
 
@@ -1206,8 +1285,21 @@ app.get("/api/cars", async (req: Request, res: Response) => {
     }
 
     const results = await searchCarsInPostgres(q, event, tag, author);
-    const responseData = { cars: results, total: results.length };
-    const etag = `W/"cars_${results.length}_${now}"`;
+
+    // If 'full' is not requested, strip the heavy images array from gallery list response to reduce 30MB payload
+    const finalCars = full
+      ? results
+      : results.map((c) => {
+          const { images, ...lightCar } = c;
+          return {
+            ...lightCar,
+            images: [], // Exclude heavy image list for visitor gallery overview
+            photoCount: c.photoCount || (images && images.length) || 1,
+          };
+        });
+
+    const responseData = { cars: finalCars, total: finalCars.length };
+    const etag = `W/"cars_${finalCars.length}_${now}"`;
 
     if (carsQueryCache.size > 50) {
       carsQueryCache.clear();
@@ -1278,20 +1370,22 @@ app.post("/api/cars", authenticateSession, async (req: Request, res: Response) =
     const folderIdentifier = cleanPlate || `car_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     // Process all images into the vehicle's folder
-    const savedImages: string[] = rawImagesList.map((img: string, idx: number) => {
-      if (img && img.startsWith("data:image/")) {
-        return saveBase64ImageToDisk(img, `photo_${idx + 1}`, folderIdentifier);
-      }
-      return img;
-    });
+    const savedImages: string[] = await Promise.all(
+      rawImagesList.map(async (img: string, idx: number) => {
+        if (img && img.startsWith("data:image/")) {
+          return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, folderIdentifier);
+        }
+        return img;
+      })
+    );
 
     const primaryImageUrl = imageUrl && imageUrl.startsWith("data:image/")
-      ? saveBase64ImageToDisk(imageUrl, "cover", folderIdentifier)
+      ? await saveBase64ImageToDisk(imageUrl, "cover", folderIdentifier)
       : (imageUrl || savedImages[0]);
 
     const savedCartoonUrl = cartoonImageUrl
       ? (cartoonImageUrl.startsWith("data:image/")
-          ? saveBase64ImageToDisk(cartoonImageUrl, "cartoon", folderIdentifier)
+          ? await saveBase64ImageToDisk(cartoonImageUrl, "cartoon", folderIdentifier)
           : cartoonImageUrl)
       : null;
 
@@ -1378,22 +1472,38 @@ app.put("/api/cars/:id", authenticateSession, async (req: Request, res: Response
 
     let savedImages: string[] = [];
     if (Array.isArray(images) && images.length > 0) {
-      savedImages = images.map((img: string, idx: number) => {
-        if (img && img.startsWith("data:image/")) {
-          return saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder);
-        }
-        return img;
-      });
+      savedImages = await Promise.all(
+        images.map(async (img: string, idx: number) => {
+          if (img && img.startsWith("data:image/")) {
+            return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder);
+          }
+          return img;
+        })
+      );
     }
 
+    // Check if the cover photo is being updated or replaced
+    let previousCoverUrl: string | undefined = undefined;
     if (imageUrl && imageUrl.startsWith("data:image/")) {
-      imageUrl = saveBase64ImageToDisk(imageUrl, `cover`, targetFolder);
+      previousCoverUrl = existingCar?.imageUrl;
+      imageUrl = await saveBase64ImageToDisk(imageUrl, `cover`, targetFolder);
+
+      // If previous cover photo was a local file and is replaced, delete old file to save space
+      if (previousCoverUrl && previousCoverUrl !== imageUrl) {
+        deleteOldLocalPhotoFile(previousCoverUrl);
+      }
+    } else if (imageUrl && existingCar?.imageUrl && existingCar.imageUrl !== imageUrl) {
+      // Replaced with another URL
+      deleteOldLocalPhotoFile(existingCar.imageUrl);
     } else if (!imageUrl && savedImages.length > 0) {
       imageUrl = savedImages[0];
     }
 
     if (cartoonImageUrl && cartoonImageUrl.startsWith("data:image/")) {
-      cartoonImageUrl = saveBase64ImageToDisk(cartoonImageUrl, `cartoon`, targetFolder);
+      if (existingCar?.cartoonImageUrl) {
+        deleteOldLocalPhotoFile(existingCar.cartoonImageUrl);
+      }
+      cartoonImageUrl = await saveBase64ImageToDisk(cartoonImageUrl, `cartoon`, targetFolder);
     }
 
     const updates: any = {

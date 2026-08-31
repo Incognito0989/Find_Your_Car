@@ -110,18 +110,60 @@ body {
   background: var(--ps-text-muted);
 }
 
-/* Skeleton shimmer animations */
+/* Skeleton shimmer animations with vivid rainbow holographic sweep */
 @keyframes shimmer {
   0% {
-    transform: translateX(-100%);
+    transform: translateX(-150%) rotate(5deg);
   }
   100% {
-    transform: translateX(100%);
+    transform: translateX(150%) rotate(5deg);
+  }
+}
+
+@keyframes rainbowShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }
 
 .animate-shimmer {
-  animation: shimmer 1.8s infinite ease-in-out;
+  animation: shimmer 2s infinite ease-in-out;
+}
+
+.skeleton-rainbow-shimmer {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 15%,
+    rgba(255, 0, 128, 0.22) 28%,
+    rgba(255, 136, 0, 0.25) 36%,
+    rgba(255, 230, 0, 0.26) 44%,
+    rgba(0, 255, 136, 0.25) 52%,
+    rgba(0, 200, 255, 0.28) 60%,
+    rgba(168, 85, 247, 0.28) 68%,
+    rgba(255, 0, 128, 0.22) 76%,
+    rgba(255, 255, 255, 0.03) 85%,
+    transparent 100%
+  );
+  filter: blur(8px);
+  animation: shimmer 2.2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.skeleton-rainbow-badge {
+  background-size: 200% 200%;
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(10, 132, 255, 0.2) 25%, rgba(168, 85, 247, 0.25) 50%, rgba(255, 42, 133, 0.2) 75%, rgba(0, 255, 170, 0.2) 100%);
+  animation: rainbowShift 3s ease infinite;
 }
 
 

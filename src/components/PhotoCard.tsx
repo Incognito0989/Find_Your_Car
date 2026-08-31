@@ -30,7 +30,9 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
     ? formatMediaUrl(rawImage)
     : getThumbnailUrl(rawImage, 720, 80);
 
-  const photoCount = Array.isArray(car.images) && car.images.length > 0 ? car.images.length : 1;
+  const photoCount = car.photoCount !== undefined 
+    ? car.photoCount 
+    : (Array.isArray(car.images) && car.images.length > 0 ? car.images.length : 1);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (onSelectCar) {
