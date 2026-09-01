@@ -166,41 +166,41 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
               </div>
 
               {/* Photographer Card & Direct Tip Menu Trigger */}
-              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
+              <div className="p-3.5 rounded-2xl bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-between gap-3 shadow-sm">
                 <div className="flex items-center gap-3 min-w-0">
                   {car.photographer?.avatar ? (
                     <img
                       src={car.photographer.avatar}
                       alt={car.photographer.name}
-                      className="w-10 h-10 rounded-full object-cover border border-white/20 shrink-0"
+                      className="w-10 h-10 rounded-full object-cover border border-[var(--ps-card-border,#2C2C2E)] shrink-0 shadow-sm"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-[var(--ps-card-bg,#1c1c1e)] border border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-center text-[var(--ps-text-main,#ffffff)] font-bold text-xs shrink-0 shadow-sm">
                       {(car.photographer?.name || 'P').charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{car.photographer?.name || 'Photographer'}</p>
-                    {car.photographer?.title && <p className="text-[10px] text-gray-400 truncate">{car.photographer.title}</p>}
+                    <p className="text-xs font-bold text-[var(--ps-text-main,#ffffff)] truncate">{car.photographer?.name || 'Photographer'}</p>
+                    {car.photographer?.title && <p className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] truncate font-medium">{car.photographer.title}</p>}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => setIsTipOpen(true)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
                     title="Tip Author via PayPal or Venmo"
                   >
-                    <Heart className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    <Heart className="w-3.5 h-3.5 fill-amber-500/30 text-amber-500" />
                     <span>Tip</span>
                   </button>
 
                   <button
                     onClick={handleCopyLink}
-                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-muted,#9ca3af)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] transition-colors cursor-pointer group shadow-sm"
                     title="Share photo link"
                   >
-                    <Share2 className="w-4 h-4" />
+                    <Share2 className="w-4 h-4 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white transition-colors" />
                   </button>
                 </div>
               </div>
@@ -217,14 +217,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                       setSelectedResolution('full');
                       setIsCartoonView(false);
                     }}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer shadow-sm ${
                       selectedResolution === 'full' && !isCartoonView
-                        ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-white'
-                        : 'border-[#2C2C2E] bg-[#141416] text-gray-400 hover:text-white'
+                        ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-text-main,#ffffff)]'
+                        : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-card-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                     }`}
                   >
-                    <p className="text-xs font-bold">Ultra HD JPG</p>
-                    <p className="text-[10px] text-gray-500">300 DPI Original</p>
+                    <p className="text-xs font-bold text-[var(--ps-text-main,#ffffff)]">Ultra HD JPG</p>
+                    <p className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] font-medium">300 DPI Original</p>
                   </button>
 
                   {car.hasCartoon && (
@@ -234,29 +234,29 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         setSelectedResolution('cartoon');
                         setIsCartoonView(true);
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer shadow-sm ${
                         isCartoonView
-                          ? 'border-pink-500 bg-pink-500/15 text-pink-300'
-                          : 'border-[#2C2C2E] bg-[#141416] text-gray-400 hover:text-white'
+                          ? 'border-pink-500 bg-pink-500/15 text-pink-700 dark:text-pink-300'
+                          : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-card-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                       }`}
                     >
                       <div className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-pink-400" />
+                        <Sparkles className="w-3 h-3 text-pink-500" />
                         <p className="text-xs font-bold">Cartoon Sticker</p>
                       </div>
-                      <p className="text-[10px] text-gray-500">Vector SVG / 2D</p>
+                      <p className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] font-medium">Vector SVG / 2D</p>
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Tipping / Author support banner */}
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-amber-400 fill-amber-400/40 shrink-0" />
+                  <Heart className="w-4 h-4 text-amber-500 fill-amber-500/30 shrink-0" />
                   <div className="text-xs">
-                    <p className="font-bold text-amber-200">Love this photo?</p>
-                    <p className="text-[11px] text-amber-300/80">Tip the photographer directly on Venmo or PayPal.</p>
+                    <p className="font-bold text-amber-800 dark:text-amber-200">Love this photo?</p>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300/80 font-medium">Tip the photographer directly on Venmo or PayPal.</p>
                   </div>
                 </div>
                 <button
@@ -291,8 +291,8 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 )}
               </button>
 
-              <p className="text-center text-[10px] text-gray-500 flex items-center justify-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <p className="text-center text-[10px] text-[var(--ps-text-muted,#9ca3af)] flex items-center justify-center gap-1 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Full resolution license • Personal and social media usage</span>
               </p>
             </div>

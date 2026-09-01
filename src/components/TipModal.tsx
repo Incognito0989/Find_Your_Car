@@ -95,17 +95,17 @@ export const TipModal: React.FC<TipModalProps> = ({
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-24 bg-gradient-to-b from-[var(--ps-primary,#0A84FF)]/20 to-transparent blur-2xl pointer-events-none" />
 
         {/* Header */}
-        <div className="relative flex items-start justify-between pb-4 border-b border-white/10 shrink-0">
+        <div className="relative flex items-start justify-between pb-4 border-b border-[var(--ps-card-border,#2C2C2E)] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-yellow-400/30 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner">
-              <Heart className="w-6 h-6 fill-amber-400 text-amber-400" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-yellow-400/30 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-inner">
+              <Heart className="w-6 h-6 fill-amber-500 text-amber-500" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-extrabold text-[var(--ps-text-main,#ffffff)] tracking-tight">
                   Tip the Photographer
                 </h2>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" />
                   Direct to Creator
                 </span>
@@ -121,7 +121,7 @@ export const TipModal: React.FC<TipModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-full hover:bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -130,7 +130,7 @@ export const TipModal: React.FC<TipModalProps> = ({
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto py-5 space-y-4 pr-1">
           {recipients.length === 0 ? (
-            <div className="p-8 text-center text-xs text-gray-400 bg-white/5 rounded-2xl border border-white/10">
+            <div className="p-8 text-center text-xs text-[var(--ps-text-muted,#9ca3af)] bg-[var(--ps-badge-bg,#141416)] rounded-2xl border border-[var(--ps-card-border,#2C2C2E)]">
               No photographer assigned to this vehicle yet.
             </div>
           ) : (
@@ -145,7 +145,7 @@ export const TipModal: React.FC<TipModalProps> = ({
               return (
                 <div
                   key={p.name + idx}
-                  className="bg-white/5 border border-white/10 rounded-2xl p-5 transition-all duration-200 hover:border-white/20 space-y-4"
+                  className="bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-2xl p-5 transition-all duration-200 hover:border-[var(--ps-primary,#0A84FF)]/40 space-y-4 shadow-sm"
                 >
                   {/* Author Profile Header */}
                   <div className="flex items-center gap-3.5">
@@ -153,28 +153,28 @@ export const TipModal: React.FC<TipModalProps> = ({
                       <img
                         src={p.avatar}
                         alt={p.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-white/20 shrink-0"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-[var(--ps-card-border,#2C2C2E)] shrink-0 shadow-sm"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-white/20 flex items-center justify-center text-white font-bold text-base shrink-0">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm">
                         {p.name ? p.name.charAt(0).toUpperCase() : 'P'}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-white text-base truncate">
+                        <h4 className="font-bold text-[var(--ps-text-main,#ffffff)] text-base truncate">
                           {p.name}
                         </h4>
                         {p.instagram && (
-                          <span className="text-[11px] text-gray-400 font-mono">
+                          <span className="text-[11px] text-[var(--ps-primary,#0A84FF)] font-mono font-medium">
                             {p.instagram.startsWith('@') ? p.instagram : `@${p.instagram}`}
                           </span>
                         )}
                       </div>
                       {p.bio ? (
-                        <p className="text-xs text-gray-400 line-clamp-2 mt-0.5">{p.bio}</p>
+                        <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] line-clamp-2 mt-0.5">{p.bio}</p>
                       ) : p.title ? (
-                        <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{p.title}</p>
+                        <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] line-clamp-1 mt-0.5">{p.title}</p>
                       ) : null}
                     </div>
                   </div>
@@ -192,16 +192,16 @@ export const TipModal: React.FC<TipModalProps> = ({
                             onClick={() => {
                               if (onTipCompleted) onTipCompleted();
                             }}
-                            className="flex-1 py-3 px-4 rounded-xl bg-[#008CFF]/15 hover:bg-[#008CFF]/25 text-[#38bdf8] hover:text-white border border-[#008CFF]/40 text-xs font-bold transition-all flex items-center justify-between shadow-sm active:scale-[0.99] cursor-pointer group"
+                            className="flex-1 py-3 px-4 rounded-xl bg-[#008CFF]/15 hover:bg-[#008CFF]/25 text-[#0070BA] dark:text-[#38bdf8] border border-[#008CFF]/40 text-xs font-bold transition-all flex items-center justify-between shadow-sm active:scale-[0.99] cursor-pointer group"
                             title={`Tip @${cleanVenmo} on Venmo`}
                           >
                             <div className="flex items-center gap-2">
-                              <div className="p-1 rounded-lg bg-[#008CFF]/20 text-[#008CFF] group-hover:text-white">
+                              <div className="p-1 rounded-lg bg-[#008CFF]/20 text-[#0070BA] dark:text-[#008CFF] group-hover:text-[var(--ps-primary,#0A84FF)]">
                                 <Smartphone className="w-4 h-4" />
                               </div>
                               <div className="text-left">
                                 <span className="block font-bold">Venmo</span>
-                                <span className="text-[11px] text-gray-400 font-mono">@{cleanVenmo}</span>
+                                <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-mono font-semibold">@{cleanVenmo}</span>
                               </div>
                             </div>
                             <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
@@ -210,13 +210,13 @@ export const TipModal: React.FC<TipModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleCopy(`@${cleanVenmo}`, `venmo-${p.name}`)}
-                            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                            className="p-3 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-muted,#9ca3af)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] transition-colors cursor-pointer group shadow-sm"
                             title="Copy Venmo username"
                           >
                             {copiedHandle === `venmo-${p.name}` ? (
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-emerald-500" />
                             ) : (
-                              <Copy className="w-4 h-4" />
+                              <Copy className="w-4 h-4 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white" />
                             )}
                           </button>
                         </div>
@@ -232,16 +232,16 @@ export const TipModal: React.FC<TipModalProps> = ({
                             onClick={() => {
                               if (onTipCompleted) onTipCompleted();
                             }}
-                            className="flex-1 py-3 px-4 rounded-xl bg-[#0070BA]/15 hover:bg-[#0070BA]/25 text-[#60a5fa] hover:text-white border border-[#0070BA]/40 text-xs font-bold transition-all flex items-center justify-between shadow-sm active:scale-[0.99] cursor-pointer group"
+                            className="flex-1 py-3 px-4 rounded-xl bg-[#0070BA]/15 hover:bg-[#0070BA]/25 text-[#005ea6] dark:text-[#60a5fa] border border-[#0070BA]/40 text-xs font-bold transition-all flex items-center justify-between shadow-sm active:scale-[0.99] cursor-pointer group"
                             title={`Tip ${cleanPayPal} on PayPal`}
                           >
                             <div className="flex items-center gap-2">
-                              <div className="p-1 rounded-lg bg-[#0070BA]/20 text-[#0070BA] group-hover:text-white">
+                              <div className="p-1 rounded-lg bg-[#0070BA]/20 text-[#0070BA] group-hover:text-[var(--ps-primary,#0A84FF)]">
                                 <CreditCard className="w-4 h-4" />
                               </div>
                               <div className="text-left">
                                 <span className="block font-bold">PayPal</span>
-                                <span className="text-[11px] text-gray-400 font-mono">paypal.me/{cleanPayPal}</span>
+                                <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-mono font-semibold">paypal.me/{cleanPayPal}</span>
                               </div>
                             </div>
                             <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
@@ -250,13 +250,13 @@ export const TipModal: React.FC<TipModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleCopy(cleanPayPal, `paypal-${p.name}`)}
-                            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                            className="p-3 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-muted,#9ca3af)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] transition-colors cursor-pointer group shadow-sm"
                             title="Copy PayPal username"
                           >
                             {copiedHandle === `paypal-${p.name}` ? (
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-emerald-500" />
                             ) : (
-                              <Copy className="w-4 h-4" />
+                              <Copy className="w-4 h-4 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white" />
                             )}
                           </button>
                         </div>
@@ -272,7 +272,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                             onClick={() => {
                               if (onTipCompleted) onTipCompleted();
                             }}
-                            className="flex-1 py-3 px-4 rounded-xl bg-[#00D632]/15 hover:bg-[#00D632]/25 text-[#4ade80] hover:text-white border border-[#00D632]/40 text-xs font-bold transition-all flex items-center justify-between shadow-sm active:scale-[0.99] cursor-pointer group"
+                            className="flex-1 py-3 px-4 rounded-xl bg-[#00D632]/15 hover:bg-[#00D632]/25 text-[#15803d] dark:text-[#4ade80] border border-[#00D632]/40 text-xs font-bold transition-all flex items-center justify-between shadow-sm active:scale-[0.99] cursor-pointer group"
                             title={`Tip $${cleanCashApp} on Cash App`}
                           >
                             <div className="flex items-center gap-2">
@@ -281,7 +281,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                               </div>
                               <div className="text-left">
                                 <span className="block font-bold">Cash App</span>
-                                <span className="text-[11px] text-gray-400 font-mono">${cleanCashApp}</span>
+                                <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-mono font-semibold">${cleanCashApp}</span>
                               </div>
                             </div>
                             <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
@@ -290,20 +290,20 @@ export const TipModal: React.FC<TipModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleCopy(`$${cleanCashApp}`, `cashapp-${p.name}`)}
-                            className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                            className="p-3 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-muted,#9ca3af)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] transition-colors cursor-pointer group shadow-sm"
                             title="Copy Cash App $cashtag"
                           >
                             {copiedHandle === `cashapp-${p.name}` ? (
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-emerald-500" />
                             ) : (
-                              <Copy className="w-4 h-4" />
+                              <Copy className="w-4 h-4 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white" />
                             )}
                           </button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="py-3 px-4 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400 text-center">
+                    <div className="py-3 px-4 rounded-xl bg-[var(--ps-card-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] text-xs text-[var(--ps-text-muted,#9ca3af)] text-center font-medium">
                       No payment links configured for this photographer yet.
                     </div>
                   )}
@@ -314,16 +314,16 @@ export const TipModal: React.FC<TipModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-white/10 flex items-center justify-between gap-4 shrink-0">
-          <div className="text-[11px] text-gray-400 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="pt-4 border-t border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-between gap-4 shrink-0">
+          <div className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] flex items-center gap-1.5 font-medium">
+            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>Opens official payment provider directly to photographer</span>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] font-semibold text-xs transition-colors cursor-pointer shadow-sm"
           >
             Close
           </button>
