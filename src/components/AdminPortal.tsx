@@ -797,33 +797,35 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   return (
     <div className="min-h-screen bg-[var(--ps-bg,#000000)] text-[var(--ps-text-main,#ffffff)] pb-24 transition-colors duration-300">
       {/* Top Admin Navigation Bar */}
-      <nav className="sticky top-0 z-50 ps-glass-nav bg-[#0F0F12]/90 border-b border-[#2C2C2E] backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 ps-glass-nav bg-[var(--ps-nav-bg,rgba(15,15,18,0.95))] border-b border-[var(--ps-card-border,#2C2C2E)] backdrop-blur-xl transition-colors">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={onBackToVisitor}
-              className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              className="flex items-center gap-2 text-xs font-bold px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#1C1C1E)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all shadow-sm active:scale-95 cursor-pointer group"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Visitor Site</span>
+              <ArrowLeft className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] group-hover:text-white transition-colors" />
+              <span>Back to Site</span>
             </button>
-            <div className="h-4 w-px bg-white/20 hidden sm:block" />
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-green-400" />
-              <span className="font-bold text-sm text-white">Photographer Admin Portal</span>
-              <span className="text-[11px] text-gray-400 font-mono hidden md:inline">({adminName})</span>
+            <div className="h-4 w-px bg-[var(--ps-card-border,#2C2C2E)] hidden sm:block" />
+            <div className="flex items-center gap-2.5">
+              <div className="p-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30">
+                <Shield className="w-4 h-4 text-emerald-500" />
+              </div>
+              <span className="font-extrabold text-sm text-[var(--ps-text-main,#ffffff)] tracking-tight">Photographer Admin Portal</span>
+              <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-mono font-medium hidden md:inline">({adminName})</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {/* Tabs Selector */}
-            <div className="flex items-center bg-[#1C1C1E] p-1 rounded-xl border border-[#2C2C2E]">
+            <div className="flex items-center bg-[var(--ps-card-bg,#1C1C1E)] p-1 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shadow-sm">
               <button
                 onClick={() => setActiveTab('upload')}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'upload'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
+                    : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <FolderUp className="w-3.5 h-3.5" />
@@ -833,8 +835,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 onClick={() => setActiveTab('theme')}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'theme'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
+                    : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Palette className="w-3.5 h-3.5" />
@@ -844,8 +846,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 onClick={() => setActiveTab('fleet')}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'fleet'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
+                    : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -855,8 +857,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 onClick={() => setActiveTab('users')}
                 className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'users'
-                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
+                    : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
@@ -868,7 +870,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             {onLogoutAdmin && (
               <button
                 onClick={onLogoutAdmin}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-300 border border-red-500/30 transition-colors cursor-pointer shadow-sm"
                 title="Lock and sign out of admin portal"
               >
                 <LogOut className="w-3.5 h-3.5" />

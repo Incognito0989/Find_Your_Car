@@ -316,33 +316,34 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Logo & Title */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-white shadow-inner">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-center text-[var(--ps-primary,#0A84FF)] shadow-inner">
               <Camera className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-lg tracking-wider text-white">PLATE SNAP</span>
-                <span className="text-gray-500 font-light">/</span>
-                <span className="font-light text-xs tracking-widest uppercase text-gray-400">
+                <span className="font-black text-lg tracking-wider text-[var(--ps-text-main,#ffffff)]">PLATE SNAP</span>
+                <span className="text-[var(--ps-text-muted,#9ca3af)] font-light">/</span>
+                <span className="font-light text-xs tracking-widest uppercase text-[var(--ps-text-muted,#9ca3af)]">
                   CARS
                 </span>
               </div>
-              <p className="text-[10px] text-gray-400 font-mono tracking-wide">
+              <p className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] font-mono tracking-wide">
                 MULTI-THEME CINEMATIC ARCHIVE
               </p>
             </div>
           </div>
 
-          {/* Discrete Admin Lock Icon */}
+          {/* Photographer Admin Portal Button */}
           <div className="flex items-center">
             <button
               id="admin-portal-lock-btn"
               onClick={onOpenAdmin}
-              className="p-2 rounded-xl text-gray-500 hover:text-gray-200 hover:bg-white/10 transition-all active:scale-90 cursor-pointer"
-              title="Admin"
-              aria-label="Admin"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#111111)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer group"
+              title=""
+              aria-label=""
             >
-              <Lock className="w-4 h-4 opacity-40 hover:opacity-100 transition-opacity" />
+              <span className="sm:hidden">Admin</span>
+              <Lock className="w-3 h-3 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white/80 transition-colors" />
             </button>
           </div>
         </div>
@@ -352,9 +353,9 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
       <main className="relative z-10 max-w-7xl mx-auto px-6 pt-12 pb-24 space-y-12">
         {/* Hero Section with High Impact Typography */}
         <section className="text-center space-y-4 max-w-3xl mx-auto pt-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--ps-badge-bg,#111111)] border border-[var(--ps-badge-border,#2C2C2E)] text-xs font-semibold text-[var(--ps-text-muted,#9ca3af)] backdrop-blur-md shadow-sm">
             <Sparkles className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
-            <span>High-Res Photography & 2D Vector Cartoon Stickers</span>
+            <span className="text-[var(--ps-text-main,#ffffff)]">High-Res Photography & 2D Vector Cartoon Stickers</span>
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-[var(--ps-text-main,#ffffff)] leading-[1.1]">
@@ -370,21 +371,21 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         {/* Hero Vehicle Name & Author Search Component */}
         <section className="max-w-3xl mx-auto space-y-4">
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-[var(--ps-primary,#0A84FF)] to-blue-600 rounded-[28px] blur-md opacity-25 group-hover:opacity-40 transition duration-500" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-[var(--ps-primary,#0A84FF)] to-blue-600 rounded-[28px] blur-md opacity-20 group-hover:opacity-35 transition duration-500" />
             <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center bg-[var(--ps-search-bg,#1C1C1E)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-2 shadow-2xl focus-within:border-[var(--ps-primary,#0A84FF)] transition-all gap-2 sm:gap-0">
               
               {/* Origin State / Region Selector Dropdown Inside Search Bar */}
-              <div className="flex items-center pl-3 pr-2 sm:border-r border-[#3A3A3C]/60 shrink-0 py-1 sm:py-0">
+              <div className="flex items-center pl-3 pr-2 sm:border-r border-[var(--ps-card-border,#2C2C2E)] shrink-0 py-1 sm:py-0">
                 <MapPin className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] mr-1.5 shrink-0" />
                 <select
                   value={selectedStateFilter}
                   onChange={(e) => setSelectedStateFilter(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-gray-200 outline-none cursor-pointer pr-2 hover:text-white transition-colors"
+                  className="bg-transparent text-xs font-bold text-[var(--ps-text-main,#ffffff)] outline-none cursor-pointer pr-2 hover:text-[var(--ps-primary,#0A84FF)] transition-colors"
                   title="Filter by Vehicle Origin State / Region"
                 >
-                  <option value="All" className="bg-[#1C1C1E] text-white">All States / Regions</option>
+                  <option value="All">All States / Regions</option>
                   {US_STATES.map((s) => (
-                    <option key={s.code} value={s.code} className="bg-[#1C1C1E] text-white">
+                    <option key={s.code} value={s.code}>
                       {s.name} ({s.code})
                     </option>
                   ))}
@@ -393,7 +394,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
               {/* Text Search Input */}
               <div className="flex items-center flex-1 min-w-0">
-                <div className="pl-3 pr-2 text-gray-400">
+                <div className="pl-3 pr-2 text-[var(--ps-text-muted,#9ca3af)]">
                   <Search className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
                 </div>
                 <input
@@ -401,12 +402,12 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by car name (e.g. Porsche 911 GT3 RS, Miata), make, author..."
-                  className="w-full bg-transparent border-none py-3 text-sm sm:text-base text-[var(--ps-text-main,#ffffff)] font-mono font-medium outline-none placeholder:text-gray-500 placeholder:font-sans"
+                  className="w-full bg-transparent border-none py-3 text-sm sm:text-base text-[var(--ps-text-main,#ffffff)] font-mono font-medium outline-none placeholder:text-[var(--ps-text-muted,#9ca3af)] placeholder:font-sans"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="p-2 text-gray-400 hover:text-white transition-colors mr-1 cursor-pointer"
+                    className="p-2 text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] transition-colors mr-1 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -423,9 +424,9 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           </div>
 
           {/* Search Helpers & Quick Vehicles */}
-          <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-gray-400 px-1">
+          <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-[var(--ps-text-muted,#9ca3af)] px-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-semibold text-gray-500">Quick Try:</span>
+              <span className="font-semibold text-[var(--ps-text-muted,#9ca3af)]">Quick Try:</span>
               {QUICK_CARS.map((carItem) => (
                 <button
                   key={carItem}
@@ -434,8 +435,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   }}
                   className={`font-mono px-2 py-0.5 rounded-lg border transition-all cursor-pointer text-[11px] ${
                     searchQuery.toLowerCase().includes(carItem.toLowerCase())
-                      ? 'border-blue-500 bg-blue-500/20 text-blue-400 font-bold'
-                      : 'border-white/10 bg-white/5 hover:bg-white/10 text-gray-300'
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-500 dark:text-blue-400 font-bold'
+                      : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-card-bg,#111111)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] hover:border-[var(--ps-primary,#0A84FF)]/40'
                   }`}
                 >
                   {carItem}
@@ -444,12 +445,12 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             </div>
 
             {selectedStateFilter !== 'All' && (
-              <div className="flex items-center gap-1.5 text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/30 text-[11px] font-mono">
-                <MapPin className="w-3 h-3 text-blue-400" />
+              <div className="flex items-center gap-1.5 text-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/10 px-2.5 py-1 rounded-full border border-[var(--ps-primary,#0A84FF)]/30 text-[11px] font-mono">
+                <MapPin className="w-3 h-3 text-[var(--ps-primary,#0A84FF)]" />
                 <span>Filtered to <strong>{getStateName(selectedStateFilter)}</strong></span>
                 <button
                   onClick={() => setSelectedStateFilter('All')}
-                  className="ml-1 hover:text-white cursor-pointer"
+                  className="ml-1 hover:opacity-75 cursor-pointer"
                   title="Clear state filter"
                 >
                   <X className="w-3 h-3" />
@@ -464,8 +465,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           {/* Row 1: State Origin Filter Chips (if inventory has distinct states) */}
           {distinctStates.length > 2 && (
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
-              <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase font-mono mr-1 shrink-0">
-                <MapPin className="w-3.5 h-3.5 text-blue-400" />
+              <div className="flex items-center gap-1 text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase font-mono mr-1 shrink-0">
+                <MapPin className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
                 <span>State:</span>
               </div>
               {distinctStates.map((st) => (
@@ -474,8 +475,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   onClick={() => setSelectedStateFilter(st)}
                   className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
                     selectedStateFilter === st
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                      : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white hover:border-gray-600'
+                      ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
+                      : 'bg-[var(--ps-card-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] border-[var(--ps-card-border,#2C2C2E)] hover:text-[var(--ps-text-main,#ffffff)] hover:border-[var(--ps-primary,#0A84FF)]/40'
                   }`}
                 >
                   {st === 'All' ? 'All States' : getStateName(st)}
@@ -487,7 +488,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           {/* Row 2: Make filter chips */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-2">
-              <span className="text-xs font-bold text-gray-400 uppercase font-mono mr-1.5 shrink-0">
+              <span className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase font-mono mr-1.5 shrink-0">
                 Make:
               </span>
               {distinctMakes.map((make) => (
@@ -497,7 +498,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
                     selectedMake === make
                       ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
-                      : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white hover:border-gray-600'
+                      : 'bg-[var(--ps-card-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] border-[var(--ps-card-border,#2C2C2E)] hover:text-[var(--ps-text-main,#ffffff)] hover:border-[var(--ps-primary,#0A84FF)]/40'
                   }`}
                 >
                   {make}
@@ -506,11 +507,11 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             </div>
 
             {/* Grid / List Switcher */}
-            <div className="hidden sm:flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E] shrink-0">
+            <div className="hidden sm:flex items-center bg-[var(--ps-card-bg,#141416)] p-1 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shrink-0">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'grid' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                  viewMode === 'grid' ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm' : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
                 title="Grid View"
               >
@@ -519,7 +520,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               <button
                 onClick={() => setViewMode('list')}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'list' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                  viewMode === 'list' ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm' : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
                 title="List View"
               >
@@ -532,7 +533,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-1">
             {/* Photographer chips */}
             <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-400 uppercase font-mono mr-1 shrink-0">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase font-mono mr-1 shrink-0">
                 <Users className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
                 <span>Author:</span>
               </div>
@@ -540,8 +541,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                 onClick={() => setSelectedAuthor('All')}
                 className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
                   selectedAuthor === 'All'
-                    ? 'bg-white/20 text-white border-white/30'
-                    : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-sm'
+                    : 'bg-[var(--ps-card-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] border-[var(--ps-card-border,#2C2C2E)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 All Photographers
@@ -554,13 +555,13 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer ${
                     selectedAuthor === p.name
                       ? 'bg-[var(--ps-primary,#0A84FF)] text-white border-[var(--ps-primary,#0A84FF)] shadow-md'
-                      : 'bg-[#141416]/80 text-gray-400 border-[#2C2C2E] hover:text-white'
+                      : 'bg-[var(--ps-card-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] border-[var(--ps-card-border,#2C2C2E)] hover:text-[var(--ps-text-main,#ffffff)]'
                   }`}
                 >
                   <img
                     src={p.avatar}
                     alt={p.name}
-                    className="w-4 h-4 rounded-full object-cover border border-white/20"
+                    className="w-4 h-4 rounded-full object-cover border border-[var(--ps-card-border,#2C2C2E)]"
                   />
                   <span>{p.name}</span>
                 </button>
@@ -568,11 +569,11 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
             </div>
 
             {/* Art Style Toggle */}
-            <div className="flex items-center bg-[#141416]/90 p-1 rounded-xl border border-[#2C2C2E] shrink-0 self-end sm:self-auto">
+            <div className="flex items-center bg-[var(--ps-card-bg,#141416)] p-1 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shrink-0 self-end sm:self-auto">
               <button
                 onClick={() => setArtFilter('all')}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  artFilter === 'all' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                  artFilter === 'all' ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm' : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 All Works
@@ -580,7 +581,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               <button
                 onClick={() => setArtFilter('photos')}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  artFilter === 'photos' ? 'bg-white/15 text-white' : 'text-gray-400 hover:text-white'
+                  artFilter === 'photos' ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm' : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 Photos Only
@@ -589,8 +590,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                 onClick={() => setArtFilter('cartoons')}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
                   artFilter === 'cartoons'
-                    ? 'bg-pink-500/20 text-pink-300 font-bold'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-pink-600 text-white font-bold shadow-sm'
+                    : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Sparkles className="w-3 h-3 text-pink-400" />
@@ -604,16 +605,16 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         <section className="space-y-6">
           {/* Multi-State Disambiguation Alert Banner */}
           {multiStateNotice && (
-            <div className="p-4 bg-gradient-to-r from-blue-950/60 to-purple-950/40 border border-blue-500/40 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg backdrop-blur-md animate-fadeIn">
-              <div className="flex items-center gap-3 text-blue-200">
-                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 shrink-0">
+            <div className="p-4 bg-[var(--ps-card-bg,#111111)] border border-blue-500/40 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg backdrop-blur-md animate-fadeIn">
+              <div className="flex items-center gap-3 text-blue-500 dark:text-blue-200">
+                <div className="p-2 rounded-xl bg-blue-500/15 text-blue-500 dark:text-blue-400 shrink-0">
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">
+                  <p className="text-xs font-bold text-[var(--ps-text-main,#ffffff)]">
                     Found {multiStateNotice.totalMatches} vehicles matching [{multiStateNotice.plateQuery}] across {multiStateNotice.states.length} different states.
                   </p>
-                  <p className="text-[11px] text-blue-300">
+                  <p className="text-[11px] text-[var(--ps-text-muted,#9ca3af)]">
                     Filter by vehicle origin state to eliminate redundant results:
                   </p>
                 </div>
@@ -623,9 +624,9 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   <button
                     key={st.code}
                     onClick={() => setSelectedStateFilter(st.code)}
-                    className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/40 text-white text-xs font-mono font-bold border border-blue-400/40 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                    className="px-3 py-1.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-mono font-bold border border-transparent flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
                   >
-                    <MapPin className="w-3 h-3 text-blue-400" />
+                    <MapPin className="w-3 h-3 text-white" />
                     <span>{st.label} ({st.count})</span>
                   </button>
                 ))}
@@ -635,18 +636,18 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white">Automotive Showcase</h2>
-              <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-white/10 text-gray-300">
+              <h2 className="text-xl font-bold text-[var(--ps-text-main,#ffffff)]">Automotive Showcase</h2>
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[var(--ps-card-bg,#111111)] text-[var(--ps-text-muted,#9ca3af)] border border-[var(--ps-card-border,#2C2C2E)]">
                 {filteredCars.length} {filteredCars.length === 1 ? 'result' : 'results'}
               </span>
               {selectedStateFilter !== 'All' && (
-                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   {getStateName(selectedStateFilter)}
                 </span>
               )}
               {selectedAuthor !== 'All' && (
-                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-300 border border-blue-500/30">
                   By {selectedAuthor}
                 </span>
               )}
@@ -661,7 +662,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   setSelectedMake('All');
                   setArtFilter('all');
                 }}
-                className="text-xs text-gray-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                className="text-xs text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <span>Reset all filters</span>
                 <X className="w-3.5 h-3.5" />
@@ -711,7 +712,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   <button
                     onClick={handleLoadMore}
                     disabled={isLoadingMoreRows}
-                    className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 shadow-md hover:border-[var(--ps-primary,#0A84FF)]/40 cursor-pointer disabled:opacity-50"
+                    className="px-6 py-3 rounded-2xl bg-[var(--ps-card-bg,#111111)] hover:border-[var(--ps-primary,#0A84FF)] border border-[var(--ps-card-border,#2C2C2E)] text-[var(--ps-text-main,#ffffff)] text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 shadow-md cursor-pointer disabled:opacity-50"
                   >
                     <ChevronDown className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] animate-bounce" />
                     <span>
@@ -724,12 +725,12 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
               )}
             </div>
           ) : (
-            <div className="p-16 text-center bg-[#141416]/60 border border-[#2C2C2E] rounded-3xl space-y-4 max-w-xl mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-gray-400">
+            <div className="p-16 text-center bg-[var(--ps-card-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl space-y-4 max-w-xl mx-auto shadow-lg">
+              <div className="w-16 h-16 rounded-2xl bg-[var(--ps-primary,#0A84FF)]/10 border border-[var(--ps-primary,#0A84FF)]/20 flex items-center justify-center mx-auto text-[var(--ps-primary,#0A84FF)]">
                 <Search className="w-8 h-8 text-[var(--ps-primary,#0A84FF)]" />
               </div>
-              <h3 className="text-lg font-bold text-white">No cars found</h3>
-              <p className="text-xs text-gray-400 max-w-sm mx-auto">
+              <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)]">No cars found</h3>
+              <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] max-w-sm mx-auto">
                 Try searching by different vehicle name, car make, model, or select another photographer.
               </p>
               <button
@@ -740,7 +741,7 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                   setSelectedAuthor('All');
                   setArtFilter('all');
                 }}
-                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-semibold transition-colors cursor-pointer shadow-md"
               >
                 Reset All Filters
               </button>
@@ -749,16 +750,16 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         </section>
 
         {/* Feature Highlight: 2D Cartoon Stickers */}
-        <section className="bg-gradient-to-r from-pink-950/40 via-purple-950/20 to-blue-950/40 border border-pink-500/20 rounded-3xl p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md">
+        <section className="bg-[var(--ps-card-bg,#141416)] border border-pink-500/30 rounded-3xl p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md shadow-xl">
           <div className="space-y-3 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-500/15 border border-pink-500/30 text-pink-600 dark:text-pink-300 text-xs font-bold">
+              <Sparkles className="w-3.5 h-3.5 text-pink-500" />
               <span>Iconic Mazda Miata Vector Art Mode</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--ps-text-main,#ffffff)]">
               Turn Your Car Into a 2D Cartoon Sticker.
             </h2>
-            <p className="text-xs sm:text-sm text-gray-400">
+            <p className="text-xs sm:text-sm text-[var(--ps-text-muted,#9ca3af)]">
               Transform any track photograph into iconic pop-up headlight Miata cel-shaded vector
               illustrations in seconds.
             </p>
@@ -766,9 +767,9 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
           <button
             onClick={() => setArtFilter('cartoons')}
-            className="bg-white text-black hover:bg-gray-100 font-bold px-6 py-3.5 rounded-2xl text-xs sm:text-sm shadow-xl active:scale-95 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+            className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold px-6 py-3.5 rounded-2xl text-xs sm:text-sm shadow-xl active:scale-95 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-pink-500" />
+            <Sparkles className="w-4 h-4 text-pink-200" />
             <span>Explore Stickers</span>
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -776,25 +777,25 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
       </main>
 
       {/* Footer (Lock removed from bottom right) */}
-      <footer className="border-t border-[var(--ps-card-border,#2C2C2E)] bg-black/80 backdrop-blur-md py-12 px-6 relative z-10 text-xs text-gray-500">
+      <footer className="border-t border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-nav-bg,rgba(0,0,0,0.8))] backdrop-blur-md py-12 px-6 relative z-10 text-xs text-[var(--ps-text-muted,#9ca3af)]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-xl bg-white/10 flex items-center justify-center text-white">
-              <Camera className="w-4 h-4 text-blue-400" />
+            <div className="w-7 h-7 rounded-xl bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-center text-[var(--ps-primary,#0A84FF)]">
+              <Camera className="w-4 h-4" />
             </div>
-            <span className="font-bold text-white">PLATE SNAP / CARS</span>
-            <span>•</span>
+            <span className="font-bold text-[var(--ps-text-main,#ffffff)]">PLATE SNAP / CARS</span>
+            <span className="text-[var(--ps-text-muted,#9ca3af)]">•</span>
             <span>© {new Date().getFullYear()} Cinematic Automotive Photography</span>
           </div>
 
-          <div className="flex items-center gap-6 text-gray-400">
-            <span className="hover:text-white transition-colors cursor-pointer">
+          <div className="flex items-center gap-6 text-[var(--ps-text-muted,#9ca3af)]">
+            <span className="hover:text-[var(--ps-text-main,#ffffff)] transition-colors cursor-pointer">
               Photographer Terms
             </span>
-            <span className="hover:text-white transition-colors cursor-pointer">
+            <span className="hover:text-[var(--ps-text-main,#ffffff)] transition-colors cursor-pointer">
               Privacy Policy
             </span>
-            <span className="hover:text-white transition-colors cursor-pointer">Support</span>
+            <span className="hover:text-[var(--ps-text-main,#ffffff)] transition-colors cursor-pointer">Support</span>
           </div>
         </div>
       </footer>

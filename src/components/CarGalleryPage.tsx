@@ -14,6 +14,7 @@ import {
   Check,
   Layers,
   Eye,
+  Shield,
   ShieldCheck,
   ExternalLink,
   ZoomIn,
@@ -242,21 +243,21 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           {/* Back Button */}
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all shadow-sm active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-bold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all shadow-sm active:scale-95 cursor-pointer group"
           >
-            <ArrowLeft className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
-            <span className="hidden sm:inline">Back to Showcase & Search</span>
+            <ArrowLeft className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] group-hover:text-white transition-colors" />
+            <span className="hidden sm:inline">Back to Site</span>
             <span className="sm:hidden">Back</span>
           </button>
 
           {/* Center Vehicle Descriptor Badge */}
           <div className="flex items-center gap-3">
-            <div className="bg-[var(--ps-badge-bg,rgba(0,0,0,0.85))] px-3.5 py-1.5 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-2 shadow-inner">
+            <div className="bg-[var(--ps-badge-bg,#111111)] px-3.5 py-1.5 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-2 shadow-sm">
               <span className="text-sm font-mono font-black text-[var(--ps-badge-text,#ffffff)] tracking-wider">
                 {car.carName || `${car.make} ${car.model || ''}`}
               </span>
             </div>
-            <span className="hidden md:inline-block text-xs font-mono text-gray-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/5">
+            <span className="hidden md:inline-block text-xs font-mono font-semibold text-[var(--ps-text-muted,#9ca3af)] bg-[var(--ps-card-bg,#111111)] px-2.5 py-1 rounded-full border border-[var(--ps-card-border,#2C2C2E)]">
               {allImages.length} {allImages.length === 1 ? 'Photo' : 'Photos'} in Set
             </span>
           </div>
@@ -265,10 +266,10 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleTipAllAuthors}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer shadow-sm"
               title="Tip Photographers"
             >
-              <Heart className="w-3.5 h-3.5 text-amber-400 fill-amber-400/50" />
+              <Heart className="w-3.5 h-3.5 text-amber-500 fill-amber-500/30" />
               <span className="hidden sm:inline">
                 {allSetAuthors.length > 1 ? `Tip Authors (Split ${allSetAuthors.length})` : 'Tip Author'}
               </span>
@@ -277,17 +278,17 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
             <button
               onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white text-xs font-medium border border-white/10 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-semibold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-colors cursor-pointer group shadow-sm"
               title="Share Gallery Link"
             >
               {copiedLink ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-green-400 text-xs">Copied!</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-emerald-500 text-xs font-bold">Copied!</span>
                 </>
               ) : (
                 <>
-                  <Share2 className="w-3.5 h-3.5" />
+                  <Share2 className="w-3.5 h-3.5 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white transition-colors" />
                   <span className="hidden sm:inline">Share</span>
                 </>
               )}
@@ -308,11 +309,13 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {onOpenAdmin && (
               <button
                 onClick={onOpenAdmin}
-                className="p-2 rounded-xl text-gray-500 hover:text-gray-200 hover:bg-white/10 transition-all active:scale-90 cursor-pointer ml-0.5"
-                title="Admin"
-                aria-label="Admin"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-bold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all active:scale-95 cursor-pointer ml-0.5 group shadow-sm"
+                title="Photographer Admin Portal"
+                aria-label="Photographer Admin Portal"
               >
-                <Lock className="w-4 h-4 opacity-40 hover:opacity-100 transition-opacity" />
+                <Shield className="w-3.5 h-3.5 text-emerald-500 group-hover:text-white transition-colors" />
+                <span className="hidden md:inline">Admin Portal</span>
+                <Lock className="w-3 h-3 text-[var(--ps-text-muted,#9ca3af)] group-hover:text-white/80 transition-colors" />
               </button>
             )}
           </div>

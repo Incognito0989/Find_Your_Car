@@ -9,33 +9,66 @@
   --ps-card-border: #2C2C2E;
   --ps-text-main: #FFFFFF;
   --ps-text-muted: #9CA3AF;
+  --ps-text-subtle: #71717A;
+  --ps-text-contrast: #FFFFFF;
   --ps-nav-bg: rgba(0, 0, 0, 0.55);
   --ps-search-bg: #1C1C1E;
   --ps-badge-bg: rgba(0, 0, 0, 0.7);
   --ps-badge-border: #2C2C2E;
   --ps-badge-text: #FFFFFF;
+  --ps-chip-bg: rgba(20, 20, 22, 0.85);
+  --ps-chip-border: #2C2C2E;
+  --ps-chip-text: #9CA3AF;
+  --ps-chip-hover-text: #FFFFFF;
+  --ps-input-bg: #1C1C1E;
+  --ps-input-border: #2C2C2E;
+  --ps-input-text: #FFFFFF;
+  --ps-input-placeholder: #6B7280;
   --ps-glow: 0 0 25px rgba(10, 132, 255, 0.25);
   --ps-radius: 24px;
   --ps-video-opacity: 0.45;
 }
 
-[data-theme="light"] {
+[data-theme="light"], :root.light {
   --ps-primary: #0A84FF;
   --ps-primary-hover: #0070E0;
-  --ps-bg: #F5F5F7;
-  --ps-bg-gradient: radial-gradient(circle at 50% 10%, rgba(10, 132, 255, 0.05), transparent 60%), #F5F5F7;
+  --ps-bg: #F8FAFC;
+  --ps-bg-gradient: radial-gradient(circle at 50% 10%, rgba(10, 132, 255, 0.04), transparent 60%), #F8FAFC;
   --ps-card-bg: #FFFFFF;
-  --ps-card-border: #E5E5EA;
-  --ps-text-main: #1C1C1E;
-  --ps-text-muted: #636366;
-  --ps-nav-bg: rgba(255, 255, 255, 0.8);
+  --ps-card-border: #E2E8F0;
+  --ps-text-main: #0F172A;
+  --ps-text-muted: #475569;
+  --ps-text-subtle: #64748B;
+  --ps-text-contrast: #0F172A;
+  --ps-nav-bg: rgba(255, 255, 255, 0.92);
   --ps-search-bg: #FFFFFF;
-  --ps-badge-bg: rgba(255, 255, 255, 0.9);
-  --ps-badge-border: #E5E5EA;
-  --ps-badge-text: #1C1C1E;
+  --ps-badge-bg: #F1F5F9;
+  --ps-badge-border: #CBD5E1;
+  --ps-badge-text: #0F172A;
+  --ps-chip-bg: rgba(241, 245, 249, 0.9);
+  --ps-chip-border: #E2E8F0;
+  --ps-chip-text: #475569;
+  --ps-chip-hover-text: #0F172A;
+  --ps-input-bg: #FFFFFF;
+  --ps-input-border: #CBD5E1;
+  --ps-input-text: #0F172A;
+  --ps-input-placeholder: #94A3B8;
   --ps-glow: 0 4px 20px rgba(0, 0, 0, 0.06);
   --ps-radius: 24px;
-  --ps-video-opacity: 0.12;
+  --ps-video-opacity: 0.08;
+}
+
+/* Light Theme Contrast Hardening */
+[data-theme="light"] select option,
+:root.light select option {
+  background-color: #FFFFFF;
+  color: #0F172A;
+}
+
+/* Ensure text elements within light theme are sharp and legible */
+[data-theme="light"] .font-mono,
+:root.light .font-mono {
+  color: inherit;
 }
 
 body {
