@@ -120,7 +120,12 @@ export function getLocalTheme(): AppThemeConfig | null {
   try {
     if (fs.existsSync(THEME_JSON_PATH)) {
       const data = fs.readFileSync(THEME_JSON_PATH, 'utf-8');
-      return JSON.parse(data);
+      if (data && data.trim()) {
+        const parsed = JSON.parse(data);
+        if (parsed && (parsed.id || parsed.primary || parsed.bg)) {
+          return parsed;
+        }
+      }
     }
   } catch (e) {
     console.warn('[Database Fallback] Error reading local theme:', e);
@@ -130,6 +135,10 @@ export function getLocalTheme(): AppThemeConfig | null {
 
 export function saveLocalTheme(theme: AppThemeConfig): void {
   try {
+    const dir = path.dirname(THEME_JSON_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(THEME_JSON_PATH, JSON.stringify(theme, null, 2), 'utf-8');
   } catch (e) {
     console.error('[Database Fallback] Error saving local theme:', e);
@@ -240,6 +249,24 @@ export async function initializePostgresDatabase(): Promise<void> {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
+
+    // Sync theme settings with app_settings in Postgres
+    try {
+      const themeRes = await pool.query("SELECT value FROM app_settings WHERE key = 'theme'");
+      if (themeRes.rows.length > 0 && themeRes.rows[0].value) {
+        saveLocalTheme(themeRes.rows[0].value);
+      } else {
+        const localTheme = getLocalTheme();
+        if (localTheme) {
+          await pool.query(
+            `INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', $1::jsonb, NOW()) ON CONFLICT (key) DO NOTHING`,
+            [JSON.stringify(localTheme)]
+          );
+        }
+      }
+    } catch (err: any) {
+      console.warn('[PostgreSQL Theme Sync] Note:', err.message);
+    }
 
     // Seed default users if empty
     const usersCountRes = await pool.query('SELECT COUNT(*) as count FROM users');

@@ -62,6 +62,9 @@ export function App() {
         if (themeData && themeData.theme) {
           setCurrentTheme(themeData.theme);
           applyThemeToDocument(themeData.theme);
+          try {
+            localStorage.setItem('plate_snap_theme', JSON.stringify(themeData.theme));
+          } catch (e) {}
         }
       }
     } catch (err) {

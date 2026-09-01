@@ -485,6 +485,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [themeForm, setThemeForm] = useState<AppThemeConfig>({ ...currentTheme });
   const [themeSavedToast, setThemeSavedToast] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (currentTheme) {
+      setThemeForm({ ...currentTheme });
+    }
+  }, [currentTheme]);
+
   // Process a list of File objects (from multi-select, folder input, or drag-and-drop)
   const handleFilesAdded = async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(
