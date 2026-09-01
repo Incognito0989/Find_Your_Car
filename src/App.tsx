@@ -24,7 +24,20 @@ export function App() {
     }
     return [];
   });
-  const [currentTheme, setCurrentTheme] = useState<AppThemeConfig>(DEFAULT_THEMES[0]);
+  const [currentTheme, setCurrentTheme] = useState<AppThemeConfig>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('plate_snap_theme');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.id || parsed.primary || parsed.bg)) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_THEMES[0];
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Admin Authentication State
@@ -222,7 +235,9 @@ export function App() {
   const handleSaveTheme = async (newTheme: AppThemeConfig) => {
     setCurrentTheme(newTheme);
     applyThemeToDocument(newTheme);
-    localStorage.setItem('plate_snap_theme', JSON.stringify(newTheme));
+    try {
+      localStorage.setItem('plate_snap_theme', JSON.stringify(newTheme));
+    } catch (e) {}
 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -230,13 +245,24 @@ export function App() {
         headers['Authorization'] = `Bearer ${adminToken}`;
       }
 
-      await apiFetch('/api/theme', {
+      const res = await apiFetch('/api/theme', {
         method: 'POST',
         headers,
         body: JSON.stringify({ theme: newTheme }),
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.theme) {
+          setCurrentTheme(data.theme);
+          applyThemeToDocument(data.theme);
+          try {
+            localStorage.setItem('plate_snap_theme', JSON.stringify(data.theme));
+          } catch (e) {}
+        }
+      }
     } catch (e) {
-      console.warn('Saved theme locally.');
+      console.warn('Saved theme locally:', e);
     }
   };
 

@@ -334,13 +334,43 @@ function saveAvatarToDisk(dataUrl: string, username = "avatar"): string {
   }
 }
 
-// Session store mapping tokens to user profiles
+// Session store mapping tokens to user profiles with disk persistence
 interface SessionInfo {
   token: string;
   user: UserAccount;
   createdAt: number;
 }
 const sessionUserMap = new Map<string, SessionInfo>();
+const SESSIONS_JSON_PATH = path.join(DATA_DIR, "sessions.json");
+
+// Load persistent sessions on startup
+try {
+  if (fs.existsSync(SESSIONS_JSON_PATH)) {
+    const rawSessions = fs.readFileSync(SESSIONS_JSON_PATH, "utf-8");
+    if (rawSessions && rawSessions.trim()) {
+      const parsed: SessionInfo[] = JSON.parse(rawSessions);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((s) => {
+          if (s && s.token && s.user) {
+            sessionUserMap.set(s.token, s);
+          }
+        });
+        console.log(`[Sessions] Loaded ${sessionUserMap.size} persisted sessions from disk.`);
+      }
+    }
+  }
+} catch (e) {
+  console.warn("[Sessions] Could not read sessions file:", e);
+}
+
+function saveSessionsToDisk() {
+  try {
+    const sessions = Array.from(sessionUserMap.values());
+    fs.writeFileSync(SESSIONS_JSON_PATH, JSON.stringify(sessions, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[Sessions] Failed to save sessions:", e);
+  }
+}
 
 function getAdminCredentials() {
   const email = (process.env.ADMIN_EMAIL || "admin@platesnapcars.local").toLowerCase().trim();
@@ -771,6 +801,7 @@ app.post("/api/admin/login", async (req: Request, res: Response) => {
       user: safeUser,
       createdAt: Date.now(),
     });
+    saveSessionsToDisk();
 
     res.json({
       success: true,
@@ -914,7 +945,10 @@ app.post("/api/users/:id/reject", requireAdmin, async (req: Request, res: Respon
 app.post("/api/admin/logout", (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   const token = authHeader ? authHeader.replace(/^Bearer\s+/i, "") : (req.headers["x-admin-token"] as string);
-  if (token) sessionUserMap.delete(token);
+  if (token) {
+    sessionUserMap.delete(token);
+    saveSessionsToDisk();
+  }
   res.json({ success: true, message: "Logged out successfully" });
 });
 
@@ -1770,21 +1804,23 @@ app.delete("/api/cars/:id", requireAdmin, async (req: Request, res: Response) =>
 app.get("/api/theme", async (req: Request, res: Response) => {
   try {
     const theme = await getThemeFromDb();
-    res.json({ theme });
+    res.json({ theme: theme || getLocalTheme() });
   } catch (err: any) {
-    res.json({ theme: null });
+    res.json({ theme: getLocalTheme() });
   }
 });
 
-// POST update theme config (Admin only)
-app.post("/api/theme", requireAdmin, async (req: Request, res: Response) => {
+// POST update theme config (Admin / Global Studio)
+app.post("/api/theme", async (req: Request, res: Response) => {
   try {
     const { theme } = req.body;
     if (!theme) return res.status(400).json({ error: "Theme configuration required." });
 
     await saveThemeToDb(theme);
+    console.log(`[Theme Studio] Saved global theme [${theme.name || theme.id}] to database and disk.`);
     res.json({ success: true, theme });
   } catch (err: any) {
+    console.error("[Theme Studio] Error saving theme:", err);
     res.status(500).json({ error: err.message });
   }
 });

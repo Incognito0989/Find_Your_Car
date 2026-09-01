@@ -140,6 +140,7 @@ export function saveLocalTheme(theme: AppThemeConfig): void {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(THEME_JSON_PATH, JSON.stringify(theme, null, 2), 'utf-8');
+    console.log(`[Database Fallback] Saved global theme [${theme.name || theme.id}] to ${THEME_JSON_PATH}`);
   } catch (e) {
     console.error('[Database Fallback] Error saving local theme:', e);
   }

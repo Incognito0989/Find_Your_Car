@@ -8,6 +8,37 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('plate_snap_theme');
+          if (saved) {
+            var theme = JSON.parse(saved);
+            if (theme && theme.bg) {
+              var root = document.documentElement;
+              if (theme.isDark) {
+                root.classList.add('dark');
+                root.classList.remove('light');
+                root.style.colorScheme = 'dark';
+              } else {
+                root.classList.remove('dark');
+                root.classList.add('light');
+                root.setAttribute('data-theme', 'light');
+                root.style.colorScheme = 'light';
+              }
+              root.style.setProperty('--ps-primary', theme.primary || '#0A84FF');
+              root.style.setProperty('--ps-bg', theme.bg || '#000000');
+              root.style.setProperty('--ps-card-bg', theme.cardBg || '#111111');
+              root.style.setProperty('--ps-card-border', theme.cardBorder || '#2C2C2E');
+              root.style.setProperty('--ps-text-main', theme.textMain || '#ffffff');
+              root.style.setProperty('--ps-text-muted', theme.textMuted || '#9ca3af');
+              root.style.setProperty('--ps-nav-bg', theme.navBg || 'rgba(0,0,0,0.55)');
+              root.style.setProperty('--ps-search-bg', theme.searchBg || '#1C1C1E');
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body class="bg-black text-white antialiased selection:bg-blue-500/30">
     <div id="root"></div>
