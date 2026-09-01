@@ -7,6 +7,7 @@ export interface Photographer {
   instagram?: string;
   venmoHandle?: string;
   payPalHandle?: string;
+  cashAppHandle?: string;
 }
 
 export interface UserAccount {
@@ -20,6 +21,7 @@ export interface UserAccount {
   instagram?: string;
   venmoHandle?: string;
   payPalHandle?: string;
+  cashAppHandle?: string;
   createdAt: string;
   isActive: boolean;
   status?: 'pending' | 'active' | 'suspended';

@@ -182,6 +182,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         bio: adminUser.bio || '',
         venmoHandle: adminUser.venmoHandle || undefined,
         payPalHandle: adminUser.payPalHandle || undefined,
+        cashAppHandle: adminUser.cashAppHandle || undefined,
         instagram: adminUser.instagram || undefined,
       };
     }
@@ -192,6 +193,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       bio: '',
       venmoHandle: undefined,
       payPalHandle: undefined,
+      cashAppHandle: undefined,
       instagram: undefined,
     };
   }, [adminUser, adminName]);
@@ -231,6 +233,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [editPhotographerInstagram, setEditPhotographerInstagram] = useState<string>('');
   const [editPhotographerVenmo, setEditPhotographerVenmo] = useState<string>('');
   const [editPhotographerPayPal, setEditPhotographerPayPal] = useState<string>('');
+  const [editPhotographerCashApp, setEditPhotographerCashApp] = useState<string>('');
   const [editCoverImageUrl, setEditCoverImageUrl] = useState<string>('');
   const [editImages, setEditImages] = useState<string[]>([]);
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
@@ -256,6 +259,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setEditPhotographerInstagram(editingCarGallery.photographer?.instagram || '');
       setEditPhotographerVenmo(editingCarGallery.photographer?.venmoHandle || '');
       setEditPhotographerPayPal(editingCarGallery.photographer?.payPalHandle || '');
+      setEditPhotographerCashApp(editingCarGallery.photographer?.cashAppHandle || '');
       setEditCoverImageUrl(editingCarGallery.imageUrl || '');
       const imgs =
         Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
@@ -654,6 +658,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           instagram: editPhotographerInstagram.trim() || undefined,
           venmoHandle: editPhotographerVenmo.trim() || undefined,
           payPalHandle: editPhotographerPayPal.trim() || undefined,
+          cashAppHandle: editPhotographerCashApp.trim() || undefined,
         },
       };
 
@@ -2066,7 +2071,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-400 mb-1">
                         Instagram Handle
@@ -2102,6 +2107,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         placeholder="paypal-handle"
                         value={editPhotographerPayPal}
                         onChange={(e) => setEditPhotographerPayPal(e.target.value)}
+                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-400 mb-1">
+                        Cash App $cashtag
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="cashtag"
+                        value={editPhotographerCashApp}
+                        onChange={(e) => setEditPhotographerCashApp(e.target.value)}
                         className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
                       />
                     </div>

@@ -63,6 +63,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   const [instagram, setInstagram] = useState<string>('');
   const [venmoHandle, setVenmoHandle] = useState<string>('');
   const [payPalHandle, setPayPalHandle] = useState<string>('');
+  const [cashAppHandle, setCashAppHandle] = useState<string>('');
 
   // Edit User Modal State
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
@@ -77,6 +78,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   const [myInstagram, setMyInstagram] = useState<string>(currentUser?.instagram || '');
   const [myVenmo, setMyVenmo] = useState<string>(currentUser?.venmoHandle || '');
   const [myPayPal, setMyPayPal] = useState<string>(currentUser?.payPalHandle || '');
+  const [myCashApp, setMyCashApp] = useState<string>(currentUser?.cashAppHandle || '');
 
   // Self Password Change State
   const [currentPassInput, setCurrentPassInput] = useState<string>('');
@@ -101,6 +103,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       setMyInstagram(currentUser.instagram || '');
       setMyVenmo(currentUser.venmoHandle || '');
       setMyPayPal(currentUser.payPalHandle || '');
+      setMyCashApp(currentUser.cashAppHandle || '');
     }
   }, [currentUser]);
 
@@ -174,6 +177,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           instagram: instagram.trim(),
           venmoHandle: venmoHandle.trim(),
           payPalHandle: payPalHandle.trim(),
+          cashAppHandle: cashAppHandle.trim(),
         }),
       });
 
@@ -191,6 +195,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
         setInstagram('');
         setVenmoHandle('');
         setPayPalHandle('');
+        setCashAppHandle('');
         if (onUserListChanged) onUserListChanged();
       } else {
         setStatusMsg({ type: 'error', text: data.error || 'Failed to create user.' });
@@ -222,6 +227,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
         instagram: editingUser.instagram,
         venmoHandle: editingUser.venmoHandle,
         payPalHandle: editingUser.payPalHandle,
+        cashAppHandle: editingUser.cashAppHandle,
         isActive: editingUser.isActive,
         status: editingUser.status,
       };
@@ -274,6 +280,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           instagram: myInstagram.trim(),
           venmoHandle: myVenmo.trim(),
           payPalHandle: myPayPal.trim(),
+          cashAppHandle: myCashApp.trim(),
         }),
       });
 
@@ -287,6 +294,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           currentUser.bio = data.user.bio;
           currentUser.venmoHandle = data.user.venmoHandle;
           currentUser.payPalHandle = data.user.payPalHandle;
+          currentUser.cashAppHandle = data.user.cashAppHandle;
           currentUser.instagram = data.user.instagram;
         }
         if (onUserListChanged) onUserListChanged();
@@ -669,7 +677,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     When car owners click the Tip button on your photos, they will be redirected to these payment usernames.
                   </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                     <div>
                       <label className="text-[11px] font-semibold text-gray-300 block mb-1">
                         Venmo Username
@@ -697,6 +705,22 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                         onChange={(e) => setMyPayPal(e.target.value)}
                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                       />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-300 block mb-1">
+                        Cash App $cashtag
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono">$</span>
+                        <input
+                          type="text"
+                          placeholder="yourcashtag"
+                          value={myCashApp}
+                          onChange={(e) => setMyCashApp(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1199,7 +1223,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                   <span>Direct Tipping & Social Handles</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
                     <label className="text-[11px] font-semibold text-gray-400 block mb-1">
                       Venmo Username
@@ -1227,6 +1251,22 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       onChange={(e) => setPayPalHandle(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                      Cash App $cashtag
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono">$</span>
+                      <input
+                        type="text"
+                        placeholder="jordanphoto"
+                        value={cashAppHandle}
+                        onChange={(e) => setCashAppHandle(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -1445,7 +1485,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                   <span>Venmo & PayPal Tipping Handles</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
                     <label className="text-[11px] font-semibold text-gray-400 block mb-1">
                       Venmo Username
@@ -1473,6 +1513,22 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       onChange={(e) => setEditingUser({ ...editingUser, payPalHandle: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                      Cash App $cashtag
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono">$</span>
+                      <input
+                        type="text"
+                        placeholder="cashapp-handle"
+                        value={editingUser.cashAppHandle || ''}
+                        onChange={(e) => setEditingUser({ ...editingUser, cashAppHandle: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      />
+                    </div>
                   </div>
 
                   <div>
