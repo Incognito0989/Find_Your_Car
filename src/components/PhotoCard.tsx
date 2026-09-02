@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Download, Sparkles, Image as ImageIcon, Camera, Eye, Layers } from 'lucide-react';
-import { CarPhoto } from '../types';
+import { CarPhoto, GeneralSettings } from '../types';
 import { formatMediaUrl, getThumbnailUrl } from '../utils/apiConfig';
 
 interface PhotoCardProps {
@@ -8,6 +8,8 @@ interface PhotoCardProps {
   onOpenDownloadModal: (car: CarPhoto, defaultToCartoon?: boolean) => void;
   onSelectCar?: (car: CarPhoto) => void;
   onSelectAuthor?: (authorName: string) => void;
+  onOpenStickerGenerator?: (car: CarPhoto) => void;
+  generalSettings?: GeneralSettings;
   viewMode?: 'grid' | 'list';
   priority?: boolean;
 }
@@ -17,6 +19,8 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
   onOpenDownloadModal,
   onSelectCar,
   onSelectAuthor,
+  onOpenStickerGenerator,
+  generalSettings,
   viewMode = 'grid',
   priority = false,
 }) => {
@@ -91,9 +95,9 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           </div>
 
           {/* Photo count indicator */}
-          <div className="absolute top-2.5 right-2.5 z-10 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-mono font-bold text-gray-200 flex items-center gap-1">
-            <Layers className="w-3 h-3 text-[var(--ps-primary,#0A84FF)]" />
-            <span>{photoCount} {photoCount === 1 ? 'Shot' : 'Shots'}</span>
+          <div className="absolute top-2.5 right-2.5 z-10 bg-black/80 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 text-[10px] font-mono font-bold text-white flex items-center gap-1 shadow-md">
+            <Layers className="w-3 h-3 text-sky-400" />
+            <span className="text-white font-bold">{photoCount} {photoCount === 1 ? 'Shot' : 'Shots'}</span>
           </div>
 
           {car.hasCartoon && (
@@ -179,7 +183,20 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           >
             <Download className="w-3.5 h-3.5" />
           </button>
-          {car.hasCartoon && (
+          {onOpenStickerGenerator && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenStickerGenerator(car);
+              }}
+              className="px-3 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              title="Generate 2D Vinyl Sticker"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+              <span className="hidden sm:inline">Sticker</span>
+            </button>
+          )}
+          {car.hasCartoon && !onOpenStickerGenerator && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -239,9 +256,9 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
         </div>
 
         {/* Photo count indicator (Top Right) */}
-        <div className="absolute top-3 right-3 z-10 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] font-mono font-bold text-gray-200 flex items-center gap-1.5 shadow-md">
-          <Layers className="w-3 h-3 text-[var(--ps-primary,#0A84FF)]" />
-          <span>{photoCount} {photoCount === 1 ? 'Photo' : 'Photos'}</span>
+        <div className="absolute top-3 right-3 z-10 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 text-[10px] font-mono font-bold text-white flex items-center gap-1.5 shadow-md">
+          <Layers className="w-3 h-3 text-sky-400" />
+          <span className="text-white font-bold">{photoCount} {photoCount === 1 ? 'Photo' : 'Photos'}</span>
         </div>
 
         {/* Art Type Indicator / Toggle */}
@@ -341,7 +358,19 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             >
               <Download className="w-4 h-4" />
             </button>
-            {car.hasCartoon && (
+            {onOpenStickerGenerator && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenStickerGenerator(car);
+                }}
+                className="p-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 shadow-md transition-all active:scale-95 cursor-pointer"
+                title="Generate 2D Vinyl Sticker"
+              >
+                <Sparkles className="w-4 h-4" />
+              </button>
+            )}
+            {car.hasCartoon && !onOpenStickerGenerator && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();

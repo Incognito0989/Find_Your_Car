@@ -1,0 +1,46 @@
+[
+  {
+    "id": "car-1788376095948-i7j8",
+    "plateNumber": "",
+    "carName": "f",
+    "make": "f",
+    "model": "",
+    "color": "",
+    "event": "",
+    "location": "",
+    "date": "September 2, 2026 • 7:08 PM",
+    "photographer": {
+      "name": "Admin",
+      "title": "Lead Automotive Photographer",
+      "avatar": "",
+      "bio": "",
+      "instagram": "",
+      "venmoHandle": "",
+      "payPalHandle": ""
+    },
+    "imageUrl": "/uploads/CAR-1788376095948-I7J8/cover_1788376181619_00nph.jpg",
+    "images": [
+      "/uploads/CAR-1788376095948-I7J8/cover_1788376181619_00nph.jpg",
+      "/uploads/CAR-1788376095948-I7J8/cover_1788376120218_1mdz3.jpg",
+      "/uploads/CAR-1788376095948-I7J8/photo_2_1788376181507_b3iek.jpg"
+    ],
+    "photoAuthors": {
+      "/uploads/CAR-1788376095948-I7J8/photo_2_1788376181507_b3iek.jpg": {
+        "id": "user-admin-1",
+        "name": "Admin",
+        "title": "Lead Automotive Photographer",
+        "avatar": "",
+        "bio": ""
+      }
+    },
+    "cartoonImageUrl": null,
+    "hasCartoon": false,
+    "tags": [],
+    "views": 8,
+    "downloads": 0,
+    "resolution": "",
+    "cameraInfo": "",
+    "createdAt": "2026-09-02T19:08:16.009Z",
+    "photoCount": 3
+  }
+]

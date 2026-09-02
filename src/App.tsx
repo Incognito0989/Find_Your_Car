@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CarPhoto, AppThemeConfig } from './types';
+import { CarPhoto, AppThemeConfig, GeneralSettings } from './types';
 import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES } from './data/initialData';
 import { VisitorPortal } from './components/VisitorPortal';
 import { AdminPortal } from './components/AdminPortal';
@@ -7,6 +7,48 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { ServerConnectionModal } from './components/ServerConnectionModal';
 import { applyThemeToDocument } from './utils/themeUtils';
 import { getApiBaseUrl } from './utils/apiConfig';
+
+const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  appName: 'PlateSnap Cars',
+  appSubtitle: 'Cinematic Automotive Showcase & Plate Lookup',
+  heroHeadline: 'Trackside Excellence. Captured in 4K.',
+  heroSubtitle: 'Search high-resolution track photography by license plate, car model, or photographer.',
+  footerText: '© 2026 Cinematic Automotive Photography',
+
+  aiProvider: 'gemini',
+  geminiApiKey: '',
+  geminiModel: 'gemini-3.1-flash-image',
+  geminiAspectRatio: '1:1',
+  geminiImageSize: '1K',
+
+  nvidiaApiKey: '',
+  nvidiaModel: 'stabilityai/stable-diffusion-3-medium',
+  nvidiaBaseUrl: 'https://integrate.api.nvidia.com/v1',
+
+  comfyuiBaseUrl: 'http://127.0.0.1:8188',
+  comfyuiWorkflow: 'default',
+
+  localColorQuantization: 16,
+  localOutlineThickness: 3,
+
+  stickerGlobalPrompt:
+    'Die-cut vinyl sticker illustration of {car_description}, clean crisp white die-cut contour border, bold black comic ink vector outlines, cel-shaded vibrant automotive paint finish, exaggerated chibi proportions, isolated on pure solid white background, sticker art, 8k resolution, masterpiece',
+  stickerNegativePrompt:
+    'photorealistic background, messy noise, blurry, text artifacts, watermark, low quality, photorealism',
+  maxStickerRetries: 3,
+  allowVisitorStickers: true,
+  failoverToLocal: true,
+  showTipBeforeDownload: false,
+  showTipBeforeSticker: true,
+  tipModalTitle: 'Support the Creator Before Generating Your Sticker',
+  tipModalDescription:
+    'Car enthusiasts and track photographers spend hours capturing these moments. Show appreciation or continue for free to generate your vinyl sticker.',
+  defaultTipAmounts: [3, 5, 10, 20],
+  enableTipping: true,
+  enableWatermark: false,
+  watermarkText: 'PlateSnap',
+  defaultDownloadQuality: 'full',
+};
 
 export function App() {
   const [currentView, setCurrentView] = useState<'visitor' | 'admin'>('visitor');
@@ -38,6 +80,20 @@ export function App() {
     }
     return DEFAULT_THEMES[0];
   });
+  const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('platesnap_general_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            return { ...DEFAULT_GENERAL_SETTINGS, ...parsed };
+          }
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_GENERAL_SETTINGS;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Admin Authentication State
@@ -54,7 +110,7 @@ export function App() {
     return fetch(url, options);
   }, []);
 
-  // Fetch cars and theme from backend API with client caching
+  // Fetch cars, theme, and general settings from backend API with client caching
   const refreshAppData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -77,6 +133,18 @@ export function App() {
           applyThemeToDocument(themeData.theme);
           try {
             localStorage.setItem('plate_snap_theme', JSON.stringify(themeData.theme));
+          } catch (e) {}
+        }
+      }
+
+      const settingsRes = await apiFetch('/api/settings');
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        if (settingsData && settingsData.settings) {
+          const merged = { ...DEFAULT_GENERAL_SETTINGS, ...settingsData.settings };
+          setGeneralSettings(merged);
+          try {
+            localStorage.setItem('platesnap_general_settings', JSON.stringify(merged));
           } catch (e) {}
         }
       }
@@ -266,6 +334,40 @@ export function App() {
     }
   };
 
+  // Save general settings globally
+  const handleSaveSettings = async (newSettings: GeneralSettings) => {
+    setGeneralSettings(newSettings);
+    try {
+      localStorage.setItem('platesnap_general_settings', JSON.stringify(newSettings));
+    } catch (e) {}
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (adminToken) {
+        headers['Authorization'] = `Bearer ${adminToken}`;
+      }
+
+      const res = await apiFetch('/api/settings', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ settings: newSettings }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.settings) {
+          const merged = { ...DEFAULT_GENERAL_SETTINGS, ...data.settings };
+          setGeneralSettings(merged);
+          try {
+            localStorage.setItem('platesnap_general_settings', JSON.stringify(merged));
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.warn('Saved general settings locally:', e);
+    }
+  };
+
   return (
     <div id="plate-snap-app-root" className="min-h-screen">
       {currentView === 'visitor' ? (
@@ -275,6 +377,8 @@ export function App() {
           onOpenAdmin={handleOpenAdmin}
           onOpenServerConfig={() => setIsServerModalOpen(true)}
           currentTheme={currentTheme}
+          generalSettings={generalSettings}
+          onUpdateCar={handleUpdateCar}
         />
       ) : (
         <AdminPortal
@@ -284,6 +388,8 @@ export function App() {
           onDeleteCar={handleDeleteCar}
           currentTheme={currentTheme}
           onSaveTheme={handleSaveTheme}
+          generalSettings={generalSettings}
+          onSaveSettings={handleSaveSettings}
           onBackToVisitor={() => setCurrentView('visitor')}
           onLogoutAdmin={handleLogoutAdmin}
           adminName={adminUser?.name || 'Admin Photographer'}

@@ -65,10 +65,11 @@
   color: #0F172A;
 }
 
-/* Ensure text elements within light theme are sharp and legible */
-[data-theme="light"] .font-mono,
-:root.light .font-mono {
-  color: inherit;
+/* Ensure dark overlay badges and pills maintain crisp white text in all themes */
+.badge-dark-overlay,
+[class*="bg-black/"],
+[class*="bg-black "] {
+  color: #FFFFFF;
 }
 
 body {

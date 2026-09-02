@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { CarPhoto, AppThemeConfig, UserAccount, Photographer } from '../types';
-import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES, INITIAL_USERS } from '../data/initialData';
+import { CarPhoto, AppThemeConfig, UserAccount, Photographer, GeneralSettings } from '../types';
+import { INITIAL_CAR_PHOTOS, DEFAULT_THEMES, INITIAL_USERS, DEFAULT_GENERAL_SETTINGS } from '../data/initialData';
 
 let pgPool: Pool | null = null;
 let isPostgresAvailable = false;
@@ -12,6 +12,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const CARS_JSON_PATH = path.join(DATA_DIR, 'cars.json');
 const THEME_JSON_PATH = path.join(DATA_DIR, 'theme.json');
 const USERS_JSON_PATH = path.join(DATA_DIR, 'users.json');
+const SETTINGS_JSON_PATH = path.join(DATA_DIR, 'settings.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -146,6 +147,41 @@ export function saveLocalTheme(theme: AppThemeConfig): void {
     console.log(`[Database Fallback] Saved global theme [${theme.name || theme.id}] to ${THEME_JSON_PATH}`);
   } catch (e) {
     console.error('[Database Fallback] Error saving local theme:', e);
+  }
+}
+
+export function getLocalGeneralSettings(): GeneralSettings {
+  try {
+    if (fs.existsSync(SETTINGS_JSON_PATH)) {
+      const data = fs.readFileSync(SETTINGS_JSON_PATH, 'utf-8');
+      if (data && data.trim()) {
+        const parsed = JSON.parse(data);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            ...DEFAULT_GENERAL_SETTINGS,
+            ...parsed,
+            // Merge nested or array properties safely
+            defaultTipAmounts: Array.isArray(parsed.defaultTipAmounts) ? parsed.defaultTipAmounts : DEFAULT_GENERAL_SETTINGS.defaultTipAmounts,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Database Fallback] Error reading local settings:', e);
+  }
+  return DEFAULT_GENERAL_SETTINGS;
+}
+
+export function saveLocalGeneralSettings(settings: GeneralSettings): void {
+  try {
+    const dir = path.dirname(SETTINGS_JSON_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(SETTINGS_JSON_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+    console.log(`[Database Fallback] Saved general settings to ${SETTINGS_JSON_PATH}`);
+  } catch (e) {
+    console.error('[Database Fallback] Error saving local settings:', e);
   }
 }
 
@@ -1314,6 +1350,40 @@ export async function saveThemeToDb(theme: AppThemeConfig): Promise<void> {
         `INSERT INTO app_settings (key, value, updated_at) VALUES ('theme', $1::jsonb, NOW())
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
         [JSON.stringify(theme)]
+      );
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+}
+
+export async function getGeneralSettingsFromDb(): Promise<GeneralSettings> {
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      const result = await pool.query("SELECT value FROM app_settings WHERE key = 'general_settings'");
+      if (result.rows.length > 0 && result.rows[0].value) {
+        return {
+          ...DEFAULT_GENERAL_SETTINGS,
+          ...result.rows[0].value,
+        };
+      }
+    } catch (e) {
+      isPostgresAvailable = false;
+    }
+  }
+  return getLocalGeneralSettings();
+}
+
+export async function saveGeneralSettingsToDb(settings: GeneralSettings): Promise<void> {
+  saveLocalGeneralSettings(settings);
+  if (isPostgresAvailable) {
+    try {
+      const pool = getPgPool();
+      await pool.query(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES ('general_settings', $1::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [JSON.stringify(settings)]
       );
     } catch (e) {
       isPostgresAvailable = false;

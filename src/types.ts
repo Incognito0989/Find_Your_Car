@@ -95,3 +95,67 @@ export interface AppThemeConfig {
   videoOpacity: number;
   radius: number;
 }
+
+export interface GeneralSettings {
+  // App Identity & Branding
+  appName: string;
+  appSubtitle: string;
+  appIconUrl?: string;
+  heroHeadline: string;
+  heroSubtitle: string;
+  footerText: string;
+
+  // Active AI Provider
+  aiProvider: 'gemini' | 'nvidia' | 'comfyui' | 'local_canvas';
+
+  // Google Gemini AI Configuration
+  geminiApiKey?: string;
+  geminiModel: string;
+  geminiAspectRatio?: '1:1' | '4:3' | '3:4' | '16:9';
+  geminiImageSize?: '512px' | '1K' | '2K';
+
+  // NVIDIA AI & NIM Configuration
+  nvidiaApiKey?: string;
+  nvidiaModel: string;
+  nvidiaBaseUrl?: string;
+
+  // ComfyUI Configuration
+  comfyuiBaseUrl?: string;
+  comfyuiWorkflow?: string;
+
+  // Local Vector Canvas Configuration
+  localColorQuantization?: number;
+  localOutlineThickness?: number;
+
+  // Universal Sticker & Prompt Settings
+  stickerGlobalPrompt: string;
+  stickerNegativePrompt?: string;
+  maxStickerRetries: number;
+  allowVisitorStickers: boolean;
+  failoverToLocal: boolean;
+
+  // Author Tipping & Gating Controls
+  showTipBeforeDownload: boolean;
+  showTipBeforeSticker: boolean;
+  tipModalTitle: string;
+  tipModalDescription: string;
+  defaultTipAmounts: number[];
+  enableTipping: boolean;
+
+  // Media Display & Extras
+  enableWatermark: boolean;
+  watermarkText?: string;
+  defaultDownloadQuality: 'full' | '1080p' | 'raw';
+}
+
+export interface StickerGenerationRequest {
+  image: string;
+  carName?: string;
+  make?: string;
+  model?: string;
+  color?: string;
+  plateNumber?: string;
+  feedback?: string;
+  feedbackPreset?: string;
+  retryAttempt?: number;
+}

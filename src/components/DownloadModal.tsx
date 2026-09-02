@@ -13,7 +13,7 @@ import {
   Share2,
   Download,
 } from 'lucide-react';
-import { CarPhoto } from '../types';
+import { CarPhoto, GeneralSettings } from '../types';
 import { formatMediaUrl, getApiBaseUrl } from '../utils/apiConfig';
 import { TipModal } from './TipModal';
 
@@ -22,6 +22,8 @@ interface DownloadModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialCartoonState?: boolean;
+  generalSettings?: GeneralSettings;
+  onOpenStickerGenerator?: (car: CarPhoto) => void;
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
@@ -29,6 +31,8 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   isOpen,
   onClose,
   initialCartoonState = false,
+  generalSettings,
+  onOpenStickerGenerator,
 }) => {
   const [selectedResolution, setSelectedResolution] = useState<'full' | '1080p' | 'cartoon' | 'raw'>('full');
   const [isCartoonView, setIsCartoonView] = useState<boolean>(initialCartoonState);
@@ -36,6 +40,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isTipOpen, setIsTipOpen] = useState<boolean>(false);
+  const [hasPassedTipGate, setHasPassedTipGate] = useState<boolean>(false);
 
   // Sync cartoon state if initial changes
   React.useEffect(() => {
@@ -47,7 +52,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   const rawImage = isCartoonView && car.cartoonImageUrl ? car.cartoonImageUrl : car.imageUrl;
   const currentDisplayImage = formatMediaUrl(rawImage);
 
-  const handleDownload = async () => {
+  const executeDownload = async () => {
     setIsDownloading(true);
     try {
       // Call backend increment download
@@ -75,6 +80,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleDownload = () => {
+    if (generalSettings?.showTipBeforeDownload && !hasPassedTipGate) {
+      setIsTipOpen(true);
+      return;
+    }
+    executeDownload();
   };
 
   const handleCopyLink = () => {
@@ -247,6 +260,25 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                       <p className="text-[10px] text-[var(--ps-text-muted,#9ca3af)] font-medium">Vector SVG / 2D</p>
                     </button>
                   )}
+                  {onOpenStickerGenerator && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenStickerGenerator(car);
+                      }}
+                      className="p-3 rounded-xl border border-pink-500/40 bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 text-left transition-all cursor-pointer shadow-sm col-span-2 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-pink-400" />
+                        <div>
+                          <p className="text-xs font-bold text-pink-200">Generate New AI Sticker</p>
+                          <p className="text-[10px] text-pink-300/80 font-medium">Create 2D vinyl cutout using NVIDIA AI engine</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-pink-400 bg-pink-500/20 px-2.5 py-1 rounded-lg">Create →</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -307,6 +339,16 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
           onClose={() => setIsTipOpen(false)}
           car={car}
           photographer={car.photographer}
+          onBypass={() => {
+            setHasPassedTipGate(true);
+            setIsTipOpen(false);
+            executeDownload();
+          }}
+          onSuccess={() => {
+            setHasPassedTipGate(true);
+            setIsTipOpen(false);
+            executeDownload();
+          }}
         />
       )}
     </>

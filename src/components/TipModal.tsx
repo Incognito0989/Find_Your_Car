@@ -9,8 +9,10 @@ import {
   Smartphone,
   CreditCard,
   DollarSign,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react';
-import { Photographer, CarPhoto } from '../types';
+import { Photographer, CarPhoto, GeneralSettings } from '../types';
 
 interface TipRecipient {
   photographer: Photographer;
@@ -23,6 +25,11 @@ interface TipModalProps {
   photographer?: Photographer | null;
   allPhotographers?: Photographer[]; // For multi-photographer attribution
   onTipCompleted?: () => void;
+  customTitle?: string;
+  customDescription?: string;
+  bypassActionLabel?: string;
+  onBypass?: () => void;
+  generalSettings?: GeneralSettings | null;
 }
 
 export const TipModal: React.FC<TipModalProps> = ({
@@ -32,6 +39,11 @@ export const TipModal: React.FC<TipModalProps> = ({
   photographer,
   allPhotographers = [],
   onTipCompleted,
+  customTitle,
+  customDescription,
+  bypassActionLabel = 'Continue Without Paying',
+  onBypass,
+  generalSettings,
 }) => {
   const [copiedHandle, setCopiedHandle] = useState<string | null>(null);
 
@@ -80,6 +92,18 @@ export const TipModal: React.FC<TipModalProps> = ({
     return `https://cash.app/$${encodeURIComponent(cleanHandle)}`;
   };
 
+  const modalTitle =
+    customTitle ||
+    generalSettings?.tipModalTitle ||
+    'Support the Photographer';
+
+  const modalDescription =
+    customDescription ||
+    generalSettings?.tipModalDescription ||
+    (car
+      ? `Send 100% of your tip directly to the shooter who captured ${car.carName || car.make || 'this vehicle'}. You can also proceed free at any time.`
+      : 'Send a tip directly to the photographer to support their automotive coverage.');
+
   return (
     <div
       id="tip-modal-overlay"
@@ -103,7 +127,7 @@ export const TipModal: React.FC<TipModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-extrabold text-[var(--ps-text-main,#ffffff)] tracking-tight">
-                  Tip the Photographer
+                  {modalTitle}
                 </h2>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" />
@@ -111,9 +135,7 @@ export const TipModal: React.FC<TipModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-0.5">
-                {car
-                  ? `Support the photographer for photos of ${car.carName || car.make || 'this vehicle'}`
-                  : 'Send a tip directly to the photographer'}
+                {modalDescription}
               </p>
             </div>
           </div>
@@ -126,6 +148,26 @@ export const TipModal: React.FC<TipModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Optional Bypass / Continue Free Banner */}
+        {onBypass && (
+          <div className="mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-600/15 to-purple-600/15 border border-blue-500/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs">
+              <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+              <span className="text-[var(--ps-text-main,#ffffff)] font-medium">
+                Tipping is completely optional!
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onBypass}
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md cursor-pointer shrink-0"
+            >
+              <span>{bypassActionLabel}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto py-5 space-y-4 pr-1">
@@ -314,19 +356,31 @@ export const TipModal: React.FC<TipModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-between gap-4 shrink-0">
+        <div className="pt-4 border-t border-[var(--ps-card-border,#2C2C2E)] flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] flex items-center gap-1.5 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>Opens official payment provider directly to photographer</span>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] font-semibold text-xs transition-colors cursor-pointer shadow-sm"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {onBypass && (
+              <button
+                type="button"
+                onClick={onBypass}
+                className="px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                {bypassActionLabel}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] font-semibold text-xs transition-colors cursor-pointer shadow-sm"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -38,10 +38,11 @@ import {
   Smartphone,
   CreditCard,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig, VehicleLookupResult, UserAccount, Photographer } from '../types';
+import { CarPhoto, AppThemeConfig, VehicleLookupResult, UserAccount, Photographer, GeneralSettings } from '../types';
 import { ImageEditorModal } from './ImageEditorModal';
 import { CartoonArtStudio } from './CartoonArtStudio';
 import { UserManagementSection } from './UserManagementSection';
+import { GeneralSettingsSection } from './GeneralSettingsSection';
 import { convertPhotoToCartoonSticker, normalizeMediaForCanvas } from '../utils/cartoonEngine';
 import { DEFAULT_THEMES } from '../data/initialData';
 import { applyThemeToDocument } from '../utils/themeUtils';
@@ -119,6 +120,8 @@ interface AdminPortalProps {
   adminName?: string;
   adminUser?: UserAccount | null;
   adminToken?: string | null;
+  generalSettings?: GeneralSettings;
+  onSaveSettings?: (settings: GeneralSettings) => Promise<boolean>;
 }
 
 interface StagedPhoto {
@@ -139,8 +142,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   adminName = 'Admin Photographer',
   adminUser,
   adminToken,
+  generalSettings,
+  onSaveSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'theme' | 'fleet' | 'users'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'theme' | 'fleet' | 'users' | 'settings'>('upload');
+  const [localGeneralSettings, setLocalGeneralSettings] = useState<GeneralSettings | null>(generalSettings || null);
+
+  // Fetch settings from API if not passed
+  useEffect(() => {
+    if (!generalSettings) {
+      fetch('/api/settings')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.settings) setLocalGeneralSettings(data.settings);
+        })
+        .catch(() => {});
+    } else {
+      setLocalGeneralSettings(generalSettings);
+    }
+  }, [generalSettings]);
 
   // Registered Photographers List
   const [usersList, setUsersList] = useState<UserAccount[]>([]);
@@ -261,14 +281,39 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setEditPhotographerPayPal(editingCarGallery.photographer?.payPalHandle || '');
       setEditPhotographerCashApp(editingCarGallery.photographer?.cashAppHandle || '');
       setEditCoverImageUrl(editingCarGallery.imageUrl || '');
-      const imgs =
+      const rawImgs =
         Array.isArray(editingCarGallery.images) && editingCarGallery.images.length > 0
-          ? editingCarGallery.images
-          : [editingCarGallery.imageUrl];
-      setEditImages(imgs);
+          ? editingCarGallery.images.filter(Boolean)
+          : [];
+      const cover = editingCarGallery.imageUrl || '';
+      const combined =
+        cover && !rawImgs.includes(cover)
+          ? [cover, ...rawImgs]
+          : rawImgs.length > 0
+          ? rawImgs
+          : cover
+          ? [cover]
+          : [];
+      setEditImages(combined);
       setEditModalTab('info');
     }
   }, [editingCarGallery]);
+
+  // Select car for editing and fetch complete database record with all images
+  const handleSelectCarForEdit = async (car: CarPhoto) => {
+    setEditingCarGallery(car);
+    try {
+      const res = await fetch(`/api/cars/${car.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.car) {
+          setEditingCarGallery(data.car);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch fresh car record for editing:', err);
+    }
+  };
 
   // Hidden File Input References
   const multiFileInputRef = useRef<HTMLInputElement>(null);
@@ -892,6 +937,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               >
                 <Users className="w-3.5 h-3.5" />
                 <span>Authors ({usersList.length || '3+'})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'settings'
+                    ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
+                    : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                <span>General Settings</span>
               </button>
             </div>
 
@@ -1719,25 +1775,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             {/* Grid of uploaded cars */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {cars.map((car) => {
-                const photoCount = Array.isArray(car.images) && car.images.length > 0 ? car.images.length : 1;
+                const photoCount = (Array.isArray(car.images) && car.images.length) || car.photoCount || 1;
                 return (
                   <div
                     key={car.id}
                     className="bg-[#161618] border border-[#2C2C2E] rounded-2xl overflow-hidden shadow-lg p-4 space-y-3 flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black flex items-center justify-center">
+                      <div
+                        onClick={() => handleSelectCarForEdit(car)}
+                        className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black flex items-center justify-center cursor-pointer group"
+                        title="Click to manage vehicle and photos"
+                      >
                         <img
                           src={formatMediaUrl(car.imageUrl)}
                           alt={car.carName}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
-                        <div className="absolute top-2.5 left-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/10 text-xs font-mono font-bold text-white flex items-center gap-1.5">
-                          <span className="truncate max-w-[150px]">{car.carName || `${car.make} ${car.model}`}</span>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold">
+                          <Edit3 className="w-4 h-4 text-[var(--ps-primary,#0A84FF)]" />
+                          <span>Manage Vehicle</span>
                         </div>
-                        <div className="absolute top-2.5 right-2.5 bg-black/80 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-mono font-bold text-gray-200 flex items-center gap-1">
-                          <Images className="w-3 h-3 text-[var(--ps-primary,#0A84FF)]" />
-                          <span>{photoCount} {photoCount === 1 ? 'Shot' : 'Shots'}</span>
+                        <div className="absolute top-2.5 left-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/20 text-xs font-mono font-bold text-white flex items-center gap-1.5 shadow-md">
+                          <span className="truncate max-w-[150px] text-white">{car.carName || `${car.make} ${car.model}`}</span>
+                        </div>
+                        <div className="absolute top-2.5 right-2.5 bg-black/80 px-2.5 py-0.5 rounded-full border border-white/20 text-[10px] font-mono font-bold text-white flex items-center gap-1.5 shadow-md">
+                          <Images className="w-3 h-3 text-sky-400" />
+                          <span className="text-white font-bold">{photoCount} {photoCount === 1 ? 'Shot' : 'Shots'}</span>
                         </div>
                       </div>
 
@@ -1753,7 +1817,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                     <div className="pt-3 border-t border-[#2C2C2E] flex items-center justify-between gap-2">
                       <button
-                        onClick={() => setEditingCarGallery(car)}
+                        onClick={() => handleSelectCarForEdit(car)}
                         className="flex-1 py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)]" />
@@ -1781,6 +1845,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             currentUser={adminUser}
             adminToken={adminToken}
             onUserListChanged={fetchUsers}
+          />
+        )}
+
+        {/* TAB 5: GENERAL & AI SETTINGS */}
+        {activeTab === 'settings' && (
+          <GeneralSettingsSection
+            initialSettings={localGeneralSettings || generalSettings}
+            onSaveSettings={async (savedSettings) => {
+              setLocalGeneralSettings(savedSettings);
+              if (onSaveSettings) {
+                return await onSaveSettings(savedSettings);
+              } else {
+                try {
+                  const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ settings: savedSettings }),
+                  });
+                  return res.ok;
+                } catch {
+                  return false;
+                }
+              }
+            }}
+            adminToken={adminToken}
           />
         )}
       </main>
@@ -2066,95 +2155,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       onChange={(e) => setEditTags(e.target.value)}
                       className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
                     />
-                  </div>
-                </div>
-
-                {/* Photographer Attribution & Tipping */}
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300 block">
-                    Photographer Attribution & Tipping
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1">
-                        Photographer Name
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Photographer Name"
-                        value={editPhotographerName}
-                        onChange={(e) => setEditPhotographerName(e.target.value)}
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1">
-                        Title / Role
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Automotive Photographer"
-                        value={editPhotographerTitle}
-                        onChange={(e) => setEditPhotographerTitle(e.target.value)}
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1">
-                        Instagram Handle
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="@username"
-                        value={editPhotographerInstagram}
-                        onChange={(e) => setEditPhotographerInstagram(e.target.value)}
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1">
-                        Venmo Username
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="venmo-handle"
-                        value={editPhotographerVenmo}
-                        onChange={(e) => setEditPhotographerVenmo(e.target.value)}
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1">
-                        PayPal Username
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="paypal-handle"
-                        value={editPhotographerPayPal}
-                        onChange={(e) => setEditPhotographerPayPal(e.target.value)}
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-400 mb-1">
-                        Cash App $cashtag
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="cashtag"
-                        value={editPhotographerCashApp}
-                        onChange={(e) => setEditPhotographerCashApp(e.target.value)}
-                        className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-xl py-2 px-3 text-white text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
                   </div>
                 </div>
               </div>

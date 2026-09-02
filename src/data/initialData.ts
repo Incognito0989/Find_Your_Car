@@ -1,4 +1,4 @@
-import { CarPhoto, AppThemeConfig, UserAccount } from '../types';
+import { CarPhoto, AppThemeConfig, UserAccount, GeneralSettings } from '../types';
 
 export const INITIAL_USERS: UserAccount[] = [
   {
@@ -448,5 +448,47 @@ export const SAMPLE_CARTOON_CORVETTE_SVG = SAMPLE_CARTOON_MIATA_SVG;
 
 // Clean initial car photos collection (stock photos/cartoons removed for photographer uploads)
 export const INITIAL_CAR_PHOTOS: CarPhoto[] = [];
+
+export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  appName: 'PlateSnap Cars',
+  appSubtitle: 'Cinematic Automotive Archive',
+  appIconUrl: '',
+  heroHeadline: 'High-Res Automotive Photography Archive',
+  heroSubtitle: 'Search license plates, car names, and events. Download high-resolution media & generate stylized AI stickers.',
+  footerText: '© 2026 PlateSnap Cars. All high-resolution automotive imagery protected under photographer attribution.',
+
+  aiProvider: 'gemini',
+  geminiApiKey: '',
+  geminiModel: 'gemini-3.1-flash-image',
+  geminiAspectRatio: '1:1',
+  geminiImageSize: '1K',
+
+  nvidiaApiKey: '',
+  nvidiaModel: 'stabilityai/stable-diffusion-3-medium',
+  nvidiaBaseUrl: 'https://integrate.api.nvidia.com/v1',
+
+  comfyuiBaseUrl: 'http://127.0.0.1:8188',
+  comfyuiWorkflow: 'default',
+
+  localColorQuantization: 16,
+  localOutlineThickness: 3,
+
+  stickerGlobalPrompt: 'Die-cut vinyl sticker illustration of {car_description}, clean crisp white die-cut contour border, bold black comic ink vector outlines, cel-shaded vibrant automotive paint finish, exaggerated chibi proportions, isolated on pure solid white background, sticker art, 8k resolution, masterpiece',
+  stickerNegativePrompt: 'photorealistic background, complex backdrop, blurry lines, noisy artifacts, cut off, low quality, dark background',
+  maxStickerRetries: 3,
+  allowVisitorStickers: true,
+  failoverToLocal: true,
+
+  showTipBeforeDownload: false,
+  showTipBeforeSticker: true,
+  tipModalTitle: 'Support the Creator',
+  tipModalDescription: 'Automotive photographers spend hours trackside and in the garage. Send a quick tip to show your appreciation!',
+  defaultTipAmounts: [3, 5, 10, 20],
+  enableTipping: true,
+
+  enableWatermark: false,
+  watermarkText: 'PlateSnap Cars Archive',
+  defaultDownloadQuality: 'full',
+};
 
 

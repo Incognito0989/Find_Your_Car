@@ -27,7 +27,7 @@ import {
   Lock,
   Loader2,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig, Photographer } from '../types';
+import { CarPhoto, AppThemeConfig, Photographer, GeneralSettings } from '../types';
 import { formatMediaUrl, getThumbnailUrl, getApiBaseUrl } from '../utils/apiConfig';
 import { DownloadModal } from './DownloadModal';
 import { TipModal } from './TipModal';
@@ -39,6 +39,8 @@ interface CarGalleryPageProps {
   currentTheme: AppThemeConfig;
   onOpenAdmin?: () => void;
   onOpenTipModal?: () => void;
+  onOpenStickerGenerator?: (car: CarPhoto, initialPhotoUrl?: string) => void;
+  generalSettings?: GeneralSettings;
 }
 
 export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
@@ -46,6 +48,9 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
   onBack,
   currentTheme,
   onOpenAdmin,
+  onOpenTipModal,
+  onOpenStickerGenerator,
+  generalSettings,
 }) => {
   // Current car state which gets enriched when full details are fetched
   const [car, setCar] = useState<CarPhoto>(initialCar);
@@ -320,6 +325,18 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
               )}
             </button>
 
+            {onOpenStickerGenerator && (
+              <button
+                onClick={() => onOpenStickerGenerator(car, allImages[activeIndex])}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-600 dark:text-pink-300 border border-pink-500/30 text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                title="Generate 2D Vinyl Sticker from this vehicle"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                <span className="hidden sm:inline">Make AI Sticker</span>
+                <span className="sm:hidden">Sticker</span>
+              </button>
+            )}
+
             <button
               onClick={handleDownloadAllPhotos}
               disabled={isDownloadingAll}
@@ -560,18 +577,18 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 pointer-events-none">
               <div className="space-y-0.5 min-w-0">
                 {car.resolution && (
-                  <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)] font-bold truncate">
+                  <p className="text-xs font-mono text-sky-400 font-bold truncate">
                     {car.resolution}
                   </p>
                 )}
                 {car.cameraInfo && (
-                  <p className="text-[11px] text-gray-300 font-mono truncate">
+                  <p className="text-[11px] text-gray-200 font-mono truncate">
                     {car.cameraInfo}
                   </p>
                 )}
               </div>
 
-              <div className="text-xs text-gray-400 font-mono bg-black/60 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-white/10 w-fit">
+              <div className="text-xs text-white font-mono font-bold bg-black/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 w-fit shadow-md">
                 Angle {activeIndex + 1} of {allImages.length}
               </div>
             </div>
@@ -681,7 +698,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                       />
 
                       {/* Badge */}
-                      <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono font-bold text-white border border-white/10 z-20">
+                      <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono font-bold text-white border border-white/20 z-20 shadow-md">
                         Photo {idx + 1}
                       </div>
 
@@ -754,6 +771,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                         >
                           <Heart className="w-3.5 h-3.5 fill-amber-500/30 text-amber-500" />
                         </button>
+
+                        {onOpenStickerGenerator && (
+                          <button
+                            onClick={() => onOpenStickerGenerator(car, imgUrl)}
+                            className="p-1.5 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-600 dark:text-pink-300 border border-pink-500/30 transition-colors cursor-pointer shadow-sm"
+                            title="Generate AI Sticker from this angle"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                          </button>
+                        )}
 
                         <button
                           onClick={() => handleDownloadSinglePhoto(imgUrl, idx)}

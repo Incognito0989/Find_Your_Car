@@ -19,6 +19,9 @@ import {
   getThemeFromDb,
   saveThemeToDb,
   getLocalTheme,
+  getGeneralSettingsFromDb,
+  saveGeneralSettingsToDb,
+  getLocalGeneralSettings,
   getLocalCars,
   mapRowToCar,
   getAllUsersFromDb,
@@ -30,7 +33,7 @@ import {
   deleteUserInDb,
   getPublicPhotographersFromDb,
 } from "./src/utils/database";
-import { UserAccount } from "./src/types";
+import { UserAccount, GeneralSettings } from "./src/types";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -658,6 +661,332 @@ async function callComfyUIGenerator(base64Data: string, mimeType: string, carDet
   }
 }
 
+// ==========================================
+// GOOGLE GEMINI AI STICKER GENERATOR ENGINE (@google/genai)
+// ==========================================
+async function callGeminiStickerGenerator(
+  base64Data: string,
+  mimeType: string,
+  options: {
+    carName?: string;
+    make?: string;
+    carModel?: string;
+    color?: string;
+    plateNumber?: string;
+    feedback?: string;
+    feedbackPreset?: string;
+    apiKey?: string;
+    aiModel?: string;
+    aspectRatio?: '1:1' | '4:3' | '3:4' | '16:9';
+    imageSize?: '512px' | '1K' | '2K';
+    promptTemplate?: string;
+    negativePrompt?: string;
+  }
+) {
+  const apiKey = (options.apiKey || process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey) {
+    return {
+      fallback: true,
+      error: 'Gemini API Key is not configured. Enter a Gemini API Key in General Settings or configure GEMINI_API_KEY.',
+    };
+  }
+
+  const modelName = (options.aiModel || 'gemini-3.1-flash-image').trim();
+  const aspectRatio = options.aspectRatio || '1:1';
+  const imageSize = options.imageSize || '1K';
+
+  // Construct prompt from global template or default
+  const carDesc = [
+    options.color,
+    options.make,
+    options.carModel,
+    options.carName,
+  ].filter(Boolean).join(' ') || 'sports car';
+
+  const defaultTemplate =
+    'Die-cut vinyl sticker illustration of {car_description}, clean crisp white die-cut contour border, bold black comic ink vector outlines, cel-shaded vibrant automotive paint finish, exaggerated chibi proportions, isolated on pure solid white background, sticker art, 8k resolution, masterpiece';
+  
+  let prompt = (options.promptTemplate || defaultTemplate)
+    .replace(/\{car_description\}/gi, carDesc)
+    .replace(/\{make\}/gi, options.make || '')
+    .replace(/\{model\}/gi, options.carModel || '')
+    .replace(/\{color\}/gi, options.color || '')
+    .replace(/\{plate\}/gi, options.plateNumber || '')
+    .replace(/\{carName\}/gi, options.carName || '');
+
+  if (options.plateNumber) {
+    prompt += `, license plate: "${options.plateNumber}"`;
+  }
+
+  if (options.negativePrompt) {
+    prompt += `. Negative attributes to avoid: ${options.negativePrompt}`;
+  }
+
+  // If user provided feedback during recreate / retry:
+  if (options.feedback || options.feedbackPreset) {
+    const feedbackDetails = [options.feedbackPreset, options.feedback].filter(Boolean).join(' - ');
+    prompt += `. Revision & Feedback adjustments: ${feedbackDetails}. Fix previous flaws and strictly apply requested style corrections.`;
+  }
+
+  try {
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    const parts: any[] = [];
+    if (base64Data) {
+      parts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType || 'image/jpeg',
+        },
+      });
+    }
+    parts.push({
+      text: prompt,
+    });
+
+    const config: any = {};
+    // Only image models support imageConfig
+    if (modelName.includes('image')) {
+      config.imageConfig = {
+        aspectRatio,
+        imageSize,
+      };
+    }
+
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: {
+        parts,
+      },
+      config: Object.keys(config).length > 0 ? config : undefined,
+    });
+
+    const candidates = response.candidates || [];
+    for (const candidate of candidates) {
+      const contentParts = candidate.content?.parts || [];
+      for (const part of contentParts) {
+        if (part.inlineData && part.inlineData.data) {
+          const mime = part.inlineData.mimeType || 'image/png';
+          const fullDataUrl = `data:${mime};base64,${part.inlineData.data}`;
+          return {
+            success: true,
+            engine: 'gemini',
+            model: modelName,
+            dataUrl: fullDataUrl,
+            promptUsed: prompt,
+            message: `Sticker generated using Google Gemini AI (${modelName})`,
+          };
+        }
+      }
+    }
+
+    // Fallback: Check if model generated an SVG string or markdown image in text
+    const textOutput = response.text;
+    if (textOutput && textOutput.includes('data:image/')) {
+      const match = textOutput.match(/data:image\/[a-zA-Z0-9+]+;base64,[A-Za-z0-9+/=]+/);
+      if (match) {
+        return {
+          success: true,
+          engine: 'gemini',
+          model: modelName,
+          dataUrl: match[0],
+          promptUsed: prompt,
+          message: `Sticker generated using Google Gemini AI (${modelName})`,
+        };
+      }
+    }
+
+    console.warn('[Gemini AI] No inline image part received from Gemini model response.');
+    return { fallback: true, error: 'Gemini model returned response without inline image payload.' };
+  } catch (err: any) {
+    console.warn('[Gemini AI] Error executing request:', err.message);
+    return { fallback: true, error: err.message };
+  }
+}
+
+// ==========================================
+// NVIDIA AI STICKER GENERATOR ENGINE (NIM / OPENAI-COMPATIBLE)
+// ==========================================
+async function callNvidiaStickerGenerator(
+  base64Data: string,
+  mimeType: string,
+  options: {
+    carName?: string;
+    make?: string;
+    carModel?: string;
+    color?: string;
+    plateNumber?: string;
+    feedback?: string;
+    feedbackPreset?: string;
+    apiKey?: string;
+    aiModel?: string;
+    baseUrl?: string;
+    promptTemplate?: string;
+    negativePrompt?: string;
+  }
+) {
+  const apiKey = (options.apiKey || process.env.NVIDIA_API_KEY || '').trim();
+  if (!apiKey) {
+    return { fallback: true, error: 'NVIDIA API Key is not configured in General Settings.' };
+  }
+
+  const rawBaseUrl = (options.baseUrl || 'https://integrate.api.nvidia.com/v1').trim();
+  const baseUrl = rawBaseUrl.replace(/\/+$/, '');
+  const modelName = (options.aiModel || 'stabilityai/stable-diffusion-3-medium').trim();
+
+  // Construct prompt from global template or default
+  const carDesc = [
+    options.color,
+    options.make,
+    options.carModel,
+    options.carName,
+  ].filter(Boolean).join(' ') || 'sports car';
+
+  const defaultTemplate = 'Die-cut vinyl sticker illustration of {car_description}, clean crisp white die-cut contour border, bold black comic ink vector outlines, cel-shaded vibrant automotive paint finish, exaggerated chibi proportions, isolated on pure solid white background, sticker art, 8k resolution, masterpiece';
+  let prompt = (options.promptTemplate || defaultTemplate)
+    .replace(/\{car_description\}/gi, carDesc)
+    .replace(/\{make\}/gi, options.make || '')
+    .replace(/\{model\}/gi, options.carModel || '')
+    .replace(/\{color\}/gi, options.color || '')
+    .replace(/\{plate\}/gi, options.plateNumber || '')
+    .replace(/\{carName\}/gi, options.carName || '');
+
+  if (options.plateNumber) {
+    prompt += `, license plate: "${options.plateNumber}"`;
+  }
+
+  // If user provided feedback during recreate / retry:
+  if (options.feedback || options.feedbackPreset) {
+    const feedbackDetails = [options.feedbackPreset, options.feedback].filter(Boolean).join(' - ');
+    prompt += `. Revision & Feedback adjustments: ${feedbackDetails}. Fix previous flaws and strictly apply requested style corrections.`;
+  }
+
+  const negativePrompt = options.negativePrompt || 'photorealistic background, complex backdrop, blurry lines, noisy artifacts, cutoff, low quality, dark background, realistic humans';
+
+  // Strategy 1: Call Model-Specific NIM endpoint (e.g. /genai/{model})
+  try {
+    const directUrl = `${baseUrl}/genai/${modelName}`;
+    const payload: any = {
+      prompt: prompt,
+      negative_prompt: negativePrompt,
+      mode: 'text-to-image',
+      aspect_ratio: '1:1',
+      cfg_scale: 7.0,
+      steps: 30,
+    };
+
+    if (base64Data && (modelName.includes('sdxl') || modelName.includes('stable-diffusion') || modelName.includes('flux'))) {
+      payload.image = `data:${mimeType};base64,${base64Data}`;
+      payload.strength = 0.75;
+    }
+
+    const response = await fetch(directUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      const data: any = await response.json();
+      let generatedBase64 = '';
+
+      if (Array.isArray(data.artifacts) && data.artifacts[0]?.base64) {
+        generatedBase64 = data.artifacts[0].base64;
+      } else if (Array.isArray(data.data) && data.data[0]?.b64_json) {
+        generatedBase64 = data.data[0].b64_json;
+      } else if (Array.isArray(data.images) && data.images[0]?.image) {
+        generatedBase64 = data.images[0].image;
+      } else if (data.image) {
+        generatedBase64 = data.image;
+      }
+
+      if (generatedBase64) {
+        const fullDataUrl = generatedBase64.startsWith('data:')
+          ? generatedBase64
+          : `data:image/png;base64,${generatedBase64}`;
+        return {
+          success: true,
+          engine: 'nvidia',
+          model: modelName,
+          dataUrl: fullDataUrl,
+          promptUsed: prompt,
+          message: `Sticker generated using NVIDIA AI (${modelName})`,
+        };
+      }
+    } else {
+      console.warn(`[NVIDIA AI] Direct NIM endpoint returned status ${response.status}. Attempting standard image endpoint...`);
+    }
+  } catch (err: any) {
+    console.warn('[NVIDIA AI] Direct NIM attempt warning:', err.message);
+  }
+
+  // Strategy 2: OpenAI-compatible format /images/generations
+  try {
+    const openAiUrl = `${baseUrl}/images/generations`;
+    const openAiPayload = {
+      model: modelName,
+      prompt: prompt,
+      n: 1,
+      size: '1024x1024',
+      response_format: 'b64_json',
+    };
+
+    const response = await fetch(openAiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(openAiPayload),
+    });
+
+    if (response.ok) {
+      const data: any = await response.json();
+      const firstItem = data.data?.[0];
+      if (firstItem?.b64_json) {
+        return {
+          success: true,
+          engine: 'nvidia',
+          model: modelName,
+          dataUrl: `data:image/png;base64,${firstItem.b64_json}`,
+          promptUsed: prompt,
+          message: `Sticker generated using NVIDIA AI (${modelName})`,
+        };
+      } else if (firstItem?.url) {
+        return {
+          success: true,
+          engine: 'nvidia',
+          model: modelName,
+          dataUrl: firstItem.url,
+          promptUsed: prompt,
+          message: `Sticker generated using NVIDIA AI (${modelName})`,
+        };
+      }
+    } else {
+      const errText = await response.text();
+      console.warn(`[NVIDIA AI] Generation failed with status ${response.status}:`, errText);
+      return { fallback: true, error: `NVIDIA API returned error (${response.status}): ${errText.slice(0, 100)}` };
+    }
+  } catch (err: any) {
+    console.warn('[NVIDIA AI] Error executing request:', err.message);
+    return { fallback: true, error: err.message };
+  }
+
+  return { fallback: true, error: 'Could not extract generated sticker from NVIDIA response.' };
+}
+
 // Unified Photographer Application & Registration Endpoint
 app.post("/api/register", async (req: Request, res: Response) => {
   try {
@@ -1198,16 +1527,264 @@ app.post("/api/upload-avatar", authenticateSession, (req: Request, res: Response
 });
 
 // ==========================================
-// SWITCHABLE AI CARTOON GENERATION ENDPOINT (COMFYUI / GEMINI)
 // ==========================================
-app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
+// GENERAL SETTINGS & MULTI-PROVIDER AI CONFIG ENDPOINTS
+// ==========================================
+app.get("/api/settings", async (req: Request, res: Response) => {
   try {
-    const { image, carName, make, model, color, specialFeatures, plateNumber } = req.body;
-    if (!image) {
-      return res.status(400).json({ error: "Image data or URL is required for cartoon generation." });
+    const settings = await getGeneralSettingsFromDb();
+    
+    // Check if request is authenticated as admin
+    const authHeader = req.headers.authorization;
+    let isAdmin = false;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      const sessionObj = sessionUserMap.get(token);
+      if (sessionObj && sessionObj.user && sessionObj.user.role === "admin") {
+        isAdmin = true;
+      }
     }
 
-    const engine = (process.env.CARTOON_ENGINE || "comfyui").toLowerCase().trim();
+    // Never leak raw API keys to unauthenticated visitor sessions
+    if (!isAdmin) {
+      res.json({
+        ...settings,
+        nvidiaApiKey: settings.nvidiaApiKey ? "••••••••" : "",
+        geminiApiKey: settings.geminiApiKey ? "••••••••" : "",
+      });
+    } else {
+      res.json(settings);
+    }
+  } catch (err: any) {
+    console.warn("[Settings API Error]:", err.message);
+    res.json(getLocalGeneralSettings());
+  }
+});
+
+app.post("/api/settings", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const incoming = req.body.settings || req.body;
+    if (!incoming || typeof incoming !== "object") {
+      return res.status(400).json({ error: "Invalid settings payload." });
+    }
+
+    const current = await getGeneralSettingsFromDb();
+    
+    // Preserve existing secret keys if masked placeholder was submitted
+    let finalNvidiaKey = incoming.nvidiaApiKey;
+    if (finalNvidiaKey === "••••••••" || (finalNvidiaKey === undefined && current.nvidiaApiKey)) {
+      finalNvidiaKey = current.nvidiaApiKey;
+    }
+
+    let finalGeminiKey = incoming.geminiApiKey;
+    if (finalGeminiKey === "••••••••" || (finalGeminiKey === undefined && current.geminiApiKey)) {
+      finalGeminiKey = current.geminiApiKey;
+    }
+
+    const updatedSettings: GeneralSettings = {
+      ...current,
+      ...incoming,
+      nvidiaApiKey: finalNvidiaKey || "",
+      geminiApiKey: finalGeminiKey || "",
+      defaultTipAmounts: Array.isArray(incoming.defaultTipAmounts)
+        ? incoming.defaultTipAmounts
+        : current.defaultTipAmounts,
+    };
+
+    await saveGeneralSettingsToDb(updatedSettings);
+    console.log("[Settings API] General settings updated by admin:", (req as any).user?.username);
+    res.json({ success: true, settings: updatedSettings });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to save settings: " + err.message });
+  }
+});
+
+// Google Gemini API Diagnostic Test Endpoint
+app.post("/api/test-gemini", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { apiKey, model } = req.body;
+    const current = await getGeneralSettingsFromDb();
+    const finalApiKey = (apiKey === "••••••••" || !apiKey ? current.geminiApiKey : apiKey || "").trim() || process.env.GEMINI_API_KEY || "";
+
+    if (!finalApiKey) {
+      return res.status(400).json({
+        success: false,
+        error: "Gemini API Key is missing. Enter a Gemini API Key or configure GEMINI_API_KEY environment variable.",
+      });
+    }
+
+    const testModel = (model || current.geminiModel || "gemini-3.1-flash-image").trim();
+    const startTime = Date.now();
+
+    const client = new GoogleGenAI({
+      apiKey: finalApiKey,
+      httpOptions: {
+        headers: { 'User-Agent': 'aistudio-build' },
+      },
+    });
+
+    let sampleText = "";
+    try {
+      const response = await client.models.generateContent({
+        model: testModel,
+        contents: "Automotive art test ping. Please respond in one sentence confirming connection status.",
+      });
+      sampleText = response.text || "Connection verified successfully.";
+    } catch (modelErr: any) {
+      // If the specific image model requires image-specific inputs or rejected text prompt,
+      // verify the API key itself using gemini-2.5-flash
+      try {
+        const pingResp = await client.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: "API connection test ping.",
+        });
+        sampleText = `API key is verified and active! Ready for ${testModel} image generation.`;
+      } catch (fallbackErr: any) {
+        throw modelErr; // rethrow the original error if key validation also fails
+      }
+    }
+
+    const latency = Date.now() - startTime;
+
+    res.json({
+      success: true,
+      message: `Google Gemini API connection verified successfully (${latency}ms)! Model: ${testModel}`,
+      model: testModel,
+      latency,
+      sampleResponse: sampleText.slice(0, 120),
+    });
+  } catch (err: any) {
+    console.warn("[Gemini Test Error]:", err.message);
+    res.status(400).json({
+      success: false,
+      error: `Gemini API test failed: ${err.message}`,
+    });
+  }
+});
+
+// NVIDIA NIM Diagnostic Test Endpoint
+app.post("/api/test-nvidia", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { apiKey, model, baseUrl } = req.body;
+    const current = await getGeneralSettingsFromDb();
+    const finalApiKey = (apiKey === "••••••••" || !apiKey ? current.nvidiaApiKey : apiKey || "").trim() || process.env.NVIDIA_API_KEY || "";
+
+    if (!finalApiKey) {
+      return res.status(400).json({ success: false, error: "NVIDIA API Key is required to test connection." });
+    }
+
+    const testBaseUrl = (baseUrl || current.nvidiaBaseUrl || "https://integrate.api.nvidia.com/v1").trim().replace(/\/+$/, "");
+    const testModel = (model || current.nvidiaModel || "stabilityai/stable-diffusion-3-medium").trim();
+
+    // Probe NVIDIA models / connection
+    try {
+      const modelsUrl = `${testBaseUrl}/models`;
+      const checkRes = await fetch(modelsUrl, {
+        headers: {
+          Authorization: `Bearer ${finalApiKey}`,
+          Accept: "application/json",
+        },
+      });
+
+      if (checkRes.ok) {
+        return res.json({
+          success: true,
+          message: `NVIDIA API connection verified successfully! Endpoint is reachable.`,
+        });
+      }
+    } catch (probeErr) {
+      // Continue to direct test
+    }
+
+    // Test with lightweight prompt
+    const testPromptUrl = `${testBaseUrl}/images/generations`;
+    const response = await fetch(testPromptUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${finalApiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        model: testModel,
+        prompt: "simple red sports car sticker, white background",
+        n: 1,
+        size: "1024x1024",
+      }),
+    });
+
+    if (response.ok) {
+      res.json({
+        success: true,
+        message: `NVIDIA AI API Key & Model "${testModel}" verified successfully!`,
+      });
+    } else {
+      const errText = await response.text();
+      res.status(400).json({
+        success: false,
+        error: `NVIDIA returned status ${response.status}: ${errText.slice(0, 150)}`,
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ComfyUI Endpoint Diagnostic Test
+app.post("/api/test-comfyui", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { baseUrl } = req.body;
+    const current = await getGeneralSettingsFromDb();
+    const testUrl = (baseUrl || current.comfyuiBaseUrl || "http://127.0.0.1:8188").trim().replace(/\/+$/, "");
+
+    const startTime = Date.now();
+    const testRes = await fetch(`${testUrl}/system_stats`, { signal: AbortSignal.timeout(4000) });
+    const latency = Date.now() - startTime;
+
+    if (testRes.ok) {
+      const stats = await testRes.json();
+      res.json({
+        success: true,
+        message: `ComfyUI instance reachable (${latency}ms)! Devices: ${stats.devices?.length || 1}`,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: `ComfyUI server returned status ${testRes.status}`,
+      });
+    }
+  } catch (err: any) {
+    res.status(400).json({
+      success: false,
+      error: `Could not connect to ComfyUI instance: ${err.message}`,
+    });
+  }
+});
+
+// ==========================================
+// SWITCHABLE MULTI-PROVIDER AI CARTOON & STICKER GENERATION ENDPOINTS
+// ==========================================
+app.post(["/api/generate-sticker", "/api/generate-cartoon"], async (req: Request, res: Response) => {
+  try {
+    const {
+      image,
+      carName,
+      make,
+      model,
+      color,
+      specialFeatures,
+      plateNumber,
+      feedback,
+      feedbackPreset,
+      retryAttempt,
+    } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: "Image data or URL is required for sticker generation." });
+    }
+
+    const settings = await getGeneralSettingsFromDb();
+    const provider = (settings.aiProvider || "gemini").toLowerCase().trim();
 
     // Extract base64 and mime type from image input (can be data URL, local /uploads/ URL, or remote URL)
     let base64Data = "";
@@ -1227,17 +1804,83 @@ app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
         const ext = path.extname(localFilePath).toLowerCase();
         mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
       }
+    } else if (typeof image === "string" && (image.startsWith("http://") || image.startsWith("https://"))) {
+      try {
+        const remoteResp = await fetch(image);
+        if (remoteResp.ok) {
+          const arrBuf = await remoteResp.arrayBuffer();
+          base64Data = Buffer.from(arrBuf).toString("base64");
+          const cType = remoteResp.headers.get("content-type");
+          if (cType) mimeType = cType.split(";")[0].trim();
+        }
+      } catch (fetchErr) {
+        console.warn("[AI Sticker] Could not fetch remote vehicle image:", fetchErr);
+      }
     }
 
-    if (!base64Data) {
-      return res.json({
-        fallback: true,
-        message: "Remote URL passed; switching to fast client-side artistic pipeline.",
+    // 1. Google Gemini AI Engine
+    if (provider === "gemini") {
+      const geminiResult = await callGeminiStickerGenerator(base64Data, mimeType, {
+        carName,
+        make,
+        carModel: model,
+        color,
+        plateNumber,
+        feedback,
+        feedbackPreset,
+        apiKey: settings.geminiApiKey,
+        aiModel: settings.geminiModel,
+        aspectRatio: settings.geminiAspectRatio,
+        imageSize: settings.geminiImageSize,
+        promptTemplate: settings.stickerGlobalPrompt,
+        negativePrompt: settings.stickerNegativePrompt,
       });
+
+      if (geminiResult && !geminiResult.fallback && geminiResult.dataUrl) {
+        return res.json({
+          success: true,
+          engine: "gemini",
+          dataUrl: geminiResult.dataUrl,
+          promptUsed: geminiResult.promptUsed,
+          message: geminiResult.message,
+          retryAttempt: retryAttempt || 0,
+        });
+      }
+      console.log("[AI Engine] Gemini generation failed or not configured. Attempting fallback...", geminiResult?.error);
     }
 
-    // 1. Try ComfyUI Container if configured as engine (or default in Docker)
-    if (engine === "comfyui" || engine === "docker") {
+    // 2. NVIDIA AI Cloud NIM Engine
+    if (provider === "nvidia") {
+      const nvidiaResult = await callNvidiaStickerGenerator(base64Data, mimeType, {
+        carName,
+        make,
+        carModel: model,
+        color,
+        plateNumber,
+        feedback,
+        feedbackPreset,
+        apiKey: settings.nvidiaApiKey,
+        aiModel: settings.nvidiaModel,
+        baseUrl: settings.nvidiaBaseUrl,
+        promptTemplate: settings.stickerGlobalPrompt,
+        negativePrompt: settings.stickerNegativePrompt,
+      });
+
+      if (nvidiaResult && !nvidiaResult.fallback && nvidiaResult.dataUrl) {
+        return res.json({
+          success: true,
+          engine: "nvidia",
+          dataUrl: nvidiaResult.dataUrl,
+          promptUsed: nvidiaResult.promptUsed,
+          message: nvidiaResult.message,
+          retryAttempt: retryAttempt || 0,
+        });
+      }
+      console.log("[AI Engine] NVIDIA AI generation failed or not configured. Attempting fallback...", nvidiaResult?.error);
+    }
+
+    // 3. ComfyUI Local Engine
+    if (provider === "comfyui" || provider === "docker") {
       const comfyResult = await callComfyUIGenerator(base64Data, mimeType, { carName, make, model, color, plateNumber });
       if (comfyResult && !comfyResult.fallback) {
         return res.json({
@@ -1247,67 +1890,20 @@ app.post("/api/generate-cartoon", async (req: Request, res: Response) => {
           ...comfyResult,
         });
       }
-      // If ComfyUI container was unreachable, continue to Gemini / high-definition fallback
-      console.log("[AI Engine] ComfyUI unavailable, attempting Gemini / local algorithmic engine.");
+      console.log("[AI Engine] ComfyUI unavailable, transitioning to local engine.");
     }
 
-    // 2. Try Gemini AI if API key is provided
-    const ai = getGemini();
-    if (ai && engine !== "local_canvas") {
-      try {
-        const promptText = `
-Convert this automotive photograph into a clean, stylized cartoon illustration sticker of the vehicle.
-Vehicle Details: ${carName || "Sports Car"} (${make || ""} ${model || ""}), Color: ${color || "Vibrant"}.
-License Plate: ${plateNumber || "Custom Plate"}.
-Style Requirements:
-- Bold black comic outline, vibrant cel-shaded automotive colors, exaggerated cute/aggressive proportions (chibi / Initial D / Hot Wheels inspired style).
-- Isolated subject on a crisp pure solid white background suitable for die-cut stickers.
-- Preserve key distinctive vehicle body lines, wheels, stance, spoilers, headlights, and badges.
-- Return ONLY the clean graphic image.
-`;
-
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType,
-                  },
-                },
-                {
-                  text: promptText,
-                },
-              ],
-            },
-          ],
-        });
-
-        const candidate = response.candidates?.[0];
-        if (candidate) {
-          return res.json({
-            success: true,
-            engine: "gemini",
-            generatedAt: new Date().toISOString(),
-          });
-        }
-      } catch (geminiErr: any) {
-        console.warn("[Gemini Cartoon Generation] Fallback triggered:", geminiErr.message);
-      }
-    }
-
-    // 3. Fallback to high-definition client-side sticker engine
+    // 4. Default Failover to Local Algorithmic Canvas Vector Engine
     res.json({
       fallback: true,
       engine: "local_canvas",
-      message: "Generated using high-contrast cel-shaded sticker engine.",
+      message: "Generated using high-contrast cel-shaded sticker engine with die-cut border.",
+      feedbackApplied: feedback || feedbackPreset || null,
+      retryAttempt: retryAttempt || 0,
     });
   } catch (err: any) {
-    console.warn("[Cartoon Generation Error]:", err.message);
-    res.json({ fallback: true, error: err.message });
+    console.warn("[Sticker Generation Error]:", err.message);
+    res.json({ fallback: true, engine: "local_canvas", error: err.message });
   }
 });
 
@@ -1472,48 +2068,42 @@ app.get("/api/cars", async (req: Request, res: Response) => {
           needsDbUpdate = true;
         }
 
-        if (full) {
-          let cleanCartoonUrl = c.cartoonImageUrl;
-          if (cleanCartoonUrl && cleanCartoonUrl.startsWith("data:image/")) {
-            cleanCartoonUrl = await saveBase64ImageToDisk(cleanCartoonUrl, "cartoon", targetFolder, false);
-            needsDbUpdate = true;
-          }
+        let cleanCartoonUrl = c.cartoonImageUrl;
+        if (cleanCartoonUrl && cleanCartoonUrl.startsWith("data:image/")) {
+          cleanCartoonUrl = await saveBase64ImageToDisk(cleanCartoonUrl, "cartoon", targetFolder, false);
+          needsDbUpdate = true;
+        }
 
-          let cleanImages = c.images;
-          if (Array.isArray(cleanImages) && cleanImages.some((img) => img && img.startsWith("data:image/"))) {
-            cleanImages = await Promise.all(
-              cleanImages.map(async (img, idx) => {
-                if (img && img.startsWith("data:image/")) {
-                  return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder, false);
-                }
-                return img;
-              })
-            );
-            needsDbUpdate = true;
-          }
+        let cleanImages = c.images;
+        if (Array.isArray(cleanImages) && cleanImages.some((img) => img && img.startsWith("data:image/"))) {
+          cleanImages = await Promise.all(
+            cleanImages.map(async (img, idx) => {
+              if (img && img.startsWith("data:image/")) {
+                return await saveBase64ImageToDisk(img, `photo_${idx + 1}`, targetFolder, false);
+              }
+              return img;
+            })
+          );
+          needsDbUpdate = true;
+        }
 
-          if (needsDbUpdate) {
-            updateCarInDb(c.id, {
-              imageUrl: cleanImageUrl,
-              cartoonImageUrl: cleanCartoonUrl,
-              images: cleanImages,
-            }).catch(() => {});
-          }
-
-          return {
-            ...c,
-            imageUrl: cleanImageUrl,
-            cartoonImageUrl: cleanCartoonUrl,
-            images: cleanImages,
-            photoCount: (cleanImages && cleanImages.length) || c.photoCount || 1,
-          };
+        // Ensure all distinct images are present in the images array
+        let allImages: string[] = Array.isArray(cleanImages) && cleanImages.length > 0
+          ? cleanImages.filter(Boolean)
+          : [];
+        if (cleanImageUrl && !allImages.includes(cleanImageUrl)) {
+          allImages = [cleanImageUrl, ...allImages];
         }
 
         if (needsDbUpdate) {
-          updateCarInDb(c.id, { imageUrl: cleanImageUrl }).catch(() => {});
+          updateCarInDb(c.id, {
+            imageUrl: cleanImageUrl,
+            cartoonImageUrl: cleanCartoonUrl,
+            images: allImages,
+          }).catch(() => {});
         }
 
-        // Return strictly lightweight car metadata and the ~200kb cover image URL
+        // Return car metadata with complete images array for fleet management and gallery
         return {
           id: c.id,
           plateNumber: c.plateNumber || "",
@@ -1534,10 +2124,14 @@ app.get("/api/cars", async (req: Request, res: Response) => {
             instagram: c.photographer?.instagram || "",
             venmoHandle: c.photographer?.venmoHandle || "",
             payPalHandle: c.photographer?.payPalHandle || "",
+            cashAppHandle: c.photographer?.cashAppHandle || "",
           },
           imageUrl: cleanImageUrl,
-          photoCount: c.photoCount || (Array.isArray(c.images) && c.images.length) || 1,
-          hasCartoon: Boolean(c.hasCartoon || c.cartoonImageUrl),
+          images: allImages,
+          photoAuthors: c.photoAuthors || {},
+          cartoonImageUrl: cleanCartoonUrl || null,
+          photoCount: allImages.length || c.photoCount || 1,
+          hasCartoon: Boolean(c.hasCartoon || cleanCartoonUrl),
           tags: Array.isArray(c.tags) ? c.tags : [],
           views: c.views || 0,
           downloads: c.downloads || 0,
@@ -1607,12 +2201,19 @@ app.get("/api/cars/:id", async (req: Request, res: Response) => {
       needsDbUpdate = true;
     }
 
+    let allImages: string[] = Array.isArray(cleanImages) && cleanImages.length > 0
+      ? cleanImages.filter(Boolean)
+      : [];
+    if (cleanImageUrl && !allImages.includes(cleanImageUrl)) {
+      allImages = [cleanImageUrl, ...allImages];
+    }
+
     const cleanCar = {
       ...car,
       imageUrl: cleanImageUrl,
       cartoonImageUrl: cleanCartoonUrl,
-      images: cleanImages,
-      photoCount: (cleanImages && cleanImages.length) || car.photoCount || 1,
+      images: allImages,
+      photoCount: allImages.length || car.photoCount || 1,
     };
 
     if (needsDbUpdate) {

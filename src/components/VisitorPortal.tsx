@@ -19,12 +19,13 @@ import {
   AlertCircle,
   Globe,
 } from 'lucide-react';
-import { CarPhoto, AppThemeConfig, Photographer } from '../types';
+import { CarPhoto, AppThemeConfig, Photographer, GeneralSettings } from '../types';
 import { PhotoCard } from './PhotoCard';
 import { PhotoCardSkeleton, PhotoCardSkeletonGrid } from './PhotoCardSkeleton';
 import { DownloadModal } from './DownloadModal';
 import { CarGalleryPage } from './CarGalleryPage';
 import { TipModal } from './TipModal';
+import { StickerGeneratorModal } from './StickerGeneratorModal';
 import { US_STATES, getStateName, parsePlateAndStateQuery } from '../utils/stateUtils';
 
 interface VisitorPortalProps {
@@ -34,6 +35,8 @@ interface VisitorPortalProps {
   onOpenServerConfig?: () => void;
   currentTheme: AppThemeConfig;
   onToggleThemeMode?: () => void;
+  generalSettings?: GeneralSettings;
+  onUpdateCar?: (id: string, updated: Partial<CarPhoto>) => Promise<void>;
 }
 
 export const VisitorPortal: React.FC<VisitorPortalProps> = ({
@@ -41,6 +44,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
   isLoading = false,
   onOpenAdmin,
   currentTheme,
+  generalSettings,
+  onUpdateCar,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedStateFilter, setSelectedStateFilter] = useState<string>('All');
@@ -64,6 +69,15 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
 
   const [tippingCar, setTippingCar] = useState<CarPhoto | null>(null);
   const [isTipModalOpen, setIsTipModalOpen] = useState<boolean>(false);
+
+  // Sticker Generation & Support Author Gate States
+  const [stickerCar, setStickerCar] = useState<CarPhoto | null>(null);
+  const [stickerPhotoUrl, setStickerPhotoUrl] = useState<string | null>(null);
+  const [isStickerModalOpen, setIsStickerModalOpen] = useState<boolean>(false);
+
+  const [supportGateCar, setSupportGateCar] = useState<CarPhoto | null>(null);
+  const [supportGatePhotoUrl, setSupportGatePhotoUrl] = useState<string | null>(null);
+  const [isSupportGateOpen, setIsSupportGateOpen] = useState<boolean>(false);
 
   // Quick sample vehicles for user click
   const QUICK_CARS = [
@@ -274,6 +288,20 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
     setIsTipModalOpen(true);
   };
 
+  const handleTriggerStickerGenerator = (car: CarPhoto, initialPhotoUrl?: string) => {
+    const photoToUse = initialPhotoUrl || car.imageUrl;
+    // Check if support author gate should be shown first
+    if (generalSettings?.showTipBeforeSticker) {
+      setSupportGateCar(car);
+      setSupportGatePhotoUrl(photoToUse);
+      setIsSupportGateOpen(true);
+    } else {
+      setStickerCar(car);
+      setStickerPhotoUrl(photoToUse);
+      setIsStickerModalOpen(true);
+    }
+  };
+
   // If a car is selected for full gallery view, render the CarGalleryPage!
   if (selectedCarForGallery) {
     const currentCar = cars.find((c) => c.id === selectedCarForGallery.id) || selectedCarForGallery;
@@ -284,6 +312,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
         currentTheme={currentTheme}
         onOpenAdmin={onOpenAdmin}
         onOpenTipModal={() => handleOpenTipModal(currentCar)}
+        onOpenStickerGenerator={handleTriggerStickerGenerator}
+        generalSettings={generalSettings}
       />
     );
   }
@@ -690,6 +720,8 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
                     onOpenDownloadModal={handleOpenDownload}
                     onSelectCar={(car) => setSelectedCarForGallery(car)}
                     onSelectAuthor={(authorName) => setSelectedAuthor(authorName)}
+                    onOpenStickerGenerator={handleTriggerStickerGenerator}
+                    generalSettings={generalSettings}
                     viewMode={viewMode}
                   />
                 ))}
@@ -809,7 +841,75 @@ export const VisitorPortal: React.FC<VisitorPortalProps> = ({
           setSelectedCarForDownload(null);
         }}
         initialCartoonState={initialCartoonState}
+        generalSettings={generalSettings}
+        onOpenStickerGenerator={(c) => {
+          setIsModalOpen(false);
+          handleTriggerStickerGenerator(c);
+        }}
       />
+
+      {/* Support Gate Tip Modal (Shown before sticker generation when configured) */}
+      {isSupportGateOpen && supportGateCar && (
+        <TipModal
+          isOpen={isSupportGateOpen}
+          onClose={() => {
+            setIsSupportGateOpen(false);
+            setSupportGateCar(null);
+            setSupportGatePhotoUrl(null);
+          }}
+          car={supportGateCar}
+          allPhotographers={
+            supportGateCar.photoAuthors && Object.keys(supportGateCar.photoAuthors).length > 0
+              ? Object.values(supportGateCar.photoAuthors)
+              : [supportGateCar.photographer]
+          }
+          customTitle="Support the Creator Before Generating Your Sticker"
+          customDescription="Car enthusiasts and track photographers spend hours capturing these moments. Show appreciation or continue for free to generate your vinyl sticker."
+          onBypass={() => {
+            const carToOpen = supportGateCar;
+            const photoToUse = supportGatePhotoUrl || supportGateCar.imageUrl;
+            setIsSupportGateOpen(false);
+            setSupportGateCar(null);
+            setSupportGatePhotoUrl(null);
+            setStickerCar(carToOpen);
+            setStickerPhotoUrl(photoToUse);
+            setIsStickerModalOpen(true);
+          }}
+          onSuccess={() => {
+            const carToOpen = supportGateCar;
+            const photoToUse = supportGatePhotoUrl || supportGateCar.imageUrl;
+            setIsSupportGateOpen(false);
+            setSupportGateCar(null);
+            setSupportGatePhotoUrl(null);
+            setStickerCar(carToOpen);
+            setStickerPhotoUrl(photoToUse);
+            setIsStickerModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Public / Visitor Sticker Generator Modal */}
+      {isStickerModalOpen && stickerCar && (
+        <StickerGeneratorModal
+          isOpen={isStickerModalOpen}
+          onClose={() => {
+            setIsStickerModalOpen(false);
+            setStickerCar(null);
+            setStickerPhotoUrl(null);
+          }}
+          car={stickerCar}
+          initialImageUrl={stickerPhotoUrl || stickerCar.imageUrl}
+          settings={generalSettings}
+          onApplyToCar={async (stickerUrl) => {
+            if (stickerCar && onUpdateCar) {
+              await onUpdateCar(stickerCar.id, {
+                hasCartoon: true,
+                cartoonImageUrl: stickerUrl,
+              });
+            }
+          }}
+        />
+      )}
 
       {/* Direct Tip Modal */}
       {isTipModalOpen && tippingCar && (
