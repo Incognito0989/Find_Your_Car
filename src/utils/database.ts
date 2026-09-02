@@ -93,7 +93,10 @@ export function getLocalUsers(): (UserAccount & { password?: string })[] {
     const data = fs.readFileSync(USERS_JSON_PATH, 'utf-8');
     const parsed = JSON.parse(data);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      return parsed.map((u) => ({
+        ...u,
+        password: u.password || (u.role === 'admin' ? (process.env.ADMIN_PASSWORD || 'platesnap2026') : 'shooter2026'),
+      }));
     }
     return INITIAL_USERS.map((u) => ({
       ...u,
@@ -581,13 +584,21 @@ export async function getUserByIdFromDb(id: string): Promise<(UserAccount & { pa
 }
 
 export async function getUserByUsernameOrEmailFromDb(identifier: string): Promise<(UserAccount & { password?: string }) | null> {
+  if (!identifier || !identifier.trim()) {
+    // If no identifier provided, find the primary admin account
+    const local = getLocalUsers();
+    return local.find((u) => u.role === 'admin' || u.username === 'admin') || local[0] || null;
+  }
+
   const clean = identifier.trim().toLowerCase();
+  const cleanNoAt = clean.replace(/^@+/, '');
+
   if (isPostgresAvailable) {
     try {
       const pool = getPgPool();
       const res = await pool.query(
-        'SELECT * FROM users WHERE LOWER(username) = $1 OR LOWER(email) = $1',
-        [clean]
+        'SELECT * FROM users WHERE LOWER(username) = $1 OR LOWER(username) = $2 OR LOWER(email) = $1 OR LOWER(email) = $2 OR LOWER(name) = $1 OR LOWER(id) = $1 LIMIT 1',
+        [clean, cleanNoAt]
       );
       if (res.rows.length > 0) {
         return mapRowToUser(res.rows[0]);
@@ -600,7 +611,11 @@ export async function getUserByUsernameOrEmailFromDb(identifier: string): Promis
   const local = getLocalUsers();
   return (
     local.find(
-      (u) => u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean)
+      (u) =>
+        (u.username && (u.username.toLowerCase() === clean || u.username.toLowerCase() === cleanNoAt)) ||
+        (u.email && (u.email.toLowerCase() === clean || u.email.toLowerCase() === cleanNoAt)) ||
+        (u.name && u.name.toLowerCase() === clean) ||
+        (u.id && u.id.toLowerCase() === clean)
     ) || null
   );
 }

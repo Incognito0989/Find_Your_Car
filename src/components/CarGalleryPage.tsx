@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   Download,
@@ -124,6 +124,32 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
   // Tipping Modal State
   const [isTipModalOpen, setIsTipModalOpen] = useState<boolean>(false);
   const [tippingPhotographers, setTippingPhotographers] = useState<Photographer[]>([]);
+
+  // Mobile Touch Swipe Handling
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX < 0) {
+        // Swipe left -> Next
+        setActiveIndex((prev) => (prev + 1) % allImages.length);
+      } else {
+        // Swipe right -> Prev
+        setActiveIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
 
   // Scroll to top on mount
   useEffect(() => {
@@ -473,13 +499,18 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           </div>
 
           {/* Main Stage Frame */}
-          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] bg-black/90 rounded-3xl overflow-hidden border border-[var(--ps-card-border,#2C2C2E)] shadow-2xl flex items-center justify-center group">
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] bg-black/90 rounded-3xl overflow-hidden border border-[var(--ps-card-border,#2C2C2E)] shadow-2xl flex items-center justify-center group touch-pan-y"
+          >
             {/* Active Image */}
             <img
               src={activePhotoUrl}
               alt={`${car.carName} - Shot ${activeIndex + 1}`}
-              className="w-full h-full object-contain cursor-zoom-in transition-transform duration-300"
+              className="w-full h-full object-contain cursor-zoom-in transition-transform duration-300 select-none"
               onClick={() => setIsFullscreenOpen(true)}
+              draggable={false}
             />
 
             {/* Left Nav Arrow */}
@@ -841,11 +872,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           </div>
 
           {/* Central Image View */}
-          <div className="relative flex-1 flex items-center justify-center my-4 overflow-hidden">
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="relative flex-1 flex items-center justify-center my-4 overflow-hidden touch-pan-y"
+          >
             <img
               src={activePhotoUrl}
               alt="Fullscreen View"
-              className="max-h-[85vh] max-w-full object-contain rounded-xl shadow-2xl"
+              className="max-h-[85vh] max-w-full object-contain rounded-xl shadow-2xl select-none"
+              draggable={false}
             />
 
             {allImages.length > 1 && (
