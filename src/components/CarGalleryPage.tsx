@@ -239,11 +239,11 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
     <div className="min-h-screen bg-[var(--ps-bg,#000000)] text-[var(--ps-text-main,#ffffff)] relative transition-colors duration-300">
       {/* Top Header / Sticky Bar */}
       <header className="sticky top-0 z-40 bg-[var(--ps-nav-bg,rgba(0,0,0,0.85))] border-b border-[var(--ps-card-border,#2C2C2E)] backdrop-blur-xl transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-18 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 min-h-16 py-2.5 sm:py-0 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
           {/* Back Button */}
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-bold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all shadow-sm active:scale-95 cursor-pointer group"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-bold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all shadow-sm active:scale-95 cursor-pointer group shrink-0"
           >
             <ArrowLeft className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] group-hover:text-white transition-colors" />
             <span className="hidden sm:inline">Back to Site</span>
@@ -251,34 +251,34 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           </button>
 
           {/* Center Vehicle Descriptor Badge */}
-          <div className="flex items-center gap-3">
-            <div className="bg-[var(--ps-badge-bg,#111111)] px-3.5 py-1.5 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-2 shadow-sm">
-              <span className="text-sm font-mono font-black text-[var(--ps-badge-text,#ffffff)] tracking-wider">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 max-w-[160px] sm:max-w-xs md:max-w-md">
+            <div className="bg-[var(--ps-badge-bg,#111111)] px-3 py-1.5 rounded-full border border-[var(--ps-badge-border,#2C2C2E)] flex items-center gap-1.5 shadow-sm min-w-0">
+              <span className="text-xs sm:text-sm font-mono font-black text-[var(--ps-badge-text,#ffffff)] tracking-wider truncate">
                 {car.carName || `${car.make} ${car.model || ''}`}
               </span>
             </div>
-            <span className="hidden md:inline-block text-xs font-mono font-semibold text-[var(--ps-text-muted,#9ca3af)] bg-[var(--ps-card-bg,#111111)] px-2.5 py-1 rounded-full border border-[var(--ps-card-border,#2C2C2E)]">
-              {allImages.length} {allImages.length === 1 ? 'Photo' : 'Photos'} in Set
+            <span className="hidden md:inline-block text-xs font-mono font-semibold text-[var(--ps-text-muted,#9ca3af)] bg-[var(--ps-card-bg,#111111)] px-2.5 py-1 rounded-full border border-[var(--ps-card-border,#2C2C2E)] shrink-0">
+              {allImages.length} {allImages.length === 1 ? 'Photo' : 'Photos'}
             </span>
           </div>
 
           {/* Right Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={handleTipAllAuthors}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer shadow-sm"
               title="Tip Photographers"
             >
               <Heart className="w-3.5 h-3.5 text-amber-500 fill-amber-500/30" />
               <span className="hidden sm:inline">
-                {allSetAuthors.length > 1 ? `Tip Authors (Split ${allSetAuthors.length})` : 'Tip Author'}
+                {allSetAuthors.length > 1 ? `Tip Authors (${allSetAuthors.length})` : 'Tip Author'}
               </span>
               <span className="sm:hidden">Tip</span>
             </button>
 
             <button
               onClick={handleShare}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-semibold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-colors cursor-pointer group shadow-sm"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-semibold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-colors cursor-pointer group shadow-sm"
               title="Share Gallery Link"
             >
               {copiedLink ? (
@@ -297,7 +297,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             <button
               onClick={handleDownloadAllPhotos}
               disabled={isDownloadingAll}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
@@ -309,7 +309,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {onOpenAdmin && (
               <button
                 onClick={onOpenAdmin}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-bold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all active:scale-95 cursor-pointer ml-0.5 group shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-[var(--ps-card-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white text-xs font-bold border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all active:scale-95 cursor-pointer group shadow-sm"
                 title="Photographer Admin Portal"
                 aria-label="Photographer Admin Portal"
               >
@@ -434,16 +434,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
         {/* Hero Interactive Photo Viewer */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)]">Full-Resolution Spotlight</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base sm:text-lg font-bold text-[var(--ps-text-main,#ffffff)]">Full-Resolution Spotlight</h2>
               <span className="text-xs font-mono font-semibold text-[var(--ps-text-muted,#9ca3af)] bg-[var(--ps-card-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] px-2.5 py-0.5 rounded-full shadow-sm">
                 Photo {activeIndex + 1} of {allImages.length}
               </span>
             </div>
 
             {/* Quick Actions for active photo */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => handleTipSingleAuthor(activeAuthor)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer shadow-sm"
@@ -473,7 +473,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           </div>
 
           {/* Main Stage Frame */}
-          <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] bg-black/90 rounded-3xl overflow-hidden border border-[var(--ps-card-border,#2C2C2E)] shadow-2xl flex items-center justify-center group">
+          <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-[16/9] bg-black/90 rounded-3xl overflow-hidden border border-[var(--ps-card-border,#2C2C2E)] shadow-2xl flex items-center justify-center group">
             {/* Active Image */}
             <img
               src={activePhotoUrl}
@@ -486,10 +486,10 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {allImages.length > 1 && (
               <button
                 onClick={() => setActiveIndex((prev) => (prev - 1 + allImages.length) % allImages.length)}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/70 hover:bg-black/90 text-white border border-white/20 backdrop-blur-md flex items-center justify-center transition-all opacity-85 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
                 title="Previous Photo (Left Arrow)"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             )}
 
@@ -497,50 +497,50 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             {allImages.length > 1 && (
               <button
                 onClick={() => setActiveIndex((prev) => (prev + 1) % allImages.length)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/70 hover:bg-black/90 text-white border border-white/20 backdrop-blur-md flex items-center justify-center transition-all opacity-85 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
                 title="Next Photo (Right Arrow)"
               >
-                <ChevronRight className="w-6 h-6" />
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             )}
 
             {/* Author Attribution Tag in Top Right */}
             {activeAuthor && (
-              <div className="absolute top-4 right-4 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-lg">
+              <div className="absolute top-3 right-3 sm:top-4 sm:right-4 bg-black/75 backdrop-blur-md px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-2xl border border-white/10 flex items-center gap-2 shadow-lg max-w-[180px] sm:max-w-none">
                 {activeAuthor.avatar ? (
                   <img
                     src={activeAuthor.avatar}
                     alt={activeAuthor.name}
-                    className="w-5 h-5 rounded-full object-cover border border-white/20"
+                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-white/20 shrink-0"
                   />
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-[10px] text-white font-bold">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-[10px] text-white font-bold shrink-0">
                     {(activeAuthor.name || 'P').charAt(0).toUpperCase()}
                   </div>
                 )}
-                <div className="text-[11px]">
+                <div className="text-[11px] min-w-0">
                   <span className="text-gray-400 block text-[9px] leading-tight">Shot by</span>
-                  <span className="text-white font-bold">{activeAuthor.name}</span>
+                  <span className="text-white font-bold truncate block">{activeAuthor.name}</span>
                 </div>
               </div>
             )}
 
             {/* Bottom Metadata Bar */}
-            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pointer-events-none">
-              <div className="space-y-0.5">
+            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 pointer-events-none">
+              <div className="space-y-0.5 min-w-0">
                 {car.resolution && (
-                  <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)] font-bold">
+                  <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)] font-bold truncate">
                     {car.resolution}
                   </p>
                 )}
                 {car.cameraInfo && (
-                  <p className="text-[11px] text-gray-300 font-mono">
+                  <p className="text-[11px] text-gray-300 font-mono truncate">
                     {car.cameraInfo}
                   </p>
                 )}
               </div>
 
-              <div className="text-xs text-gray-400 font-mono bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 w-fit">
+              <div className="text-xs text-gray-400 font-mono bg-black/60 backdrop-blur-md px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-white/10 w-fit">
                 Angle {activeIndex + 1} of {allImages.length}
               </div>
             </div>
@@ -549,7 +549,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           {/* Thumbnail Carousel Strip */}
           {isLoadingDetails ? (
             expectedPhotoCount > 1 && (
-              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+              <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
                 {Array.from({ length: expectedPhotoCount }).map((_, idx) => (
                   <GalleryThumbnailSkeleton key={`thumb-skel-${idx}`} />
                 ))}
@@ -557,12 +557,12 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
             )
           ) : (
             allImages.length > 1 && (
-              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+              <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
                 {allImages.map((imgUrl, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveIndex(idx)}
-                    className={`relative w-24 sm:w-32 aspect-[4/3] rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                    className={`relative w-20 sm:w-28 md:w-32 aspect-[4/3] rounded-xl sm:rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                       activeIndex === idx
                         ? 'border-[var(--ps-primary,#0A84FF)] scale-105 shadow-lg shadow-[var(--ps-primary,#0A84FF)]/20 ring-2 ring-[var(--ps-primary,#0A84FF)]/40'
                         : 'border-[#2C2C2E] opacity-60 hover:opacity-100 hover:border-white/40'
@@ -586,9 +586,9 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
         {/* Complete Car Photo Gallery Grid with Author attribution per picture */}
         <section className="space-y-6 pt-4 border-t border-[var(--ps-card-border,#2C2C2E)]">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-[var(--ps-text-main,#ffffff)]">Vehicle Photo Gallery</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-[var(--ps-text-main,#ffffff)]">Vehicle Photo Gallery</h2>
               <p className="text-xs text-[var(--ps-text-muted,#9ca3af)]">
                 {isLoadingDetails
                   ? `Loading ${expectedPhotoCount} high-resolution captures for ${car.carName}...`
@@ -596,7 +596,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleTipAllAuthors}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold transition-colors cursor-pointer shadow-sm"
@@ -620,7 +620,7 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
           {isLoadingDetails ? (
             <GalleryPhotoSkeletonGrid count={expectedPhotoCount} />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {allImages.map((imgUrl, idx) => {
                 const formattedUrl = formatMediaUrl(imgUrl);
                 const isSelected = activeIndex === idx;
@@ -698,16 +698,16 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
                     </div>
 
                     {/* Card Info Footer with Author Info */}
-                    <div className="p-4 flex items-center justify-between border-t border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-card-bg,#111111)]">
-                      <div className="space-y-1 min-w-0 pr-2">
+                    <div className="p-3.5 sm:p-4 flex items-center justify-between border-t border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-card-bg,#111111)] gap-2">
+                      <div className="space-y-1 min-w-0 pr-1">
                         <p className="text-xs font-bold text-[var(--ps-text-main,#ffffff)] truncate">
                           {idx === 0 ? 'Primary Front Shot' : `Angle Capture #${idx + 1}`}
                         </p>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <img
                             src={author.avatar}
                             alt={author.name}
-                            className="w-4 h-4 rounded-full object-cover border border-[var(--ps-card-border,#2C2C2E)] shadow-sm"
+                            className="w-4 h-4 rounded-full object-cover border border-[var(--ps-card-border,#2C2C2E)] shadow-sm shrink-0"
                           />
                           <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-medium truncate">
                             {author.name}
@@ -726,10 +726,10 @@ export const CarGalleryPage: React.FC<CarGalleryPageProps> = ({
 
                         <button
                           onClick={() => handleDownloadSinglePhoto(imgUrl, idx)}
-                          className="px-3 py-1.5 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm group"
+                          className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer shadow-sm group"
                         >
                           <Download className="w-3.5 h-3.5 text-[var(--ps-primary,#0A84FF)] group-hover:text-white transition-colors" />
-                          <span>Download</span>
+                          <span className="hidden xs:inline sm:inline">Download</span>
                         </button>
                       </div>
                     </div>

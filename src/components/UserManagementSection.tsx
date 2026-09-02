@@ -445,16 +445,16 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   });
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
+    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Navigation Sub-Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-b border-[var(--ps-card-border,#2C2C2E)] pb-4">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0">
           <button
             onClick={() => setActiveSubTab('users')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 shrink-0 ${
               activeSubTab === 'users'
-                ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-lg'
-                : 'bg-white/5 text-gray-400 hover:text-white'
+                ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-md'
+                : 'bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)]'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -464,14 +464,14 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           {isAdmin && (
             <button
               onClick={() => setActiveSubTab('pending')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 relative ${
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 relative shrink-0 ${
                 activeSubTab === 'pending'
-                  ? 'bg-amber-500 text-black shadow-lg'
-                  : 'bg-white/5 text-gray-400 hover:text-white'
+                  ? 'bg-amber-500 text-black shadow-md'
+                  : 'bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)]'
               }`}
             >
               <Clock className="w-4 h-4" />
-              <span>Pending Approvals</span>
+              <span>Pending</span>
               {pendingUsers.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-black text-[10px] font-black animate-pulse">
                   {pendingUsers.length}
@@ -482,21 +482,21 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
 
           <button
             onClick={() => setActiveSubTab('my_account')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 shrink-0 ${
               activeSubTab === 'my_account'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'bg-white/5 text-gray-400 hover:text-white'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)]'
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>My Profile & Settings</span>
+            <span>My Profile</span>
           </button>
         </div>
 
         {isAdmin && activeSubTab !== 'my_account' && (
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer shrink-0"
           >
             <UserPlus className="w-4 h-4" />
             <span>Add Author</span>
@@ -509,15 +509,15 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
         <div
           className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs font-semibold animate-in slide-in-from-top-2 duration-200 ${
             statusMsg.type === 'success'
-              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-              : 'bg-red-950/40 border-red-500/40 text-red-300'
+              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-300'
+              : 'bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-300'
           }`}
         >
           <div className="flex items-center gap-2">
-            {statusMsg.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+            {statusMsg.type === 'success' ? <Check className="w-4 h-4 text-emerald-500" /> : <AlertCircle className="w-4 h-4 text-red-500" />}
             <span>{statusMsg.text}</span>
           </div>
-          <button onClick={() => setStatusMsg(null)} className="p-1 hover:opacity-70">
+          <button onClick={() => setStatusMsg(null)} className="p-1 hover:opacity-70 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -527,15 +527,15 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       {/* SUBTAB: MY PROFILE & SETTINGS (Self-Service Profile + Password Change)   */}
       {/* ========================================================================= */}
       {activeSubTab === 'my_account' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-200">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 animate-in fade-in duration-200">
           {/* Left Column: Profile Card Preview */}
           <div className="space-y-6">
-            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-6 shadow-xl text-center space-y-4">
+            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-5 sm:p-6 shadow-xl text-center space-y-4">
               <div className="relative inline-block mx-auto">
                 <img
                   src={formatMediaUrl(myAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200')}
                   alt="My Profile"
-                  className="w-24 h-24 rounded-3xl object-cover border-4 border-white/20 shadow-2xl mx-auto"
+                  className="w-24 h-24 rounded-3xl object-cover border-4 border-[var(--ps-card-border,#2C2C2E)] shadow-2xl mx-auto"
                 />
                 <button
                   type="button"
@@ -557,27 +557,27 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               </div>
 
               <div>
-                <h3 className="text-xl font-black text-white">{myName || 'Photographer'}</h3>
+                <h3 className="text-xl font-black text-[var(--ps-text-main,#ffffff)]">{myName || 'Photographer'}</h3>
                 <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)]">@{myUsername || 'handle'}</p>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold mt-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold mt-2">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Active Contributor</span>
                 </span>
               </div>
 
-              <p className="text-xs text-gray-400 leading-relaxed bg-white/5 p-3 rounded-2xl border border-white/5 text-left">
+              <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] leading-relaxed bg-[var(--ps-badge-bg,#141416)] p-3 rounded-2xl border border-[var(--ps-card-border,#2C2C2E)] text-left font-medium">
                 {myBio || 'No bio entered yet. Describe your automotive photography style and gear.'}
               </p>
 
-              <div className="pt-2 border-t border-white/10 text-xs text-left space-y-2 font-mono">
+              <div className="pt-2 border-t border-[var(--ps-card-border,#2C2C2E)] text-xs text-left space-y-2 font-mono">
                 {myVenmo && (
-                  <div className="flex items-center gap-2 text-gray-300">
+                  <div className="flex items-center gap-2 text-[var(--ps-text-muted,#9ca3af)]">
                     <Smartphone className="w-4 h-4 text-[#008CFF]" />
                     <span>Venmo: @{myVenmo.replace(/^@/, '')}</span>
                   </div>
                 )}
                 {myPayPal && (
-                  <div className="flex items-center gap-2 text-gray-300">
+                  <div className="flex items-center gap-2 text-[var(--ps-text-muted,#9ca3af)]">
                     <CreditCard className="w-4 h-4 text-[#0070BA]" />
                     <span>PayPal: {myPayPal.replace(/^@/, '')}</span>
                   </div>
@@ -587,23 +587,23 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           </div>
 
           {/* Right Column: Edit Forms */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
             {/* General Profile Settings */}
-            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-white/10">
-                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-5 sm:p-8 shadow-xl space-y-6">
+              <div className="flex items-center gap-2.5 pb-4 border-b border-[var(--ps-card-border,#2C2C2E)]">
+                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400">
                   <Edit2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Author Profile & Tipping Info</h3>
-                  <p className="text-xs text-gray-400">Update your username, bio, and tip payment routes</p>
+                  <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)]">Author Profile & Tipping Info</h3>
+                  <p className="text-xs text-[var(--ps-text-muted,#9ca3af)]">Update your username, bio, and tip payment routes</p>
                 </div>
               </div>
 
               <form onSubmit={handleSaveMyProfile} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                    <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                       Username (@handle)
                     </label>
                     <input
@@ -611,11 +611,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       required
                       value={myUsername}
                       onChange={(e) => setMyUsername(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                    <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                       Display Name
                     </label>
                     <input
@@ -623,25 +623,25 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       required
                       value={myName}
                       onChange={(e) => setMyName(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                    <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                       Email Address
                     </label>
                     <input
                       type="email"
                       value={myEmail}
                       onChange={(e) => setMyEmail(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                    <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                       Instagram Handle
                     </label>
                     <input
@@ -649,13 +649,13 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       placeholder="@photographer.raw"
                       value={myInstagram}
                       onChange={(e) => setMyInstagram(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Photographer Bio
                   </label>
                   <textarea
@@ -663,39 +663,39 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     value={myBio}
                     onChange={(e) => setMyBio(e.target.value)}
                     placeholder="Tell car enthusiasts about your automotive photography..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl p-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
 
                 {/* Direct Payment Routing */}
-                <div className="p-4 rounded-2xl bg-white/3 border border-white/10 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                <div className="p-4 rounded-2xl bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                     <CreditCard className="w-4 h-4" />
                     <span>Direct Tip Button Payment Handles</span>
                   </div>
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11px] text-[var(--ps-text-muted,#9ca3af)]">
                     When car owners click the Tip button on your photos, they will be redirected to these payment usernames.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                     <div>
-                      <label className="text-[11px] font-semibold text-gray-300 block mb-1">
+                      <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                         Venmo Username
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono">@</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)] font-mono">@</span>
                         <input
                           type="text"
                           placeholder="your-venmo-id"
                           value={myVenmo}
                           onChange={(e) => setMyVenmo(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                          className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 pl-7 pr-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-semibold text-gray-300 block mb-1">
+                      <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                         PayPal.me Handle
                       </label>
                       <input
@@ -703,22 +703,22 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                         placeholder="yourpaypalusername"
                         value={myPayPal}
                         onChange={(e) => setMyPayPal(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                        className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-semibold text-gray-300 block mb-1">
+                      <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                         Cash App $cashtag
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono">$</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)] font-mono">$</span>
                         <input
                           type="text"
                           placeholder="yourcashtag"
                           value={myCashApp}
                           onChange={(e) => setMyCashApp(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                          className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 pl-7 pr-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                         />
                       </div>
                     </div>
@@ -738,20 +738,20 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
             </div>
 
             {/* Change Password Card */}
-            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-white/10">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+            <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-5 sm:p-8 shadow-xl space-y-6">
+              <div className="flex items-center gap-2.5 pb-4 border-b border-[var(--ps-card-border,#2C2C2E)]">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
                   <Key className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Security & Password</h3>
-                  <p className="text-xs text-gray-400">Change your login password securely</p>
+                  <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)]">Security & Password</h3>
+                  <p className="text-xs text-[var(--ps-text-muted,#9ca3af)]">Change your login password securely</p>
                 </div>
               </div>
 
               <form onSubmit={handleChangeMyPassword} className="space-y-4 max-w-lg">
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Current Password *
                   </label>
                   <input
@@ -760,13 +760,13 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     value={currentPassInput}
                     onChange={(e) => setCurrentPassInput(e.target.value)}
                     placeholder="Enter existing password..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                    <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                       New Password *
                     </label>
                     <input
@@ -775,11 +775,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       value={newPassInput}
                       onChange={(e) => setNewPassInput(e.target.value)}
                       placeholder="At least 6 chars..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                    <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                       Confirm New Password *
                     </label>
                     <input
@@ -788,7 +788,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       value={confirmPassInput}
                       onChange={(e) => setConfirmPassInput(e.target.value)}
                       placeholder="Repeat new password..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
@@ -814,17 +814,17 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       {activeSubTab !== 'my_account' && (
         <div className="space-y-6">
           {/* Top Banner & Control Bar */}
-          <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-3xl p-5 sm:p-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="p-2 rounded-xl bg-[var(--ps-primary,#0A84FF)]/20 text-[var(--ps-primary,#0A84FF)] border border-[var(--ps-primary,#0A84FF)]/30">
                   <Users className="w-5 h-5" />
                 </span>
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-[var(--ps-text-main,#ffffff)] tracking-tight">
                   {activeSubTab === 'pending' ? 'Photographer Application Queue' : 'Studio Photographers & Authors'}
                 </h2>
               </div>
-              <p className="text-xs sm:text-sm text-gray-400 max-w-xl">
+              <p className="text-xs sm:text-sm text-[var(--ps-text-muted,#9ca3af)] max-w-xl">
                 {activeSubTab === 'pending'
                   ? 'Review new photographer registrations. Approved photographers gain immediate access to upload high-resolution car galleries.'
                   : 'Manage local photographer profiles, customize usernames and passwords, and review direct Venmo/PayPal routing.'}
@@ -834,7 +834,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
             {isAdmin && (
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold text-xs sm:text-sm shadow-xl active:scale-95 transition-all cursor-pointer shrink-0"
+                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white font-bold text-xs sm:text-sm shadow-xl active:scale-95 transition-all cursor-pointer shrink-0 w-full sm:w-auto justify-center"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Create New User</span>
@@ -845,37 +845,37 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
           {/* Search & Stats Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)]" />
               <input
                 type="text"
                 placeholder="Search by name, @username, or handles..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 pl-10 pr-4 text-xs text-[var(--ps-text-main,#ffffff)] placeholder:text-[var(--ps-text-muted,#9ca3af)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
               />
             </div>
 
-            <div className="flex items-center gap-3 text-xs font-mono text-gray-400">
-              <span className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
-                Total Users: <strong className="text-white">{users.length}</strong>
+            <div className="flex items-center gap-2 sm:gap-3 text-xs font-mono text-[var(--ps-text-muted,#9ca3af)] overflow-x-auto pb-1 sm:pb-0">
+              <span className="bg-[var(--ps-badge-bg,#141416)] px-3 py-1.5 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shrink-0">
+                Total: <strong className="text-[var(--ps-text-main,#ffffff)]">{users.length}</strong>
               </span>
-              <span className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
-                Pending: <strong className="text-amber-400">{pendingUsers.length}</strong>
+              <span className="bg-[var(--ps-badge-bg,#141416)] px-3 py-1.5 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shrink-0">
+                Pending: <strong className="text-amber-500 dark:text-amber-400">{pendingUsers.length}</strong>
               </span>
-              <span className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
-                Active: <strong className="text-emerald-400">{activePhotographers.length}</strong>
+              <span className="bg-[var(--ps-badge-bg,#141416)] px-3 py-1.5 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shrink-0">
+                Active: <strong className="text-emerald-600 dark:text-emerald-400">{activePhotographers.length}</strong>
               </span>
             </div>
           </div>
 
           {/* Empty State */}
           {filteredUsers.length === 0 && (
-            <div className="text-center py-16 bg-white/3 rounded-3xl border border-white/5">
-              <UserCheck className="w-12 h-12 text-gray-500 mx-auto mb-3 opacity-50" />
-              <p className="text-sm font-bold text-gray-300">
+            <div className="text-center py-16 bg-[var(--ps-card-bg,#111111)] rounded-3xl border border-[var(--ps-card-border,#2C2C2E)]">
+              <UserCheck className="w-12 h-12 text-[var(--ps-text-muted,#9ca3af)] mx-auto mb-3 opacity-50" />
+              <p className="text-sm font-bold text-[var(--ps-text-main,#ffffff)]">
                 {activeSubTab === 'pending' ? 'No pending applications!' : 'No matching photographers found.'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] mt-1">
                 {activeSubTab === 'pending'
                   ? 'All applicants have been reviewed and approved.'
                   : 'Try adjusting your search criteria.'}
@@ -890,10 +890,10 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               return (
                 <div
                   key={u.id}
-                  className={`bg-[var(--ps-card-bg,#111111)] border rounded-3xl p-6 shadow-lg transition-all duration-200 flex flex-col justify-between space-y-5 ${
+                  className={`bg-[var(--ps-card-bg,#111111)] border rounded-3xl p-5 sm:p-6 shadow-lg transition-all duration-200 flex flex-col justify-between space-y-5 ${
                     isPending
-                      ? 'border-amber-500/40 bg-amber-950/10'
-                      : 'border-[var(--ps-card-border,#2C2C2E)] hover:border-white/20'
+                      ? 'border-amber-500/40 bg-amber-500/5'
+                      : 'border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)]/40'
                   }`}
                 >
                   {/* User Header */}
@@ -907,10 +907,10 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
                             )}
                             alt={u.name}
-                            className="w-14 h-14 rounded-2xl object-cover border-2 border-white/20 shadow-md"
+                            className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-[var(--ps-card-border,#2C2C2E)] shadow-md"
                           />
                           <span
-                            className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-black ${
+                            className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[var(--ps-card-bg,#111111)] ${
                               isPending ? 'bg-amber-500' : 'bg-emerald-500'
                             }`}
                             title={isPending ? 'Pending Approval' : 'Active'}
@@ -919,15 +919,15 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-extrabold text-white text-base truncate">{u.name}</h3>
+                            <h3 className="font-extrabold text-[var(--ps-text-main,#ffffff)] text-base truncate">{u.name}</h3>
                           </div>
                           <p className="text-xs font-mono text-[var(--ps-primary,#0A84FF)]">@{u.username}</p>
                           <div className="flex items-center gap-1.5 flex-wrap mt-1">
                             <span
                               className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                                 u.role === 'admin'
-                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                  ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30'
+                                  : 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30'
                               }`}
                             >
                               {u.role === 'admin' ? <Shield className="w-2.5 h-2.5" /> : <Camera className="w-2.5 h-2.5" />}
@@ -935,7 +935,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                             </span>
 
                             {isPending && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40">
                                 <Clock className="w-2.5 h-2.5" />
                                 <span>Pending Approval</span>
                               </span>
@@ -950,7 +950,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                             setEditingUser(u);
                             setEditPassword('');
                           }}
-                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
+                          className="p-2 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:brightness-110 text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)] transition-colors cursor-pointer"
                           title="Edit User Profile"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -959,7 +959,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                         {isAdmin && u.id !== currentUser?.id && (
                           <button
                             onClick={() => handleDeleteUser(u.id, u.name)}
-                            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-600 transition-colors cursor-pointer"
                             title="Delete User Account"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -969,32 +969,32 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     </div>
 
                     {/* Bio */}
-                    <p className="text-xs text-gray-300 leading-relaxed line-clamp-3 bg-white/3 p-3 rounded-2xl border border-white/5">
+                    <p className="text-xs text-[var(--ps-text-muted,#9ca3af)] leading-relaxed line-clamp-3 bg-[var(--ps-badge-bg,#141416)] p-3 rounded-2xl border border-[var(--ps-card-border,#2C2C2E)]">
                       {u.bio || 'No bio provided for this photographer.'}
                     </p>
 
                     {/* Handles & Socials */}
                     <div className="space-y-1.5 pt-1 text-xs">
                       {u.email && (
-                        <div className="flex items-center gap-2 text-gray-400">
-                          <Mail className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                        <div className="flex items-center gap-2 text-[var(--ps-text-muted,#9ca3af)]">
+                          <Mail className="w-3.5 h-3.5 text-[var(--ps-text-muted,#9ca3af)] shrink-0" />
                           <span className="truncate">{u.email}</span>
                         </div>
                       )}
                       {u.instagram && (
-                        <div className="flex items-center gap-2 text-gray-400">
-                          <Instagram className="w-3.5 h-3.5 text-pink-400 shrink-0" />
+                        <div className="flex items-center gap-2 text-[var(--ps-text-muted,#9ca3af)]">
+                          <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
                           <span className="truncate">{u.instagram}</span>
                         </div>
                       )}
                       {u.venmoHandle && (
-                        <div className="flex items-center gap-2 text-gray-300 font-mono">
+                        <div className="flex items-center gap-2 text-[var(--ps-text-muted,#9ca3af)] font-mono">
                           <Smartphone className="w-3.5 h-3.5 text-[#008CFF] shrink-0" />
                           <span>Venmo: @{u.venmoHandle.replace(/^@/, '')}</span>
                         </div>
                       )}
                       {u.payPalHandle && (
-                        <div className="flex items-center gap-2 text-gray-300 font-mono">
+                        <div className="flex items-center gap-2 text-[var(--ps-text-muted,#9ca3af)] font-mono">
                           <CreditCard className="w-3.5 h-3.5 text-[#0070BA] shrink-0" />
                           <span>PayPal: {u.payPalHandle.replace(/^@/, '')}</span>
                         </div>
@@ -1015,7 +1015,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                         </button>
                         <button
                           onClick={() => handleRejectUser(u.id, u.name)}
-                          className="py-2 px-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all"
+                          className="py-2 px-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-500 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all"
                         >
                           <UserX className="w-3.5 h-3.5" />
                           <span>Reject</span>
@@ -1023,8 +1023,8 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       </div>
                     ) : (
                       <>
-                        <span className="text-[11px] text-gray-500">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
-                        <span className="text-emerald-400 font-mono text-[11px] flex items-center gap-1">
+                        <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)]">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono text-[11px] flex items-center gap-1">
                           <Check className="w-3 h-3" /> Tip Ready
                         </span>
                       </>
@@ -1040,48 +1040,48 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       {/* CREATE USER MODAL */}
       {isCreateModalOpen && (
         <div
-          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => setIsCreateModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-2xl bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[28px] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            className="relative w-full max-w-2xl bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] sm:rounded-[28px] p-5 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--ps-card-border,#2C2C2E)]">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-[var(--ps-primary,#0A84FF)]/20 text-[var(--ps-primary,#0A84FF)] border border-[var(--ps-primary,#0A84FF)]/30 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-[var(--ps-primary,#0A84FF)]/20 text-[var(--ps-primary,#0A84FF)] border border-[var(--ps-primary,#0A84FF)]/30 flex items-center justify-center shrink-0">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Create Photographer / User</h3>
-                  <p className="text-xs text-gray-400">Admin restricted user creation</p>
+                  <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)]">Create Photographer / User</h3>
+                  <p className="text-xs text-[var(--ps-text-muted,#9ca3af)]">Admin restricted user creation</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                className="p-2 rounded-full hover:bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="py-6 space-y-5">
+            <form onSubmit={handleCreateUser} className="py-5 space-y-4 sm:space-y-5">
               {/* Profile Avatar Upload */}
               <div>
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-2">
                   Profile Picture / Avatar
                 </label>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <img
                     src={avatar}
                     alt="Preview"
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shrink-0"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-[var(--ps-card-border,#2C2C2E)] shrink-0 self-start"
                   />
                   <div className="flex-1 space-y-2">
                     <button
                       type="button"
                       onClick={() => avatarFileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:brightness-110 text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)] text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
                     >
                       <Upload className="w-3.5 h-3.5" />
                       <span>Upload Profile Photo</span>
@@ -1100,7 +1100,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       value={avatar}
                       onChange={(e) => setAvatar(e.target.value)}
                       placeholder="Or enter direct image URL..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs text-gray-300 focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
@@ -1109,7 +1109,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               {/* Name & Username */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Display Name *
                   </label>
                   <input
@@ -1118,11 +1118,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     placeholder="e.g. Jordan Miller"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Username (@handle) *
                   </label>
                   <input
@@ -1131,7 +1131,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     placeholder="e.g. jordan_apex"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
               </div>
@@ -1139,7 +1139,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               {/* Email & Initial Password */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Email Address
                   </label>
                   <input
@@ -1147,11 +1147,11 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     placeholder="jordan@platesnap.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Initial Password *
                   </label>
                   <input
@@ -1159,28 +1159,28 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
               </div>
 
               {/* Role Selector */}
               <div>
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                   Account Role
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setRole('photographer')}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                       role === 'photographer'
-                        ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-white font-bold'
-                        : 'border-white/10 bg-white/5 text-gray-400'
+                        ? 'border-[var(--ps-primary,#0A84FF)] bg-[var(--ps-primary,#0A84FF)]/15 text-[var(--ps-text-main,#ffffff)] font-bold'
+                        : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <Camera className="w-4 h-4 text-blue-400" />
+                      <Camera className="w-4 h-4 text-blue-500" />
                       <span className="text-xs">Automotive Photographer</span>
                     </div>
                   </button>
@@ -1190,12 +1190,12 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     onClick={() => setRole('admin')}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                       role === 'admin'
-                        ? 'border-purple-500 bg-purple-500/15 text-purple-200 font-bold'
-                        : 'border-white/10 bg-white/5 text-gray-400'
+                        ? 'border-purple-500 bg-purple-500/15 text-purple-700 dark:text-purple-200 font-bold'
+                        : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-purple-400" />
+                      <Shield className="w-4 h-4 text-purple-500" />
                       <span className="text-xs">Studio Admin</span>
                     </div>
                   </button>
@@ -1204,7 +1204,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
 
               {/* Bio */}
               <div>
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                   Photographer Bio
                 </label>
                 <textarea
@@ -1212,36 +1212,36 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                   placeholder="e.g. Rolling shot specialist & trackday automotive media creator based in SoCal."
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                  className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl p-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                 />
               </div>
 
               {/* Tipping & Payment Handles (Venmo, PayPal, Instagram) */}
-              <div className="p-4 rounded-2xl bg-white/3 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              <div className="p-4 rounded-2xl bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                   <CreditCard className="w-4 h-4" />
                   <span>Direct Tipping & Social Handles</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       Venmo Username
                     </label>
                     <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono">@</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)] font-mono">@</span>
                       <input
                         type="text"
                         placeholder="jordan-miller-photo"
                         value={venmoHandle}
                         onChange={(e) => setVenmoHandle(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                        className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       PayPal.me Handle
                     </label>
                     <input
@@ -1249,28 +1249,28 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       placeholder="jordanmillerphoto"
                       value={payPalHandle}
                       onChange={(e) => setPayPalHandle(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       Cash App $cashtag
                     </label>
                     <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)] font-mono">$</span>
                       <input
                         type="text"
                         placeholder="jordanphoto"
                         value={cashAppHandle}
                         onChange={(e) => setCashAppHandle(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                        className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       Instagram Handle
                     </label>
                     <input
@@ -1278,18 +1278,18 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       placeholder="@jordan_shoots"
                       value={instagram}
                       onChange={(e) => setInstagram(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 text-xs font-semibold cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:brightness-110 text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)] text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1309,48 +1309,48 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       {/* EDIT USER MODAL */}
       {editingUser && (
         <div
-          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => setEditingUser(null)}
         >
           <div
-            className="relative w-full max-w-2xl bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[28px] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            className="relative w-full max-w-2xl bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] sm:rounded-[28px] p-5 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--ps-card-border,#2C2C2E)]">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 flex items-center justify-center shrink-0">
                   <Edit2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Edit User Profile: @{editingUser.username}</h3>
-                  <p className="text-xs text-gray-400">Update bio, avatar, and payment handles</p>
+                  <h3 className="text-lg font-bold text-[var(--ps-text-main,#ffffff)]">Edit User Profile: @{editingUser.username}</h3>
+                  <p className="text-xs text-[var(--ps-text-muted,#9ca3af)]">Update bio, avatar, and payment handles</p>
                 </div>
               </div>
               <button
                 onClick={() => setEditingUser(null)}
-                className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                className="p-2 rounded-full hover:bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateUser} className="py-6 space-y-5">
+            <form onSubmit={handleUpdateUser} className="py-5 space-y-4 sm:space-y-5">
               {/* Profile Avatar Upload */}
               <div>
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-2">
                   Profile Picture / Avatar
                 </label>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <img
                     src={formatMediaUrl(editingUser.avatar || '')}
                     alt="Preview"
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shrink-0"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-[var(--ps-card-border,#2C2C2E)] shrink-0 self-start"
                   />
                   <div className="flex-1 space-y-2">
                     <button
                       type="button"
                       onClick={() => editAvatarFileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:brightness-110 text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)] text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
                     >
                       <Upload className="w-3.5 h-3.5" />
                       <span>Change Avatar Image</span>
@@ -1369,7 +1369,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       value={editingUser.avatar || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, avatar: e.target.value })}
                       placeholder="Or enter direct image URL..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs text-gray-300 focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
@@ -1378,7 +1378,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               {/* Display Name & Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Display Name
                   </label>
                   <input
@@ -1386,25 +1386,25 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                     required
                     value={editingUser.name}
                     onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Email Address
                   </label>
                   <input
                     type="email"
                     value={editingUser.email || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                    className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                   />
                 </div>
               </div>
 
               {/* Password Change (Optional) */}
               <div>
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                   Change Password (leave empty to keep unchanged)
                 </label>
                 <input
@@ -1412,24 +1412,24 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                   placeholder="New password..."
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                  className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2.5 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                 />
               </div>
 
               {/* Status / Active Toggle (Admin Only) */}
               {isAdmin && (
                 <div>
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                  <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                     Account Status
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setEditingUser({ ...editingUser, status: 'active', isActive: true })}
                       className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
                         editingUser.status === 'active' || (editingUser.isActive && editingUser.status !== 'suspended')
-                          ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                          : 'border-white/10 bg-white/5 text-gray-400'
+                          ? 'border-emerald-500 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                          : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)]'
                       }`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1441,8 +1441,8 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       onClick={() => setEditingUser({ ...editingUser, status: 'pending', isActive: false })}
                       className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
                         editingUser.status === 'pending'
-                          ? 'border-amber-500 bg-amber-500/20 text-amber-300'
-                          : 'border-white/10 bg-white/5 text-gray-400'
+                          ? 'border-amber-500 bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                          : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)]'
                       }`}
                     >
                       <Clock className="w-3.5 h-3.5" />
@@ -1454,8 +1454,8 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       onClick={() => setEditingUser({ ...editingUser, status: 'suspended', isActive: false })}
                       className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
                         editingUser.status === 'suspended'
-                          ? 'border-red-500 bg-red-500/20 text-red-300'
-                          : 'border-white/10 bg-white/5 text-gray-400'
+                          ? 'border-red-500 bg-red-500/20 text-red-500'
+                          : 'border-[var(--ps-card-border,#2C2C2E)] bg-[var(--ps-badge-bg,#141416)] text-[var(--ps-text-muted,#9ca3af)]'
                       }`}
                     >
                       <UserX className="w-3.5 h-3.5" />
@@ -1467,43 +1467,43 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
 
               {/* Bio */}
               <div>
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-[var(--ps-text-muted,#9ca3af)] uppercase tracking-wider block mb-1.5">
                   Photographer Bio
                 </label>
                 <textarea
                   rows={2}
                   value={editingUser.bio || ''}
                   onChange={(e) => setEditingUser({ ...editingUser, bio: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                  className="w-full bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl p-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                 />
               </div>
 
               {/* Tipping Handles */}
-              <div className="p-4 rounded-2xl bg-white/3 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              <div className="p-4 rounded-2xl bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                   <CreditCard className="w-4 h-4" />
                   <span>Venmo & PayPal Tipping Handles</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       Venmo Username
                     </label>
                     <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono">@</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)] font-mono">@</span>
                       <input
                         type="text"
                         placeholder="venmo-handle"
                         value={editingUser.venmoHandle || ''}
                         onChange={(e) => setEditingUser({ ...editingUser, venmoHandle: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                        className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       PayPal.me Handle
                     </label>
                     <input
@@ -1511,28 +1511,28 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       placeholder="paypal-handle"
                       value={editingUser.payPalHandle || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, payPalHandle: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       Cash App $cashtag
                     </label>
                     <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ps-text-muted,#9ca3af)] font-mono">$</span>
                       <input
                         type="text"
                         placeholder="cashapp-handle"
                         value={editingUser.cashAppHandle || ''}
                         onChange={(e) => setEditingUser({ ...editingUser, cashAppHandle: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                        className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 pl-7 pr-2.5 text-xs font-mono text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-400 block mb-1">
+                    <label className="text-[11px] font-semibold text-[var(--ps-text-muted,#9ca3af)] block mb-1">
                       Instagram
                     </label>
                     <input
@@ -1540,18 +1540,18 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                       placeholder="@instagram"
                       value={editingUser.instagram || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, instagram: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
+                      className="w-full bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-xl py-2 px-3 text-xs text-[var(--ps-text-main,#ffffff)] focus:outline-none focus:border-[var(--ps-primary,#0A84FF)]"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-[var(--ps-card-border,#2C2C2E)] flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 text-xs font-semibold cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[var(--ps-badge-bg,#141416)] hover:brightness-110 text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)] border border-[var(--ps-card-border,#2C2C2E)] text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>

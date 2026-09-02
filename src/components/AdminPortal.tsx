@@ -804,83 +804,106 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     <div className="min-h-screen bg-[var(--ps-bg,#000000)] text-[var(--ps-text-main,#ffffff)] pb-24 transition-colors duration-300">
       {/* Top Admin Navigation Bar */}
       <nav className="sticky top-0 z-50 ps-glass-nav bg-[var(--ps-nav-bg,rgba(15,15,18,0.95))] border-b border-[var(--ps-card-border,#2C2C2E)] backdrop-blur-xl transition-colors">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onBackToVisitor}
-              className="flex items-center gap-2 text-xs font-bold px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#1C1C1E)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all shadow-sm active:scale-95 cursor-pointer group"
-            >
-              <ArrowLeft className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] group-hover:text-white transition-colors" />
-              <span>Back to Site</span>
-            </button>
-            <div className="h-4 w-px bg-[var(--ps-card-border,#2C2C2E)] hidden sm:block" />
-            <div className="flex items-center gap-2.5">
-              <div className="p-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30">
-                <Shield className="w-4 h-4 text-emerald-500" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-0 min-h-16 flex flex-col md:flex-row md:items-center justify-between gap-2.5 md:gap-4">
+          {/* Top Row: Back Button, Portal Title & Logout */}
+          <div className="flex items-center justify-between gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={onBackToVisitor}
+                className="flex items-center gap-1.5 sm:gap-2 text-xs font-bold px-3 sm:px-3.5 py-2 rounded-xl bg-[var(--ps-card-bg,#1C1C1E)] hover:bg-[var(--ps-primary,#0A84FF)] text-[var(--ps-text-main,#ffffff)] hover:text-white border border-[var(--ps-card-border,#2C2C2E)] hover:border-[var(--ps-primary,#0A84FF)] transition-all shadow-sm active:scale-95 cursor-pointer group shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 text-[var(--ps-primary,#0A84FF)] group-hover:text-white transition-colors" />
+                <span className="hidden sm:inline">Back to Site</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+
+              <div className="h-4 w-px bg-[var(--ps-card-border,#2C2C2E)] hidden sm:block" />
+
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 shrink-0">
+                  <Shield className="w-4 h-4 text-emerald-500" />
+                </div>
+                <span className="font-extrabold text-xs sm:text-sm text-[var(--ps-text-main,#ffffff)] tracking-tight truncate">
+                  Admin Portal
+                </span>
+                <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-mono font-medium hidden lg:inline truncate">
+                  ({adminName})
+                </span>
               </div>
-              <span className="font-extrabold text-sm text-[var(--ps-text-main,#ffffff)] tracking-tight">Photographer Admin Portal</span>
-              <span className="text-[11px] text-[var(--ps-text-muted,#9ca3af)] font-mono font-medium hidden md:inline">({adminName})</span>
             </div>
+
+            {/* Logout button on mobile / top bar */}
+            {onLogoutAdmin && (
+              <button
+                onClick={onLogoutAdmin}
+                className="flex items-center gap-1.5 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-300 border border-red-500/30 transition-colors cursor-pointer shadow-sm md:hidden shrink-0"
+                title="Lock and sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline sm:inline">Log Out</span>
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Bottom Row / Right Side: Tabs Selector & Desktop Logout */}
+          <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto overflow-x-auto scrollbar-none pb-1 md:pb-0">
             {/* Tabs Selector */}
-            <div className="flex items-center bg-[var(--ps-card-bg,#1C1C1E)] p-1 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shadow-sm">
+            <div className="flex items-center bg-[var(--ps-card-bg,#1C1C1E)] p-1 rounded-xl border border-[var(--ps-card-border,#2C2C2E)] shadow-sm whitespace-nowrap min-w-fit">
               <button
                 onClick={() => setActiveTab('upload')}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'upload'
                     ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
                     : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <FolderUp className="w-3.5 h-3.5" />
-                Upload Multi-Photos & Folder
+                <span>Upload Photos</span>
               </button>
               <button
                 onClick={() => setActiveTab('theme')}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'theme'
                     ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
                     : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Palette className="w-3.5 h-3.5" />
-                Theme Studio
+                <span>Theme Studio</span>
               </button>
               <button
                 onClick={() => setActiveTab('fleet')}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'fleet'
                     ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
                     : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                Manage Fleet ({cars.length})
+                <span>Manage Fleet ({cars.length})</span>
               </button>
               <button
                 onClick={() => setActiveTab('users')}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   activeTab === 'users'
                     ? 'bg-[var(--ps-primary,#0A84FF)] text-white shadow-sm font-bold'
                     : 'text-[var(--ps-text-muted,#9ca3af)] hover:text-[var(--ps-text-main,#ffffff)]'
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>Photographer Team ({usersList.length || '3+'})</span>
+                <span>Authors ({usersList.length || '3+'})</span>
               </button>
             </div>
 
-            {/* Logout button */}
+            {/* Desktop Logout button */}
             {onLogoutAdmin && (
               <button
                 onClick={onLogoutAdmin}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-300 border border-red-500/30 transition-colors cursor-pointer shadow-sm"
+                className="hidden md:flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-300 border border-red-500/30 transition-colors cursor-pointer shadow-sm shrink-0"
                 title="Lock and sign out of admin portal"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Lock / Log Out</span>
+                <span className="hidden lg:inline">Lock / Log Out</span>
               </button>
             )}
           </div>
@@ -888,11 +911,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       </nav>
 
       {/* Main Admin Content */}
-      <main className="max-w-7xl mx-auto px-6 pt-10">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-6 sm:pt-10">
         {/* Status Toast */}
         {statusMsg && (
           <div
-            className={`mb-8 p-4 rounded-2xl border flex items-center justify-between animate-in fade-in slide-in-from-top-2 ${
+            className={`mb-6 sm:mb-8 p-4 rounded-2xl border flex items-center justify-between animate-in fade-in slide-in-from-top-2 ${
               statusMsg.type === 'success'
                 ? 'bg-green-500/15 border-green-500/30 text-green-300'
                 : 'bg-red-500/15 border-red-500/30 text-red-300'
@@ -917,13 +940,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {/* TAB 1: MULTI-IMAGE & FOLDER UPLOAD SUITE */}
         {activeTab === 'upload' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
             {/* Left Side: Upload & Multi-Photo Staging Tray (7 cols) */}
             <div className="lg:col-span-7 space-y-6">
-              <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl space-y-6">
-                <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
+              <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-2xl sm:rounded-[24px] p-4 sm:p-6 shadow-xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#2C2C2E] pb-4">
                   <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                       <Images className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
                       Vehicle Gallery & Media Staging
                     </h2>
@@ -933,7 +956,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
 
                   {stagedPhotos.length > 0 && (
-                    <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-mono font-bold px-3 py-1 rounded-full">
+                    <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-mono font-bold px-3 py-1 rounded-full w-fit">
                       {stagedPhotos.length} {stagedPhotos.length === 1 ? 'Photo' : 'Photos'} Staged
                     </span>
                   )}
@@ -966,14 +989,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
-                    className="border-2 border-dashed border-[#3C3C3E] hover:border-[var(--ps-primary,#0A84FF)] rounded-2xl p-8 text-center transition-all bg-[#161618] relative group flex flex-col items-center justify-center space-y-4"
+                    className="border-2 border-dashed border-[#3C3C3E] hover:border-[var(--ps-primary,#0A84FF)] rounded-2xl p-6 sm:p-8 text-center transition-all bg-[#161618] relative group flex flex-col items-center justify-center space-y-4"
                   >
-                    <div className="w-16 h-16 rounded-2xl bg-blue-500/10 text-[var(--ps-primary,#0A84FF)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <FolderUp className="w-8 h-8" />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-blue-500/10 text-[var(--ps-primary,#0A84FF)] flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FolderUp className="w-7 h-7 sm:w-8 sm:h-8" />
                     </div>
 
                     <div className="space-y-1">
-                      <h3 className="font-bold text-white text-base">
+                      <h3 className="font-bold text-white text-sm sm:text-base">
                         Drag & Drop Photos or Entire Car Folder Here
                       </h3>
                       <p className="text-xs text-gray-400 max-w-md mx-auto">
@@ -982,11 +1005,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
 
                     {/* Dual Action Buttons */}
-                    <div className="flex items-center gap-3 pt-2">
+                    <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 pt-2 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={() => multiFileInputRef.current?.click()}
-                        className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                        className="w-full sm:w-auto bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
                       >
                         <Images className="w-4 h-4" />
                         Select Multiple Photos
@@ -995,7 +1018,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <button
                         type="button"
                         onClick={() => folderInputRef.current?.click()}
-                        className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                        className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
                       >
                         <FolderUp className="w-4 h-4" />
                         Upload Car Folder
@@ -1005,7 +1028,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 ) : (
                   <div className="space-y-6">
                     {/* Primary Cover Spotlight Preview */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Cover Photo */}
                       <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-[var(--ps-primary,#0A84FF)] bg-black flex items-center justify-center group shadow-xl">
                         <img
@@ -1018,7 +1041,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           Primary Cover Photo
                         </div>
 
-                        {/* Interactive Edit Trigger on Hover */}
+                        {/* Interactive Edit Trigger */}
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             type="button"
@@ -1087,7 +1110,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             <p className="text-[11px] text-gray-500 mb-3">
                               Turn selected picture into a stylized 2D decal sticker
                             </p>
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center justify-center gap-2 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => handleAutoGenerateCartoonFromPhoto(currentCoverPhoto?.url || stagedPhotos[0]?.url)}
@@ -1114,11 +1137,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                     {/* Staged Photos Gallery Grid */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
                           Staged Photos in Gallery ({stagedPhotos.length})
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => multiFileInputRef.current?.click()}
@@ -1139,7 +1162,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
 
                       {/* Thumbnails grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
                         {stagedPhotos.map((photo, idx) => {
                           const isCover = coverIndex === idx;
                           return (
@@ -1235,7 +1258,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <div className="lg:col-span-5">
               <form
                 onSubmit={handleSubmitCar}
-                className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl space-y-5"
+                className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-2xl sm:rounded-[24px] p-4 sm:p-6 shadow-xl space-y-5"
               >
                 <div className="border-b border-[#2C2C2E] pb-3 flex items-center justify-between">
                   <div>
@@ -1336,7 +1359,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
 
                 {/* Make & Model Inputs */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-300 mb-1">
                       Manufacturer
@@ -1384,7 +1407,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
 
                 {/* Year & Color */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-300 mb-1">
                       Model Year
@@ -1412,7 +1435,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
 
                 {/* Event & Location */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-300 mb-1">
                       Event / Meet
@@ -1441,7 +1464,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
 
                 {/* Automatic Photographer & Tipping Attribution Info */}
-                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={currentPhotographer.avatar}
@@ -1471,7 +1494,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveTab('users')}
-                      className="text-[11px] font-medium text-[var(--ps-primary,#0A84FF)] hover:underline shrink-0 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                      className="text-[11px] font-medium text-[var(--ps-primary,#0A84FF)] hover:underline shrink-0 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer self-start sm:self-auto"
                     >
                       Manage Team
                     </button>
@@ -1521,11 +1544,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {/* TAB 2: THEME STUDIO */}
         {activeTab === 'theme' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-12 bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl space-y-6">
-              <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+            <div className="lg:col-span-12 bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-2xl sm:rounded-[24px] p-4 sm:p-6 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2C2C2E] pb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                     <Palette className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
                     Global Website Theme & Color Studio
                   </h2>
@@ -1534,7 +1557,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 self-start sm:self-auto">
                   {themeSavedToast && (
                     <span className="text-xs font-bold text-green-400 animate-in fade-in flex items-center gap-1">
                       <Check className="w-4 h-4" /> Saved Globally!
@@ -1555,12 +1578,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 block">
                   Quick Theme Presets:
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
                   {DEFAULT_THEMES.map((preset) => (
                     <button
                       key={preset.id}
                       onClick={() => handleApplyPreset(preset)}
-                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border text-left transition-all cursor-pointer ${
                         themeForm.id === preset.id
                           ? 'border-[var(--ps-primary,#0A84FF)] ring-2 ring-[var(--ps-primary,#0A84FF)]/40 bg-white/5'
                           : 'border-[#2C2C2E] hover:border-white/30 bg-[#161618]'
@@ -1568,15 +1591,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <div
-                          className="w-4 h-4 rounded-full border border-white/20"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-white/20 shrink-0"
                           style={{ backgroundColor: preset.primary }}
                         />
                         <span className="text-xs font-bold text-white truncate">{preset.name}</span>
                       </div>
                       <div className="flex gap-1">
-                        <div className="w-4 h-4 rounded" style={{ backgroundColor: preset.bg }} />
-                        <div className="w-4 h-4 rounded" style={{ backgroundColor: preset.cardBg }} />
-                        <div className="w-4 h-4 rounded" style={{ backgroundColor: preset.primary }} />
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded" style={{ backgroundColor: preset.bg }} />
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded" style={{ backgroundColor: preset.cardBg }} />
+                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded" style={{ backgroundColor: preset.primary }} />
                       </div>
                     </button>
                   ))}
@@ -1584,7 +1607,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
 
               {/* Color Customizers Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4 border-t border-[#2C2C2E]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pt-4 border-t border-[#2C2C2E]">
                 {/* Primary Accent */}
                 <div className="p-4 rounded-2xl bg-[#161618] border border-[#2C2C2E] space-y-2">
                   <div className="flex items-center justify-between">
@@ -1596,9 +1619,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="color"
                       value={themeForm.primary}
                       onChange={(e) => handleThemeColorChange('primary', e.target.value)}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer shrink-0"
                     />
-                    <div className="flex-1 flex gap-1.5">
+                    <div className="flex-1 flex gap-1.5 flex-wrap">
                       {['#0A84FF', '#FF2A54', '#00F5D4', '#FFB703', '#A855F7', '#10B981'].map((c) => (
                         <button
                           key={c}
@@ -1623,9 +1646,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="color"
                       value={themeForm.bg.startsWith('#') ? themeForm.bg : '#000000'}
                       onChange={(e) => handleThemeColorChange('bg', e.target.value)}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer shrink-0"
                     />
-                    <div className="flex-1 flex gap-1.5">
+                    <div className="flex-1 flex gap-1.5 flex-wrap">
                       {['#000000', '#08080C', '#0A0A0A', '#121212', '#FAFAFA', '#F3F4F6'].map((c) => (
                         <button
                           key={c}
@@ -1650,9 +1673,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="color"
                       value={themeForm.cardBg.startsWith('#') ? themeForm.cardBg : '#111111'}
                       onChange={(e) => handleThemeColorChange('cardBg', e.target.value)}
-                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-transparent border border-[#3C3C3E] cursor-pointer shrink-0"
                     />
-                    <div className="flex-1 flex gap-1.5">
+                    <div className="flex-1 flex gap-1.5 flex-wrap">
                       {['#111111', '#16161A', '#141414', '#1A1A1E', '#FFFFFF', '#F9FAFB'].map((c) => (
                         <button
                           key={c}
@@ -1672,10 +1695,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {/* TAB 3: FLEET & GALLERY MANAGEMENT */}
         {activeTab === 'fleet' && (
-          <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-[24px] p-6 shadow-xl space-y-6">
-            <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
+          <div className="bg-[var(--ps-card-bg,#111111)] border border-[var(--ps-card-border,#2C2C2E)] rounded-2xl sm:rounded-[24px] p-4 sm:p-6 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2C2C2E] pb-4">
               <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   <Layers className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
                   Live Gallery Fleet Management ({cars.length} vehicles)
                 </h2>
@@ -1686,7 +1709,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
               <button
                 onClick={() => setActiveTab('upload')}
-                className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer"
+                className="bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
               >
                 <Plus className="w-4 h-4" />
                 Upload New Car / Folder
@@ -1694,7 +1717,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
             {/* Grid of uploaded cars */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {cars.map((car) => {
                 const photoCount = Array.isArray(car.images) && car.images.length > 0 ? car.images.length : 1;
                 return (
@@ -1764,36 +1787,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       {/* Editing Car Gallery & Details Modal */}
       {editingCarGallery && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in">
-          <div className="bg-[#161618] border border-[#2C2C2E] rounded-3xl max-w-4xl w-full p-6 space-y-6 max-h-[92vh] overflow-y-auto shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
+          <div className="bg-[#161618] border border-[#2C2C2E] rounded-2xl sm:rounded-3xl max-w-4xl w-full p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[94vh] overflow-y-auto shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-4">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Edit3 className="w-5 h-5 text-[var(--ps-primary,#0A84FF)]" />
-                  Update Vehicle, Shot & Gallery Details
+            <div className="flex items-center justify-between border-b border-[#2C2C2E] pb-3 sm:pb-4 gap-2">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 truncate">
+                  <Edit3 className="w-5 h-5 text-[var(--ps-primary,#0A84FF)] shrink-0" />
+                  <span className="truncate">Update Vehicle Details</span>
                 </h3>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-400 truncate">
                   {editingCarGallery.carName || `${editingCarGallery.make || ''} ${editingCarGallery.model || ''}`.trim() || 'Vehicle Details'}
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handleSaveCarDetails}
                   disabled={isSavingEdit}
-                  className="px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  className="px-3 sm:px-4 py-2 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
                 >
                   {isSavingEdit ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving...</span>
+                      <span className="hidden sm:inline">Saving...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Save Changes</span>
+                      <span className="hidden sm:inline">Save Changes</span>
+                      <span className="sm:hidden">Save</span>
                     </>
                   )}
                 </button>
@@ -1808,24 +1832,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
             {/* Sub Tabs */}
-            <div className="flex border-b border-[#2C2C2E] gap-2 pb-1">
+            <div className="flex border-b border-[#2C2C2E] gap-2 pb-1 overflow-x-auto scrollbar-none whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setEditModalTab('info')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                   editModalTab === 'info'
                     ? 'bg-white/15 text-white shadow-sm'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Tag className="w-4 h-4 text-blue-400" />
-                <span>Vehicle & Shot Metadata</span>
+                <span>Vehicle & Specs</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setEditModalTab('photos')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                   editModalTab === 'photos'
                     ? 'bg-white/15 text-white shadow-sm'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -2234,11 +2258,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             )}
 
             {/* Modal Footer Actions */}
-            <div className="pt-4 border-t border-[#2C2C2E] flex items-center justify-between">
+            <div className="pt-4 border-t border-[#2C2C2E] flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setEditingCarGallery(null)}
-                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer text-center"
               >
                 Cancel / Close
               </button>
@@ -2247,7 +2271,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 type="button"
                 onClick={handleSaveCarDetails}
                 disabled={isSavingEdit}
-                className="px-6 py-2.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[var(--ps-primary,#0A84FF)] hover:brightness-110 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer disabled:opacity-50"
               >
                 {isSavingEdit ? (
                   <>

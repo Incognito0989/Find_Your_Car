@@ -150,7 +150,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
                   {car.photographer.name.charAt(0)}
                 </div>
               )}
-              <span className="text-xs text-gray-300 font-medium hover:text-[var(--ps-primary,#0A84FF)]">
+              <span className="text-xs text-[var(--ps-text-main,#ffffff)] font-medium hover:text-[var(--ps-primary,#0A84FF)]">
                 {car.photographer.name}
               </span>
             </div>
@@ -295,7 +295,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
             {car.tags.slice(0, 3).map((tag, idx) => (
               <span
                 key={idx}
-                className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-gray-400 font-mono"
+                className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--ps-badge-bg,#141416)] border border-[var(--ps-card-border,#2C2C2E)] text-[var(--ps-text-muted,#9ca3af)] font-mono"
               >
                 #{tag}
               </span>
@@ -322,7 +322,7 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
                   {car.photographer.name.charAt(0)}
                 </div>
               )}
-              <span className="text-xs text-gray-300 font-medium truncate max-w-[100px] hover:text-[var(--ps-primary,#0A84FF)]">
+              <span className="text-xs text-[var(--ps-text-main,#ffffff)] font-medium truncate max-w-[100px] hover:text-[var(--ps-primary,#0A84FF)]">
                 {car.photographer.name}
               </span>
             </div>
